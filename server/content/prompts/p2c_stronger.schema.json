@@ -1,0 +1,1 @@
+{"type":"object","required":["rewrite","placeholders"],"properties":{"rewrite":{"type":"string"},"placeholders":{"type":"array","items":{"type":"string"}}}}

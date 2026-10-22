@@ -1,0 +1,6 @@
+{"type":"object","required":["situation","task","action","result","voice","result_type","relevant","reflection","evidence","praise"],"properties":{
+ "situation":{"type":"boolean"},"task":{"type":"boolean"},"action":{"type":"boolean"},"result":{"type":"boolean"},
+ "voice":{"enum":["i","we","mixed","none"]},
+ "result_type":{"enum":["number","concrete","vague","none"]},
+ "relevant":{"type":"boolean"},"reflection":{"type":"boolean"},
+ "evidence":{"type":"string"},"praise":{"type":"string"}}}

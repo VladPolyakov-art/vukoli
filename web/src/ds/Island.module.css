@@ -1,0 +1,35 @@
+/* Island (G21): card fill (D51: no stroke), pill (voice) / lg (text box) / xl (two rows on phones). */
+.island {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+}
+.box { width: 100%; padding: var(--space-3); border-radius: var(--radius-lg); }
+.stacked { width: 100%; padding: var(--space-3); border-radius: var(--radius-xl); gap: var(--space-3); }
+.box.stacked { border-radius: var(--radius-xl); }
+
+.row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; min-height: var(--control-h-lg); }
+.group { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.grow { flex: 1 1 auto; }
+/* One row: groups keep their width, so a row that doesn't fit overflows instead of running groups into each other
+ * (UT-3: the divider lay over Send now); the Session then switches to two rows. */
+.island:not(.stacked) .group { flex-shrink: 0; }
+.divider { flex: none; width: var(--border-width); height: var(--control-h-sm); background: var(--color-border-subtle); }
+/* Wraps rather than clips when a row has more than the screen holds (13, QA-10: 320px). */
+.stacked .row { gap: var(--space-2); flex-wrap: wrap; }
+.stacked .divider { display: none; }
+
+.lead { min-width: 0; }
+.rule { height: var(--border-width); margin-inline: calc(var(--space-3) * -1); background: var(--color-border-subtle); }
+
+/* Pill → box (docs/motion.md 3.7 "Island text-mode morph"): grows from the bottom, transform + opacity only. */
+@keyframes island-grow { from { opacity: 0; transform: scaleY(0.96); } }
+.morph { transform-origin: bottom center; animation: island-grow var(--duration-slower) var(--ease-standard) backwards; }

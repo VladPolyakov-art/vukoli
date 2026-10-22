@@ -1,0 +1,61 @@
+.root { min-width: 0; }
+/* Card surface: card tokens (radius-md, DS-1); the header button is the card's top, full bleed. */
+.card {
+  background: var(--color-surface-card);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  list-style: none;
+}
+.heading { margin: 0; font: inherit; }
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--control-h-touch);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.card .header { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); }
+.card.isOpen .header { border-end-start-radius: 0; border-end-end-radius: 0; }
+.card .header:not(:disabled):hover { background: var(--color-surface-card-hover); }
+.plain .header { padding: var(--space-2) 0; align-items: center; color: var(--color-text-secondary); }
+.plain .header:not(:disabled):hover { color: var(--color-text-primary); }
+.header:disabled { cursor: not-allowed; color: var(--color-text-tertiary); }
+.leading { flex: none; display: inline-flex; }
+.text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.title { font-size: var(--text-md); font-weight: var(--weight-medium); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.plain .title { font-size: var(--text-sm); }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+.card .chevron { margin-top: calc(var(--space-1) / 2); }
+.chevronOpen { transform: rotate(180deg); }
+/* D76: grows open / folds shut. Rows 0fr ↔ 1fr animate the height without measuring; @starting-style gives the
+ * opening its 0fr start (the region comes out of display: none). Padding and the divider live on .body, so nothing
+ * is left showing at 0fr. */
+.region {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard);
+}
+@starting-style {
+  .region { grid-template-rows: 0fr; opacity: 0; }
+}
+.region.folding { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
+.region[hidden] { display: none; }
+.clip { min-height: 0; overflow: hidden; }
+.settled > .clip { overflow: visible; }
+.card .body { padding: var(--space-4) var(--space-5) var(--space-5); border-top: var(--border-width) solid var(--color-border-subtle); }
+.plain .body { padding-top: var(--space-2); }

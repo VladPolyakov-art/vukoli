@@ -1,0 +1,88 @@
+.group {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  /* D82: always one row — never a stack of options in a tall pill on a phone; options shrink and truncate instead. */
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface-chip);
+  border-radius: var(--radius-pill);
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  /* Hug the options instead of stretching in grid/flex-column parents. */
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  align-self: flex-start;
+}
+.full { display: flex; width: 100%; }
+.full .option { flex: 1 1 0; }
+.legend { padding: 0; margin-bottom: var(--space-2); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+/* 13 (QA-03): a 44px hit area on touch screens; the option looks the same. */
+@media (pointer: coarse) {
+  .option { position: relative; }
+  .option::before {
+    content: "";
+    position: absolute;
+    inset-block: min(0px, calc((100% - var(--control-h-touch)) / 2));
+    inset-inline: min(0px, calc((100% - var(--control-h-touch)) / 2));
+  }
+}
+.optionLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.option:not(:disabled):hover { color: var(--color-text-primary); }
+/* D51: no strokes. The selected segment is the inverted chip fill (the thumb below), label = on-checked, hover never changes it. */
+.option[aria-checked="true"],
+.option[aria-checked="true"]:not(:disabled):hover {
+  background: var(--color-surface-chip-selected);
+  color: var(--color-text-on-checked);
+}
+.option:disabled { opacity: 0.5; cursor: not-allowed; }
+.wrap { display: flex; flex-direction: column; min-width: 0; }
+
+/* Sliding thumb. Without JS measurement (first paint, hidden parent) the selected option paints its own fill. */
+.thumb {
+  --thumb-x: 0px;
+  --thumb-y: 0px;
+  --thumb-w: 0px;
+  --thumb-h: 0px;
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: var(--thumb-w);
+  height: var(--thumb-h);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-chip-selected);
+  transform: translate(var(--thumb-x), var(--thumb-y));
+  pointer-events: none;
+}
+/* Position moves by transform. The width also eases: the thumb is absolutely positioned, so this repaints only
+ * the thumb (no sibling reflow); scaleX would squash the pill ends. */
+.slide {
+  transition: transform var(--duration-base) var(--ease-standard), width var(--duration-base) var(--ease-standard);
+}
+.hasThumb .option[aria-checked="true"],
+.hasThumb .option[aria-checked="true"]:not(:disabled):hover {
+  background: transparent;
+}

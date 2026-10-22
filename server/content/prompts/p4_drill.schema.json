@@ -1,0 +1,9 @@
+{"type":"object","required":["items"],"properties":{"items":{"type":"array","minItems":1,"maxItems":5,"items":{
+ "type":"object","required":["type","target_tag","layer","success_check"],"properties":{
+  "type":{"enum":["question","say_it"]},
+  "question_id":{"type":"string"},
+  "prompt":{"type":"string"},
+  "target_tag":{"type":"string"},
+  "layer":{"enum":["content","language","delivery"]},
+  "follow_ups":{"type":"array","maxItems":2,"items":{"type":"string"}},
+  "success_check":{"type":"string"}}}}}}

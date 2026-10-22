@@ -1,0 +1,144 @@
+#!/bin/bash
+# Vukoli launcher (macOS). Installed as <prefix>/bin/vukoli.
+#   vukoli            start the app if it is not running, then open it in the browser
+#   vukoli stop       stop the app
+#   vukoli status     say whether the app is running
+#   vukoli logs       print the log file path
+#   vukoli autostart off|status   stop (or check) "start Ollama with the computer" if the installer set it up
+# Port: IC_PORT (default 8000). The app listens on this computer only (127.0.0.1).
+set -u
+
+# Resolve this script's real location (follows symlinks) -> <prefix>/bin/vukoli.
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+PREFIX="$(cd -P "$(dirname "$src")/.." && pwd)"
+
+PORT="${IC_PORT:-8000}"
+HOST=127.0.0.1
+URL="http://$HOST:$PORT"
+PY="$PREFIX/venv/bin/python"
+LOGDIR="$PREFIX/logs"
+LOG="$LOGDIR/server.log"
+PIDFILE="$PREFIX/server.pid"
+
+say() { printf '%s\n' "$*"; }
+notify() {   # started from the app icon (VUKOLI_GUI=1) there is no terminal: show a dialog as well
+  say "$*"
+  if [ "${VUKOLI_GUI:-}" = 1 ] && command -v osascript >/dev/null 2>&1; then
+    osascript -e "display dialog \"${*//\"/\\\"}\" with title \"Vukoli\" buttons {\"OK\"} default button 1 giving up after 120" >/dev/null 2>&1 || true
+  fi
+}
+
+is_vukoli() {   # health answers with Vukoli's own JSON
+  local body
+  body="$(curl -fsS --max-time 2 "$URL/api/health" 2>/dev/null)" || return 1
+  case "$body" in *'"data_version"'*) return 0 ;; *) return 1 ;; esac
+}
+
+port_busy() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1
+  else
+    (exec 3<>"/dev/tcp/$HOST/$PORT") 2>/dev/null
+  fi
+}
+
+server_pid() {   # pid from the pid file if it is really our server, else whoever listens on the port
+  local pid=""
+  if [ -f "$PIDFILE" ]; then
+    pid="$(cat "$PIDFILE" 2>/dev/null)"
+    if [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q -- "-m server"; then
+      echo "$pid"; return 0
+    fi
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    pid="$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1)"
+    if [ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null | grep -q -- "-m server"; then
+      echo "$pid"; return 0
+    fi
+  fi
+  return 1
+}
+
+open_browser() {
+  if [ "${VUKOLI_NO_BROWSER:-}" = 1 ]; then return 0; fi
+  if command -v open >/dev/null 2>&1; then open "$URL"
+  elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
+  fi
+}
+
+cmd_start() {
+  if is_vukoli; then
+    say "Vukoli is already running: $URL"
+    open_browser; return 0
+  fi
+  if port_busy; then
+    notify "Port $PORT is used by another program, not by Vukoli. Close that program, or start Vukoli on another port: IC_PORT=8001 $PREFIX/bin/vukoli"
+    return 1
+  fi
+  if [ ! -x "$PY" ] || [ ! -d "$PREFIX/app/server/server" ]; then
+    notify "Vukoli is not installed completely ($PREFIX). Run the install command again to repair it."
+    return 1
+  fi
+  mkdir -p "$LOGDIR"
+  say "Starting Vukoli..."
+  ( cd "$PREFIX/app/server" && { nohup "$PY" -m server --port "$PORT" >>"$LOG" 2>&1 </dev/null & echo $! >"$PIDFILE"; disown; } )
+  local i=0
+  while [ $i -lt 60 ]; do   # up to 30 s
+    if is_vukoli; then
+      say "Vukoli is running: $URL"
+      open_browser; return 0
+    fi
+    sleep 0.5; i=$((i + 1))
+  done
+  notify "Vukoli did not start within 30 seconds. See the log: $LOG"
+  return 1
+}
+
+cmd_stop() {
+  local pid
+  if ! pid="$(server_pid)"; then
+    if is_vukoli; then
+      say "Vukoli answers on port $PORT, but it was not started from this install. Stop it yourself."
+      return 1
+    fi
+    say "Vukoli is not running."
+    rm -f "$PIDFILE"; return 0
+  fi
+  kill "$pid" 2>/dev/null || true
+  local i=0
+  while [ $i -lt 20 ] && kill -0 "$pid" 2>/dev/null; do sleep 0.25; i=$((i + 1)); done
+  if kill -0 "$pid" 2>/dev/null; then kill -9 "$pid" 2>/dev/null || true; fi
+  rm -f "$PIDFILE"
+  say "Vukoli stopped."
+}
+
+cmd_autostart() {
+  local plist="$HOME/Library/LaunchAgents/com.vukoli.ollama.plist"
+  case "${1:-status}" in
+    off)
+      if [ -f "$plist" ]; then
+        launchctl bootout "gui/$(id -u)/com.vukoli.ollama" >/dev/null 2>&1 || true
+        rm -f "$plist"
+        say "Ollama will no longer start with your computer. Ollama itself stays installed."
+      else
+        say "The installer did not set up start-at-login for Ollama. If Ollama still starts with your computer, turn it off in System Settings > General > Login Items."
+      fi ;;
+    status) if [ -f "$plist" ]; then say "Ollama starts with your computer (set up by the Vukoli installer)."; else say "No start-at-login entry from the Vukoli installer."; fi ;;
+    *) say "Use: autostart off | autostart status"; return 2 ;;
+  esac
+}
+
+case "${1:-start}" in
+  start|open|"") cmd_start ;;
+  stop) cmd_stop ;;
+  status) if is_vukoli; then say "Vukoli is running: $URL"; else say "Vukoli is not running."; exit 1; fi ;;
+  logs) say "$LOG" ;;
+  autostart) shift; cmd_autostart "${1:-status}" ;;
+  -h|--help|help) sed -n 2,8p "$src" | sed 's/^# \{0,1\}//' ;;
+  *) say "Unknown command: $1 (use: start, stop, status, logs)"; exit 2 ;;
+esac

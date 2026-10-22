@@ -1,0 +1,33 @@
+/* Row: field (grows) · counter · save / cancel. The error line sits under the field (Field shell). */
+.rename {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+.field { flex: 1 1 auto; min-width: 0; }
+.input { font-weight: var(--weight-medium); }
+.lg .input {
+  min-height: var(--control-h-lg);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+/* Counter and buttons centre on the field's first line (the field height), not on the error line. */
+.counter,
+.actions {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h-md);
+  flex: none;
+}
+.lg .counter,
+.lg .actions { min-height: var(--control-h-lg); }
+.counter {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.actions { gap: var(--space-1); }

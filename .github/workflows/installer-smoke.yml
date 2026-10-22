@@ -1,0 +1,244 @@
+name: Installer smoke
+
+# Builds the release archive and runs the real one-command installer on a clean macOS and Windows runner:
+# install, resume, start the app through its launcher, check it serves, stop, uninstall.
+# Models and Ollama are skipped (several GB); everything else is the same path a user takes.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IC_PORT: "8791"
+
+jobs:
+  macos:
+    name: Installer (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Build the release archive
+        run: |
+          set -euo pipefail
+          python install/build_release.py --out "$RUNNER_TEMP/release"
+          ls -lh "$RUNNER_TEMP/release"
+          test -s "$RUNNER_TEMP/release/vukoli.zip"
+
+      - name: Install (first run)
+        run: |
+          set -euo pipefail
+          bash install/install.sh --from "$RUNNER_TEMP/release/vukoli.zip" --yes --no-ollama --no-models --no-launch --prefix "$RUNNER_TEMP/vukoli"
+          test -d "$RUNNER_TEMP/vukoli/app/server"
+          test -f "$RUNNER_TEMP/vukoli/install-state"
+          echo "--- install-state ---"; cat "$RUNNER_TEMP/vukoli/install-state"
+
+      - name: Install again (resume / update path)
+        run: |
+          set -euo pipefail
+          bash install/install.sh --from "$RUNNER_TEMP/release/vukoli.zip" --yes --no-ollama --no-models --no-launch --prefix "$RUNNER_TEMP/vukoli"
+
+      - name: Start the app through the launcher and check it
+        env:
+          IC_DATA_DIR: ${{ runner.temp }}/vukoli-data
+          VUKOLI_NO_BROWSER: "1"
+        run: |
+          set -euo pipefail
+          PREFIX="$RUNNER_TEMP/vukoli"
+          "$PREFIX/bin/vukoli" || { echo "::error::launcher failed"; tail -n 60 "$PREFIX/logs/server.log" || true; exit 1; }
+          ok=0
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:${IC_PORT}/api/health" -o health.json; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then echo "::error::/api/health did not answer within 60 s"; tail -n 80 "$PREFIX/logs/server.log" || true; exit 1; fi
+          echo "health: $(cat health.json)"
+          curl -fsS "http://127.0.0.1:${IC_PORT}/" -o index.html
+          grep -q '<div id="root"' index.html || { echo "::error::/ does not serve the web app (no <div id=\"root\")"; head -c 600 index.html; exit 1; }
+          "$PREFIX/bin/vukoli" stop
+          sleep 2
+          if curl -fsS "http://127.0.0.1:${IC_PORT}/api/health" >/dev/null 2>&1; then echo "::error::server still answers after stop"; exit 1; fi
+          echo "launcher start/stop OK"
+
+      - name: Uninstall (purge)
+        env:
+          IC_DATA_DIR: ${{ runner.temp }}/vukoli-data
+        run: |
+          set -euo pipefail
+          bash install/install.sh --uninstall --purge --prefix "$RUNNER_TEMP/vukoli"
+          if [ -e "$RUNNER_TEMP/vukoli" ]; then echo "::error::install folder still exists"; ls -la "$RUNNER_TEMP/vukoli"; exit 1; fi
+          if [ -e "$RUNNER_TEMP/vukoli-data" ]; then echo "::error::data folder still exists after --purge"; exit 1; fi
+
+      - name: Upload installer logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-logs-macos
+          path: ${{ runner.temp }}/vukoli/logs
+          if-no-files-found: warn
+
+  windows:
+    name: Installer (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Share one package cache between the installs below (the installer keeps an existing UV_CACHE_DIR)
+        shell: powershell
+        run: |
+          "UV_CACHE_DIR=$env:RUNNER_TEMP\uv-cache" | Out-File -FilePath $env:GITHUB_ENV -Encoding ascii -Append
+
+      - name: Build the release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python install/build_release.py --out "$RUNNER_TEMP/release"
+          ls -lh "$RUNNER_TEMP/release"
+          test -s "$RUNNER_TEMP/release/vukoli.zip"
+
+      # Windows PowerShell 5.1 (what users have): the installer run as a file with parameters
+      - name: Install (first run, Windows PowerShell 5.1, file mode)
+        shell: powershell
+        run: |
+          $PSVersionTable.PSVersion.ToString()
+          $zip = Join-Path $env:RUNNER_TEMP 'release\vukoli.zip'
+          $prefix = Join-Path $env:RUNNER_TEMP 'vukoli'
+          powershell -NoProfile -ExecutionPolicy Bypass -File install/install.ps1 -From $zip -Yes -NoOllama -NoModels -NoLaunch -Prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 exited with $LASTEXITCODE" }
+          foreach ($p in 'app\server\requirements.txt', 'venv\Scripts\python.exe', 'uv\uv.exe', 'install-state', 'bin\Vukoli.cmd') {
+            if (-not (Test-Path (Join-Path $prefix $p))) { throw "missing after install: $p" }
+          }
+          "--- install-state ---"; Get-Content (Join-Path $prefix 'install-state')
+
+      # Resume: pretend the run stopped after step 3, then run again under PowerShell 7 (also covers pwsh)
+      - name: Install again (resume from a half-finished state, PowerShell 7)
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'release\vukoli.zip'
+          $prefix = Join-Path $env:RUNNER_TEMP 'vukoli'
+          Set-Content -Path (Join-Path $prefix 'install-state') -Value @('app=done', 'python=done') -Encoding ASCII
+          $log = Join-Path $env:RUNNER_TEMP 'resume.log'
+          $argLine = "-NoProfile -File install/install.ps1 -From $zip -Yes -NoOllama -NoModels -NoLaunch -Prefix $prefix"
+          $p = Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList $argLine -RedirectStandardOutput $log -RedirectStandardError "$log.err" -NoNewWindow -Wait -PassThru
+          $out = Get-Content -Raw -Path $log
+          Write-Host $out
+          if (Test-Path "$log.err") { Write-Host '--- stderr ---'; Get-Content "$log.err" }
+          if ($p.ExitCode -ne 0) { throw "install.ps1 exited with $($p.ExitCode)" }
+          $skipped = ([regex]::Matches($out, 'Already done earlier')).Count
+          if ($skipped -lt 2) { throw "expected steps 2 and 3 to be skipped on resume, saw $skipped skip(s)" }
+
+      - name: Start the app through the launcher and check it
+        shell: powershell
+        env:
+          IC_DATA_DIR: ${{ runner.temp }}\vukoli-data
+          VUKOLI_NO_BROWSER: "1"
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP 'vukoli'
+          $port = $env:IC_PORT
+          $launcher = Join-Path $prefix 'app\install\windows\vukoli.ps1'
+          function Show-Log { if (Test-Path "$prefix\logs\server.log") { Write-Host '--- server.log (tail) ---'; Get-Content "$prefix\logs\server.log" -Tail 80 } }
+          powershell -NoProfile -ExecutionPolicy Bypass -File $launcher
+          if ($LASTEXITCODE -ne 0) { Show-Log; throw "launcher exited with $LASTEXITCODE" }
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            try { $h = Invoke-WebRequest "http://127.0.0.1:$port/api/health" -UseBasicParsing -TimeoutSec 3; $ok = $true; break } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $ok) { Show-Log; throw "/api/health did not answer within 60 s" }
+          Write-Host "health: $($h.Content)"
+          $root = (Invoke-WebRequest "http://127.0.0.1:$port/" -UseBasicParsing).Content
+          if ($root -notmatch '<div id="root"') { Show-Log; throw "/ does not serve the web app (no <div id=""root"")" }
+          # a second launch while it runs must only open the browser (no second server)
+          powershell -NoProfile -ExecutionPolicy Bypass -File $launcher
+          if ($LASTEXITCODE -ne 0) { Show-Log; throw "second launcher run exited with $LASTEXITCODE" }
+          # the .cmd wrapper: Vukoli.cmd stop
+          & "$prefix\app\install\windows\Vukoli.cmd" stop
+          if ($LASTEXITCODE -ne 0) { Show-Log; throw "Vukoli.cmd stop exited with $LASTEXITCODE" }
+          Start-Sleep -Seconds 2
+          $still = $false
+          try { Invoke-WebRequest "http://127.0.0.1:$port/api/health" -UseBasicParsing -TimeoutSec 3 | Out-Null; $still = $true } catch { $still = $false }
+          if ($still) { throw "server still answers after Vukoli.cmd stop" }
+          Write-Host "launcher start/stop OK"
+
+      - name: Uninstall with purge
+        shell: powershell
+        env:
+          IC_DATA_DIR: ${{ runner.temp }}\vukoli-data
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP 'vukoli'
+          powershell -NoProfile -ExecutionPolicy Bypass -File install/install.ps1 -Uninstall -Purge -Prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "uninstall exited with $LASTEXITCODE" }
+          if (Test-Path $prefix) { throw "install folder still exists" }
+          if (Test-Path (Join-Path $env:RUNNER_TEMP 'vukoli-data')) { throw "data folder still exists after -Purge" }
+          foreach ($f in @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))) {
+            if (Test-Path (Join-Path $f 'Vukoli.lnk')) { throw "shortcut left behind in $f" }
+          }
+          if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Vukoli') { throw "uninstall registry entry left behind" }
+
+      # The documented one-liner: `irm <url> | iex` with options in environment variables. The script text is piped
+      # from the checked-out file, so this proves the iex mode (no param binding, no exit, no profile) on this commit.
+      - name: Install the iex way (env vars, Windows PowerShell 5.1)
+        shell: powershell
+        env:
+          VUKOLI_FROM: ${{ runner.temp }}\release\vukoli.zip
+          VUKOLI_PREFIX: ${{ runner.temp }}\vukoli-iex
+          VUKOLI_YES: "1"
+          VUKOLI_NO_OLLAMA: "1"
+          VUKOLI_NO_MODELS: "1"
+          VUKOLI_NO_LAUNCH: "1"
+        run: |
+          Get-Content -Raw -Path install/install.ps1 | Invoke-Expression
+          $prefix = $env:VUKOLI_PREFIX
+          foreach ($p in 'app\server\requirements.txt', 'venv\Scripts\python.exe', 'install-state') {
+            if (-not (Test-Path (Join-Path $prefix $p))) { throw "iex mode: missing after install: $p" }
+          }
+          Write-Host "iex mode install OK"
+
+      - name: Uninstall the iex install (scriptblock mode)
+        shell: powershell
+        env:
+          IC_DATA_DIR: ${{ runner.temp }}\vukoli-data
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP 'vukoli-iex'
+          & ([scriptblock]::Create((Get-Content -Raw -Path install/install.ps1))) -Uninstall -Purge -Prefix $prefix
+          if (Test-Path $prefix) { throw "iex install folder still exists" }
+
+      - name: Upload installer logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-logs-windows
+          path: |
+            ${{ runner.temp }}\vukoli\logs
+            ${{ runner.temp }}\vukoli-iex\logs
+            ${{ runner.temp }}\vukoli\install-state
+          if-no-files-found: warn

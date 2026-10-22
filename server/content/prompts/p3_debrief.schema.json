@@ -1,0 +1,9 @@
+{"type":"object","required":["verdict","weak_spots","strength","next_step"],"properties":{
+ "verdict":{"type":"string"},
+ "weak_spots":{"type":"array","maxItems":3,"items":{"type":"object","required":["layer","tag","text","evidence"],"properties":{
+   "layer":{"enum":["content","language","delivery"]},
+   "tag":{"type":"string"},
+   "text":{"type":"string"},
+   "evidence":{"type":"array","items":{"type":"string"}}}}},
+ "strength":{"type":"string"},
+ "next_step":{"type":"string"}}}

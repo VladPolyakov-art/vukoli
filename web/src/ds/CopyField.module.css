@@ -1,0 +1,19 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-field);
+  min-width: 0;
+}
+.code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+.done { color: var(--color-text-success); font-size: var(--text-sm); font-weight: var(--weight-medium); white-space: nowrap; }

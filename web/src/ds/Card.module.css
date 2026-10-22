@@ -1,0 +1,56 @@
+/* Cards and rows: --radius-md (10px, DS-1, CONTRACT 2.7). Composer and panels keep --radius-lg. */
+.card {
+  background: var(--color-surface-card);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+}
+.pad-sm { padding: var(--space-3); }
+.pad-md { padding: var(--space-5); }
+.pad-lg { padding: var(--space-6); }
+.flat { box-shadow: none; }
+.subtle { background: var(--color-surface-chip); }
+.interactive {
+  position: relative;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.interactive:not(:disabled):hover { background: var(--color-surface-card-hover); }
+/* Room for the check icon in the top-end corner, so text never runs under it. */
+.withCheck { padding-inline-end: calc(var(--space-5) + var(--icon-sm)); }
+/* Selected (D51) = a quiet 1px inset outline (the one stroke kept: it carries state) + the check icon +
+ * aria-pressed / aria-checked. The fill stays the card fill, so fields inside keep their contrast.
+ * Hover / press on a selected card steps the fill like any card; the outline and the text stay. */
+.selected { box-shadow: inset 0 0 0 var(--border-width) var(--color-border-control); }
+.check {
+  position: absolute;
+  top: var(--space-3);
+  inset-inline-end: var(--space-3);
+  display: inline-flex;
+  color: var(--color-text-primary);
+  animation: global(fade-in) var(--duration-fast) var(--ease-standard) backwards;
+}
+/* Disabled = colour tokens, no opacity (DS-5). */
+.interactive:disabled {
+  cursor: not-allowed;
+  background: var(--color-subtle);
+  color: var(--color-text-tertiary);
+}
+
+/* Radio group of cards: columns adapt to the group's own width, not the viewport. */
+.group { container-type: inline-size; width: 100%; display: flex; flex-direction: column; gap: var(--space-3); }
+.groupLabel { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-text-primary); }
+.groupHint { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
+.cols-1 { --cols: 1; }
+.cols-2 { --cols: 2; }
+.cols-3 { --cols: 3; }
+.cols-4 { --cols: 4; }
+@container (max-width: 559px) {
+  .cols-3, .cols-4 { --cols: 2; }
+}
+@container (max-width: 319px) {
+  .grid { --cols: 1; }
+}

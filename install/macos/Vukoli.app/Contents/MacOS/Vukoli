@@ -1,0 +1,8 @@
+#!/bin/bash
+# Vukoli.app: opens the app (starts the local server first if needed). The install folder is written next
+# to this file by the installer (Contents/Resources/prefix).
+here="$(cd "$(dirname "$0")/.." && pwd)"
+prefix="$HOME/.vukoli"
+if [ -f "$here/Resources/prefix" ]; then prefix="$(cat "$here/Resources/prefix")"; fi
+export VUKOLI_GUI=1
+exec "$prefix/bin/vukoli" start

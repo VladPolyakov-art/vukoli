@@ -1,0 +1,19 @@
+/* Select (D78): the field's fill and shape (Field .control) on a button; value left, chevron right. */
+span.wrapFill { display: flex; width: 100%; }
+span.wrapContent { display: inline-flex; max-width: 100%; }
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-3);
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+.wrapContent .trigger { width: auto; max-width: 100%; }
+.value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.placeholder { color: var(--color-text-tertiary); }
+.chev { flex: none; display: inline-flex; color: var(--color-text-secondary); transition: transform var(--duration-fast) var(--ease-standard); }
+.trigger[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.trigger[aria-expanded="true"] { background: var(--color-surface-chip-hover); }

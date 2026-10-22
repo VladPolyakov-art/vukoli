@@ -1,0 +1,98 @@
+.thread { display: flex; flex-direction: column; gap: var(--space-4); }
+.head { display: flex; flex-direction: column; gap: var(--space-1); }
+.headTitle { font-size: var(--text-md); font-weight: var(--weight-semibold); outline: none; }
+.headSub { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.question { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.summary { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.answerToggle { align-self: flex-start; }
+.answers { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); background: var(--color-subtle); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.answerLabel { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.lowConf { text-decoration: underline dotted; text-decoration-color: var(--color-mark-heard); text-underline-offset: 0.25em; }
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 0;
+  border-left: var(--border-width-strong) solid transparent;
+}
+/* Session feedback layers are monochrome: one rule colour, the layers differ by label + icon. */
+.content, .language, .delivery { border-left-color: var(--color-layer-session-rule); }
+.blockHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.blockTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-layer-session-text);
+  margin: 0;
+}
+.fix { font-size: var(--text-md); font-weight: var(--weight-medium); line-height: var(--leading-normal); }
+.ok { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.sub { display: flex; flex-direction: column; gap: var(--space-2); }
+.subLabel { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.quote { font-size: var(--text-sm); color: var(--color-text-secondary); font-style: italic; }
+.list { margin: 0; padding-left: var(--space-5); font-size: var(--text-sm); display: flex; flex-direction: column; gap: var(--space-1); }
+.chips { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; font-size: var(--text-sm); }
+.metrics { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-sm); color: var(--color-text-primary); margin: 0; padding: 0; list-style: none; }
+.note { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.pending { font-size: var(--text-sm); color: var(--color-text-secondary); }
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+}
+.check { background: var(--color-surface-chip); }
+.grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: 0; font-size: var(--text-sm); }
+.grid dt { color: var(--color-text-tertiary); }
+.grid dd { margin: 0; }
+.itemFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.itemActions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.removed { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.checkTitle { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text-secondary); }
+
+.stronger { display: flex; flex-direction: column; gap: var(--space-2); }
+.rewrite { font-size: var(--text-sm); line-height: var(--leading-relaxed); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-subtle); }
+.placeholder { background: var(--color-mark-fix); color: var(--color-text-primary); font-weight: var(--weight-semibold); border-radius: var(--radius-sm); padding: 0 var(--space-1); }
+
+/* ---------- live panel (Session): layer blocks are a left rule, no box (session.md 3.9) ---------- */
+.answerRow { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: center; }
+.live { gap: var(--space-5); }
+.live .block {
+  padding: 0 0 0 var(--space-4);
+  border: 0;
+  border-left: var(--border-width-strong) solid var(--color-layer-session-rule);
+  border-radius: 0;
+}
+.live .item { padding: var(--space-4); }
+.live .fix { font-size: var(--text-md); }
+.live .quote { font-style: normal; }
+.fixSm { font-size: var(--text-sm); color: var(--color-text-primary); line-height: var(--leading-normal); }
+.star { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+}
+.metricsOne { grid-template-columns: minmax(0, 1fr); }
+.metricsGrid dt { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.metricsGrid dd { margin: 0; font-size: var(--text-sm); color: var(--color-text-primary); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; }
+.saidField { gap: var(--space-3); }
+.strongerBtn { align-self: flex-start; }
+.strongerBtn svg:last-child { transition: transform var(--duration-base) var(--ease-standard); }
+.strongerBtn[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
+/* The panel is a narrow container: three metric columns stack into one row each below ~320px. */
+@container panel (max-width: 320px) {
+  .metricsGrid { grid-template-columns: minmax(0, 1fr); }
+}

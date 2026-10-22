@@ -1,0 +1,5 @@
+/* Colour and motion come from the global .shimmer-text; this file only sets the type. */
+.text { font-weight: var(--weight-medium); line-height: var(--leading-normal); }
+.sm { font-size: var(--text-sm); }
+.md { font-size: var(--text-md); }
+.still { color: var(--color-text-secondary); }

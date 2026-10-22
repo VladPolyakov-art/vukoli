@@ -1,0 +1,23 @@
+/* Presence (D49): fills the box its parent gives it (the Session: full stage width, --presence-reach tall; the box's
+ * bottom is the first text line). Decorative, never takes a click.
+ * Two layers of the same half-resolution glow: a soft field, and a copy shown only through the owner's dot pattern
+ * (mask-image, alpha). The tile is a 2× image: 645 × 430 file px = 20.15625 × 13.4375rem, so one file pixel is half a
+ * CSS pixel (one device pixel on a 2× screen) and the dots stay sharp. On a dark canvas both layers use
+ * mix-blend-mode: screen (the view sets data-blend from --color-canvas). */
+.box {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.layer { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+/* The soft field under the dots. */
+.field { opacity: 0.6; }
+.dots {
+  mask-image: url("./assets/presence-dots.webp");
+  mask-size: 20.15625rem 13.4375rem;
+  mask-repeat: repeat;
+  mask-mode: alpha;
+}
+.box[data-blend="screen"] .layer { mix-blend-mode: screen; }

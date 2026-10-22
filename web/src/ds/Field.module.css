@@ -1,0 +1,34 @@
+.field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.label { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-text-primary); }
+.optional { font-weight: var(--weight-regular); color: var(--color-text-tertiary); }
+.hint { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.error { font-size: var(--text-sm); color: var(--color-text-error); display: flex; gap: var(--space-1); align-items: flex-start; }
+
+.control {
+  width: 100%;
+  /* One line is exactly a button's height (control-h-md): no vertical padding; a text area sets its own. */
+  min-height: var(--control-h-md);
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid transparent;
+  /* D78: a rounded interface: one-line fields are pills, a text area a rounded box. */
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-field);
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.control::placeholder { color: var(--color-text-tertiary); }
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--color-text-error); }
+.control:focus-visible { outline-offset: 0; }
+/* D51: no stroke; a field is a fill with a visible label / placeholder. Hover steps the fill. Invalid keeps the error stroke. */
+.control:not(:disabled):not(:focus):hover { background: var(--color-surface-chip-hover); }
+
+.textarea { resize: vertical; min-height: calc(var(--control-h-lg) * 2.5); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); }
+
+.inputWrap { position: relative; display: flex; align-items: center; }
+.inputWrap .control { padding-right: var(--space-12); }
+.adorn { position: absolute; right: var(--space-2); display: inline-flex; }
+
+.counter { font-size: var(--text-sm); color: var(--color-text-tertiary); text-align: right; }

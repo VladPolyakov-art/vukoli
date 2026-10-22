@@ -1,0 +1,46 @@
+.row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.label { font-size: var(--text-md); font-weight: var(--weight-medium); }
+.desc { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.switch {
+  position: relative;
+  flex: none;
+  width: var(--toggle-w);
+  height: var(--toggle-h);
+  border-radius: var(--radius-pill);
+  border: var(--border-width) solid var(--color-border-control);
+  background: var(--color-subtle);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
+}
+/* 13 (QA-03): a 44px hit area on touch screens; the switch looks the same. */
+@media (pointer: coarse) {
+  .switch::before {
+    content: "";
+    position: absolute;
+    inset-block: min(0px, calc((100% - var(--control-h-touch)) / 2));
+    inset-inline: min(0px, calc((100% - var(--control-h-touch)) / 2));
+  }
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: var(--space-0);
+  left: var(--space-0);
+  margin: calc(var(--space-1) / 2);
+  width: calc(var(--toggle-h) - var(--space-1) - var(--border-width) * 2);
+  height: calc(var(--toggle-h) - var(--space-1) - var(--border-width) * 2);
+  border-radius: var(--radius-pill);
+  background: var(--color-text-secondary);
+  /* Knob trails the track by 40ms (v1 P9: 260ms vs 220ms). */
+  transition: transform calc(var(--duration-base) + var(--duration-stagger) / 2) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard);
+}
+/* Owner (D76): the switch is blue when on; other selection (checkbox, chips) stays neutral. */
+.switch[aria-checked="true"] { background: var(--color-toggle-on); border-color: var(--color-toggle-on); }
+.switch[aria-checked="true"]::after {
+  background: var(--color-text-on-toggle);
+  transform: translateX(calc(var(--toggle-w) - var(--toggle-h)));
+}
+.switch:disabled { opacity: 0.5; cursor: not-allowed; }

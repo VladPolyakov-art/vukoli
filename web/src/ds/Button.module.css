@@ -1,0 +1,144 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-md);
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+/* Press feedback (v1 B1). */
+.button:not(:disabled):not([aria-disabled="true"]):active { transform: scale(0.97); }
+.link:not(:disabled):active { transform: none; }
+
+/* 13 (QA-03): the touch target is bigger than the look. On coarse pointers a see-through ::before widens the hit area
+ * to the touch size (44px, WCAG 2.5.5); the look and the layout do not change. The inline link has no fill, so its box
+ * itself is 24px (WCAG 2.5.8 counts the element's own box, not a pseudo-element). min(0px, …) keeps a control that is
+ * already large from shrinking its own hit area. */
+.link { position: relative; }
+@media (pointer: coarse) {
+  .button,
+  .iconButton { position: relative; }
+  .button::before,
+  .iconButton::before {
+    content: "";
+    position: absolute;
+    inset-block: min(0px, calc((100% - var(--control-h-touch)) / 2));
+    inset-inline: min(0px, calc((100% - var(--control-h-touch)) / 2));
+  }
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sm { min-height: var(--control-h-sm); padding: 0 var(--space-3); }
+.lg { min-height: var(--control-h-lg); padding: 0 var(--space-6); font-size: var(--text-md); }
+.full { width: 100%; }
+
+.primary {
+  background: var(--color-action);
+  color: var(--color-text-on-action);
+}
+.primary:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-action-hover); }
+.primary:not(:disabled):not([aria-disabled="true"]):active { background: var(--color-action-pressed); }
+.primary:disabled,
+.primary[aria-disabled="true"] { background: var(--color-action-disabled); color: var(--color-text-disabled); opacity: 1; }
+
+.secondary {
+  background: var(--color-surface-chip);
+  color: var(--color-text-primary);
+}
+.secondary:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-surface-chip-hover); }
+.secondary:not(:disabled):not([aria-disabled="true"]):active { background: var(--color-surface-chip-hover); }
+
+.ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+.ghost:not(:disabled):not([aria-disabled="true"]):hover,
+.ghost:not(:disabled):not([aria-disabled="true"]):active { background: var(--color-hover); }
+
+.link {
+  background: transparent;
+  color: var(--color-text-link);
+  padding: 0 var(--space-1);
+  min-height: var(--space-6);
+  min-width: var(--space-6);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* D80: a delete is a red fill with a white label (a delete action must read as red), in both themes.
+ * Only on the button that confirms a delete; the menu item that opens the question stays neutral. */
+.danger {
+  background: var(--color-danger);
+  color: var(--color-text-on-danger);
+}
+.danger:not(:disabled):not([aria-disabled="true"]):hover,
+.danger:not(:disabled):not([aria-disabled="true"]):active { background: var(--color-danger-hover); }
+
+.spin {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  border: var(--border-width-strong) solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-pill);
+  animation: global(spin) var(--duration-loop-dots) linear infinite;
+}
+
+.iconButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0;
+  border: var(--border-width) solid transparent;
+  /* Owner (D76): every icon button is round — its hover and pressed fills too. */
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+.iconButton:not(:disabled):active { transform: scale(0.94); }
+/* A mark on the icon's top-right corner: the text colour (monochrome, never blue), the shape of a Badge dot. */
+.iconDot {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-text-primary);
+  pointer-events: none;
+}
+.iconButton.sm .iconDot { top: var(--space-1); right: var(--space-1); }
+.iconButton:not(:disabled):hover { background: var(--color-hover); color: var(--color-text-primary); }
+.iconButton.outlined:not(:disabled):hover { background: var(--color-surface-chip-hover); }
+.iconButton:disabled { opacity: 0.5; cursor: not-allowed; }
+.iconButton.sm { width: var(--control-h-sm); height: var(--control-h-sm); min-height: 0; padding: 0; }
+/* D51: `outlined` keeps its name for the API but has no stroke: a chip fill. D59: round, like the send button. */
+.iconButton.outlined { background: var(--color-surface-chip); border-radius: var(--radius-pill); }
+/* Pressed = selected fill + the "on" icon variant supplied by the caller (e.g. micOff) + aria-pressed. */
+.iconButton[aria-pressed="true"] { background: var(--color-selected); color: var(--color-text-primary); }
+/* Pressed + hover: the selected fill one step over, the icon colour unchanged. */
+.iconButton[aria-pressed="true"]:not(:disabled):hover,
+.iconButton.outlined[aria-pressed="true"]:not(:disabled):hover { background: var(--color-surface-chip-hover); color: var(--color-text-primary); }
+.iconButton:disabled:hover { background: transparent; }
+.iconButton.outlined:disabled:hover { background: var(--color-surface-chip); }

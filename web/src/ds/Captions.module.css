@@ -1,0 +1,41 @@
+/* Captions take their width from the parent and adapt to their own box (container query), not the viewport. */
+.root {
+  container-type: inline-size;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+.body { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; }
+/* Transcript: scrolls inside the height its parent gives it (no vh). */
+.transcript { flex: 1 1 auto; }
+.transcript .body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+.turn { display: flex; flex-direction: column; gap: var(--space-1); }
+.head { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--text-sm); line-height: var(--leading-tight); }
+.name { font-weight: var(--weight-semibold); color: var(--color-text-primary); }
+.time { color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.words {
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.interim { color: var(--color-text-secondary); }
+/* Mike's new streamed chunk: opacity only, no blur (CONTRACT 4.4). */
+.chunkIn { animation: global(fade-in) var(--duration-slow) var(--ease-enter) backwards; }
+/* Subtitles: at most 3 lines, the newest at the bottom, a hard clip (no gradient mask, P4). */
+.clip {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: calc(var(--text-lg) * var(--leading-relaxed) * 3);
+  overflow: hidden;
+}
+.empty { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.footer { font-size: var(--text-sm); color: var(--color-text-secondary); }
+/* Narrow parent (375 frame): one step smaller, the clip follows. */
+@container (max-width: 479px) {
+  .words { font-size: var(--text-md); }
+  .clip { max-height: calc(var(--text-md) * var(--leading-relaxed) * 3); }
+}

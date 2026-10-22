@@ -1,0 +1,143 @@
+/* Session layout (v2, session.md §V2). The root is a size container named `session`; every width rule is a container
+ * query on it (review frames and the real window behave the same). Height comes from the parent (100%), never from
+ * the viewport. No top bar, no dock: one floating island at the bottom centre of the stage. */
+.root {
+  container: session / inline-size;
+  /* Height of the dock (notices + island), measured by the view (ResizeObserver); this default is the one-row pill. */
+  --island-h: calc(var(--control-h-lg) + var(--space-2) * 2);
+  /* D49: the glow box along the top edge; its bottom is the first text line (Presence text-safe mask). */
+  --stage-reach: var(--presence-reach);
+  --island-offset: var(--space-6);
+  /* D91: the transcript reaches up into the glow's lower part, fading out over --text-fade as it goes (more
+   * room for the dialogue, but not too much). The glow's bright band stays clear of text. */
+  --text-top: calc(var(--stage-reach) * 0.4);
+  --text-fade: var(--space-16);
+  /* Wide, panel open: the stage content shifts left by half of what the floating panel takes (V2.4, "Stage shift"). */
+  --stage-shift: calc((var(--layout-panel) + var(--space-4)) / -2);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+}
+.body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
+
+/* ---------- stage ---------- */
+.stage { position: relative; flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/* Presence (D49): full stage width along the top edge, never takes a click. */
+.presenceBox { position: absolute; inset-inline: 0; top: 0; height: var(--stage-reach); z-index: 0; pointer-events: none; }
+/* The transcript starts under the glow (margin, not padding: no text ever scrolls under it, P4). Newest at the bottom:
+ * the column sits at the end of the scroller. The bottom keeps room for the dock.
+ * Both ends fade (a mask on the scroller's own box, not on its content): older turns fade out at the glow line instead
+ * of being cut mid-line, and while the user reads above, turns fade out before the dock (state text + island) instead
+ * of running under it. A mask reads only alpha: "black" here means opaque, not a colour. */
+.scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: var(--text-top);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  justify-content: center;
+  /* Top padding = the fade height, so the first turn is never faded when scrolled to the very top. */
+  padding: var(--text-fade) var(--space-8) calc(var(--island-h) + var(--island-offset) + var(--space-8));
+  --dock-top: calc(100% - var(--island-h) - var(--island-offset));
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black var(--text-fade),
+    black calc(var(--dock-top) - var(--space-8)),
+    transparent var(--dock-top)
+  );
+}
+.flow { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-8); width: 100%; max-width: var(--layout-narrow); margin-top: auto; min-width: 0; }
+
+/* "Jump to latest": above the dock, centred, only while the user reads above. */
+.jumpWrap {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(var(--island-h) + var(--island-offset) + var(--space-3));
+  z-index: var(--z-sticky);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.jump { pointer-events: auto; box-shadow: var(--shadow-raised); }
+
+/* ---------- island (sticky bottom centre of the stage, V2.1) ---------- */
+.islandWrap {
+  position: absolute;
+  inset-inline: 0;
+  bottom: var(--island-offset);
+  z-index: var(--z-sticky);
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--space-8);
+  pointer-events: none;
+}
+/* The dock: the one state text (O5) right above the island. */
+/* D62: the voice pill hugs its content and may run wider than the text column (it squeezed the mic at 704px); the
+ * text-mode box and the notices keep the column width. */
+.dock { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); width: 100%; max-width: 100%; min-width: 0; }
+/* D92: the state text in the glow, top centre, above where the transcript fades in (the line above the island
+ * took too much space). It takes no room from the dialogue. */
+.status {
+  position: absolute;
+  inset-inline: 0;
+  top: var(--space-6);
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--space-8);
+  pointer-events: none;
+}
+.islandBox { display: flex; justify-content: center; width: 100%; max-width: 100%; min-width: 0; }
+.islandBox[data-input="text"] { max-width: var(--layout-narrow); }
+.islandBox > * { pointer-events: auto; }
+
+/* Stage shift (docs/motion.md "Stage shift"): transform only, `slower`, instant under reduced motion (tokens = 0). */
+.shift { transition: transform var(--duration-slower) var(--ease-standard); }
+.root[data-panel="open"] .shift { transform: translateX(var(--stage-shift)); }
+/* Shifted content must still fit left of the panel on a 1024-1280 window. D63: with a wider margin on both sides
+ * (space-12, was space-8), so the text doesn't run up to the left edge. */
+.root[data-panel="open"] .flow,
+.root[data-panel="open"] .dock {
+  max-width: min(var(--layout-narrow), calc(100cqw - var(--layout-panel) - var(--space-4) * 3 - var(--space-12) * 2));
+}
+
+@container session (width < 768px) {
+  .root { --island-offset: var(--space-4); }
+  .body { --stage-reach: var(--presence-reach-sm); }
+  .scroll { padding: var(--text-fade) var(--layout-gutter) calc(var(--island-h) + var(--island-offset) + var(--space-6)); }
+  .flow { gap: var(--space-5); }
+  .status { top: var(--space-4); padding-inline: var(--layout-gutter); }
+  .dock { gap: var(--space-2); }
+  /* Two-row island: full width minus the gutter, above the home indicator (V2.7). */
+  .islandWrap { padding-inline: var(--layout-gutter); bottom: calc(var(--island-offset) + env(safe-area-inset-bottom)); }
+}
+
+/* ---------- floating feedback panel (wide, V2.4): no scrim, the session stays usable ---------- */
+.float {
+  container: panel / inline-size;
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: var(--z-overlay);
+  display: flex;
+  width: var(--layout-panel);
+  min-height: 0;
+}
+.float > * { flex: 1 1 auto; min-width: 0; }
+.panel { box-shadow: var(--shadow-overlay); }
+/* Drawer slide (docs/motion.md "Drawer G5"): translateX + opacity. */
+@keyframes panel-in { from { opacity: 0; transform: translateX(var(--space-6)); } }
+@keyframes panel-out { to { opacity: 0; transform: translateX(var(--space-6)); } }
+.floatIn { animation: panel-in var(--duration-slower) var(--ease-enter) backwards; }
+.floatOut { animation: panel-out var(--duration-exit) var(--ease-exit) forwards; pointer-events: none; }
+/* D72: the muted-speech tooltip over the mic says the same thing; the status keeps its place but steps back. */
+.statusQuiet { visibility: hidden; }

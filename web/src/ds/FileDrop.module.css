@@ -1,0 +1,58 @@
+.root { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; width: 100%; }
+.privacy { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  border: var(--border-width) dashed var(--color-border-control);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  text-align: center;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+/* D80: compact — one low row under a list of files (icon, prompt, hint), the same height as a file row. */
+.zone.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  min-height: calc(var(--control-h-md) + var(--space-3) * 2);
+  text-align: start;
+}
+.compact .hint { margin-inline-start: auto; }
+/* Drag-over: solid selected border + hover fill (monochrome, no glow). */
+/* D51: the drop zone is a fill; a drag over it is the one place a stroke carries meaning. */
+.over { border-style: solid; border-color: var(--color-border-selected); background: var(--color-surface-card-hover); }
+.disabled { background: var(--color-subtle); color: var(--color-text-tertiary); }
+.icon { display: inline-flex; color: var(--color-text-secondary); }
+.prompt { font-size: var(--text-sm); color: var(--color-text-primary); }
+.prompt button { vertical-align: baseline; }
+.hint { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-card);
+  min-width: 0;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.fileIcon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--radius-pill);
+  background: var(--color-raised);
+  color: var(--color-text-secondary);
+}
+.fileText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.fileName { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileSize { font-size: var(--text-sm); color: var(--color-text-secondary); }

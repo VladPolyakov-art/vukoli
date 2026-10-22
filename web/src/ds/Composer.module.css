@@ -1,0 +1,145 @@
+/* The composer takes the parent's width and adapts to its own box (container query), never to the viewport. */
+.root { container-type: inline-size; width: 100%; display: flex; flex-direction: column; gap: var(--space-2); }
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-card);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+/* D51: no stroke; the fill steps one level on focus. D70 dropped the ring, but the caret alone left keyboard users
+ * without a clear focus mark (13, QA-16, WCAG 2.4.7): the box shows the contract's focus ring while the field is
+ * focused (token ring, 2px offset), next to the lighter fill; the wrapper is the field's visible edge. Radius 24px. */
+.box:focus-within { background: var(--color-surface-card-hover); }
+/* The ring follows the text field, not the send button (which has its own ring when tabbed to). */
+.box:has(.field:focus) { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); }
+/* Field + inline send (no toolbar): the button stays inside the box, bottom-right, as the text grows. */
+.row { display: flex; align-items: flex-end; gap: var(--space-2); min-width: 0; }
+/* D90: the control on the left sits on the last line, centred on the send button's height (both stay put as the text grows). */
+.leading { flex: none; display: flex; align-items: center; height: var(--control-h-md); }
+/* surface: none (v2) — inside the Island. D62: a rounded chip fill (like the End button), one step lighter on focus,
+ * the round send sits inside it. Focus = the fill + the same ring as the plain box (QA-16, replaces D62's "no blue ring"). */
+.box.bare { padding: var(--space-1); border: 0; border-radius: var(--radius-xl); background: var(--color-surface-chip); box-shadow: none; }
+.box.bare:focus-within { background: var(--color-surface-chip-hover); }
+.box.bare.disabled { background: var(--color-surface-chip); }
+/* D64: the text starts a little further in from the rounded edge (nudged in from the edge). */
+.box.bare .field { padding-inline-start: var(--space-4); }
+.invalid { box-shadow: inset 0 0 0 var(--border-width) var(--color-text-error); }
+.disabled, .disabled:focus-within { background: var(--color-subtle); }
+/* D89: a file is dragged over the composer: the fill steps up and a selected-colour line shows where it lands. */
+.box.dropping { background: var(--color-surface-card-hover); box-shadow: inset 0 0 0 var(--border-width) var(--color-border-selected); }
+
+/* Borderless field; the ring is drawn on .box (see above). */
+.field {
+  /* Defaults; the component overrides them inline from minRows / maxRows. */
+  --min-rows: 2;
+  --max-rows: 8;
+  --line: calc(var(--text-md) * var(--leading-normal));
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--line) * var(--min-rows) + var(--space-2) * 2);
+  max-height: calc(var(--line) * var(--max-rows) + var(--space-2) * 2);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  resize: none;
+  overflow-y: auto;
+  field-sizing: content;
+}
+.field::placeholder { color: var(--color-text-tertiary); }
+.field:focus-visible { outline: none; }
+.field:disabled { cursor: not-allowed; color: var(--color-text-tertiary); }
+
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.start, .end { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; }
+.end { margin-inline-start: auto; }
+
+/* Round send button: pill, 40px; `action` black / white, `quiet` outlined. */
+.send {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.send:not(:disabled):active { transform: scale(0.92); }
+/* D52: a new icon (mic → arrow) fades in; global.css switches the animation off under reduced motion. */
+.sendIcon { display: inline-grid; place-items: center; animation: global(fade-in) var(--duration-fast) var(--ease-enter) backwards; }
+.action { background: var(--color-action); color: var(--color-text-on-action); }
+.action:not(:disabled):hover { background: var(--color-action-hover); }
+.action:not(:disabled):active { background: var(--color-action-pressed); }
+.quiet { background: var(--color-surface-chip); color: var(--color-text-primary); }
+.quiet:not(:disabled):hover { background: var(--color-surface-chip-hover); }
+/* Disabled = readable colour tokens, no opacity (CONTRACT 3.3, DS-5). */
+.send:disabled { cursor: not-allowed; background: var(--color-action-disabled); color: var(--color-text-disabled); border-color: transparent; }
+@media (pointer: coarse) {
+  .send::before {
+    content: "";
+    position: absolute;
+    inset: calc((var(--control-h-md) - var(--control-h-touch)) / 2);
+  }
+}
+
+.hint { font-size: var(--text-sm); color: var(--color-text-secondary); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.error { display: flex; gap: var(--space-1); align-items: flex-start; font-size: var(--text-sm); color: var(--color-text-error); }
+
+/* Attachment card (attached job). */
+.attachment { min-width: 0; }
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+  min-width: 0;
+}
+.tile {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--radius-md);
+  background: var(--color-raised);
+  color: var(--color-text-primary);
+}
+.cardText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cardTitle, .cardMeta {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.cardTitle { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text-primary); }
+.cardMeta { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.cardPreview { font-size: var(--text-sm); color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardStatus { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.cardActions { flex: none; display: flex; align-items: center; gap: var(--space-1); }
+
+/* Narrow parent (375 frame): the end group (strictness + send) takes its own line, end-aligned. */
+@container (max-width: 419px) {
+  .start { flex: 1 1 100%; }
+  .end { flex: 1 1 100%; justify-content: flex-end; }
+  /* D52: a lone send button (no toolbarEnd) stays on the toolbar line, at the end (the Gemini input row). */
+  .toolbar:not(:has(.end > :not(.send))) .start { flex: 1 1 auto; }
+  .toolbar:not(:has(.end > :not(.send))) .end { flex: none; }
+}

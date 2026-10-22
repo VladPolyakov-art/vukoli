@@ -1,0 +1,7 @@
+/* Your CV (D78): the files, then the text under a disclosure, split by a hairline like rows. */
+.files { display: flex; flex-direction: column; gap: var(--space-2); scroll-margin-block: var(--space-6); }
+.text { margin: 0 !important; padding-block: var(--space-2); border-top: var(--border-width) solid var(--color-border-subtle); }
+.textBody { display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-2); }
+.actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.hint { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.note { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }

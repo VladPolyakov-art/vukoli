@@ -1,0 +1,5 @@
+{"type":"object","required":["corrections","phrase_to_keep"],"properties":{
+ "corrections":{"type":"array","maxItems":2,"items":{"type":"object","required":["original","better","reason","level","class"],"properties":{
+   "original":{"type":"string"},"better":{"type":"string"},"reason":{"type":"string"},
+   "level":{"enum":["A2","B1","B2","C1"]},"class":{"enum":["M","N","C"]}}}},
+ "phrase_to_keep":{"anyOf":[{"type":"null"},{"type":"object","required":["phrase","why"],"properties":{"phrase":{"type":"string"},"why":{"type":"string"}}}]}}}

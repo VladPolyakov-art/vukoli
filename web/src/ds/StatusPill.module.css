@@ -1,0 +1,45 @@
+.root { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); max-width: 100%; text-align: center; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+  max-width: 100%;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+.dot {
+  flex: none;
+  width: calc(var(--space-1) * 1.5);
+  height: calc(var(--space-1) * 1.5);
+  border-radius: var(--radius-pill);
+  background: var(--color-text-tertiary);
+}
+.dotLive { background: var(--color-mic-live); }
+.dotPulse { animation: global(pulse-dot) var(--duration-loop-dots) var(--ease-standard) infinite; }
+.icon { display: inline-flex; color: var(--color-text-secondary); }
+.label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labelIn { animation: global(fade-in) var(--duration-fast) var(--ease-standard) backwards; }
+/* D93: see-through, the glow behind it shows through (blurred, so the label stays readable). */
+.glass {
+  background: color-mix(in srgb, var(--color-subtle) 50%, transparent);
+  -webkit-backdrop-filter: blur(var(--space-3));
+  backdrop-filter: blur(var(--space-3));
+}
+/* The sub line folds away (D91): opacity first, then its row closes, so nothing under it jumps. */
+.subWrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  max-width: 100%;
+  margin-top: 0;
+  transition: grid-template-rows var(--duration-slow) var(--ease-standard) var(--duration-fast),
+    opacity var(--duration-slow) var(--ease-exit), margin-top var(--duration-slow) var(--ease-standard) var(--duration-fast);
+}
+.subWrap > .sub { min-height: 0; overflow: hidden; }
+.subGone { grid-template-rows: 0fr; opacity: 0; margin-top: calc(var(--space-2) * -1); }
+.sub { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); max-width: 100%; }

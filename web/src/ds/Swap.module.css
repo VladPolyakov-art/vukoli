@@ -1,0 +1,3 @@
+.swap { position: relative; min-width: 0; }
+/* The outgoing content overlays the top of the incoming one while it fades; it takes no space. */
+.out { position: absolute; inset: 0 0 auto 0; pointer-events: none; }

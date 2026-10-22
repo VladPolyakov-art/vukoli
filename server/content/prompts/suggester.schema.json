@@ -1,0 +1,1 @@
+{"type":"object","required":["story","answer","points"],"properties":{"story":{"type":"string"},"answer":{"type":"string"},"points":{"type":"array","maxItems":4,"items":{"type":"string"}}}}

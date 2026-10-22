@@ -1,0 +1,2 @@
+.wrap { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: var(--layout-gutter); }
+.card { width: min(100%, var(--layout-dialog)); display: flex; flex-direction: column; gap: var(--space-4); }

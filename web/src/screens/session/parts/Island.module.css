@@ -1,0 +1,33 @@
+/* Session island content (session.md §V2.1). The surface itself is DS Island (G21); here only what sits in it. */
+.island { pointer-events: auto; }
+.full { width: 100%; }
+.grow { flex: 1 1 auto; min-width: 0; display: flex; }
+
+/* Status: "2 of 5 · 07:12". Static text, tabular digits, no pulse, no colour (D37). */
+.status { display: inline-flex; align-items: baseline; gap: var(--space-2); padding-inline: var(--space-1); white-space: nowrap; font-size: var(--text-sm); }
+.progress { font-weight: var(--weight-medium); }
+/* D62: no 7ch reserve for "1:02:14" (it left a gap before the mic); past the hour the island widens once. */
+.timer { color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+
+/* Main action slot: every label this variant can show is stacked in one grid cell (the visible one on top), so the
+ * slot is as wide as the longest label and the island never changes width (V2.1). */
+.slot { display: inline-grid; align-items: center; justify-items: stretch; }
+.slot > * { grid-area: 1 / 1; }
+.sizer { display: grid; visibility: hidden; pointer-events: none; }
+.sizer > * { grid-area: 1 / 1; }
+.slotGrow { display: grid; flex: 1 1 auto; min-width: 0; justify-items: stretch; }
+.dots { display: inline-flex; align-items: center; min-height: var(--control-h-md); padding-inline: var(--space-3); font-size: var(--text-sm); color: var(--color-text-secondary); }
+
+/* More menu header: the context that left the top bar (V2.3). */
+.menuHeader { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; max-width: calc(var(--layout-panel) * 0.75); }
+.menuTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+}
+.menuSub { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.menuBadges { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }

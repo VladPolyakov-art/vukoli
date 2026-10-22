@@ -1,0 +1,71 @@
+/* Screen-local parts of the Session (stage, dock, panel content). Spacing rhythm from the map: sections --space-8,
+ * panels / cards --space-5, groups --space-4, rows --space-2. Every value is a token. */
+
+/* ---------- running transcript (D49) ---------- */
+.transcript { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; min-width: 0; }
+.turn { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+/* "Question N": a quiet heading that starts each question's part of the dialogue. */
+.turnQuestion {
+  margin: 0;
+  padding-top: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--color-text-secondary);
+}
+.turn:first-child .turnQuestion { padding-top: 0; }
+/* "Follow-up": quiet small text above Mike's line, not an outlined pill. */
+.followUp { font-size: var(--text-sm); line-height: var(--leading-tight); color: var(--color-text-secondary); }
+.interimWords { color: var(--color-text-secondary); }
+/* Interim bubble: the whole line is secondary until the answer is final. */
+.turnInterim p { color: var(--color-text-secondary); }
+/* Mike's new streamed chunk: opacity only, no blur (CONTRACT 4.4). */
+.chunkIn { animation: global(fade-in) var(--duration-slow) var(--ease-enter) backwards; }
+.transcriptFooter { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+
+/* ---------- first-time tips ---------- */
+.tips { width: 100%; max-width: var(--layout-narrow); border-radius: var(--radius-md); }
+.tipsInner { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-sm); }
+.tipsTitle { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-weight: var(--weight-semibold); }
+.tipsList { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); color: var(--color-text-secondary); }
+
+/* ---------- suggester ---------- */
+/* D92: a sample, not part of the dialogue: the card fill (darker than the chip fill of the tips and the bubbles in the
+ * dark theme), no outline. */
+.suggest { width: 100%; max-width: var(--layout-narrow); border-radius: var(--radius-md); }
+.suggestInner { display: flex; flex-direction: column; gap: var(--space-3); }
+.suggestBody { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-sm); }
+.suggestStory { color: var(--color-text-secondary); }
+.suggestAnswer { margin: 0; line-height: var(--leading-relaxed); }
+.suggestList { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }
+
+/* ---------- banners ---------- */
+/* D61: the notices sit in the dock, right above the state text and the island (the dock is measured, so the
+ * transcript keeps its room above them; nothing covers the glow). */
+.banners { display: flex; flex-direction: column; gap: var(--space-3); width: 100%; max-width: var(--layout-narrow); pointer-events: auto; }
+
+/* ---------- interrupted ---------- */
+.interrupted { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-5); width: 100%; max-width: var(--layout-narrow); }
+.interruptedNote { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.interruptedActions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* ---------- dialog ---------- */
+.steps { margin: var(--space-3) 0 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }
+
+/* ---------- panel content ---------- */
+.panelHint { margin: 0; font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-text-secondary); }
+.panelWait { display: flex; flex-direction: column; gap: var(--space-4); }
+.panelWait > p { margin: 0; }
+.panelFeedback { display: flex; flex-direction: column; gap: var(--space-5); }
+.earlierList { display: flex; flex-direction: column; gap: var(--space-6); }
+.edit { display: flex; flex-direction: column; gap: var(--space-4); }
+.editHead { display: flex; flex-direction: column; gap: var(--space-1); }
+.editTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); outline: none; }
+.editHint { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.editActions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Keyboard shortcuts dialog (V2.3) */
+.keys { display: grid; grid-template-columns: max-content 1fr; align-items: baseline; gap: var(--space-2) var(--space-4); margin: 0; }
+.keyRow { display: contents; }
+.keyRow dt, .keyRow dd { margin: 0; }
+.keysHint { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }

@@ -1,0 +1,21 @@
+.track {
+  position: relative;
+  width: 100%;
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-border-subtle);
+  overflow: hidden;
+}
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-action);
+  transition: width var(--duration-base) var(--ease-standard);
+}
+.sweep { width: 30%; animation: sweep var(--duration-loop-shimmer) var(--ease-standard) infinite; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) {
+  .fill { transition: none; }
+  .sweep { animation: none; width: 100%; opacity: 0.4; }
+}

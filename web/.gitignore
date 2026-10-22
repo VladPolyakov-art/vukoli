@@ -1,0 +1,15 @@
+node_modules/
+dist/
+storybook-static/
+.screens/
+*.log
+dist-review/
+# end-to-end suite (docs/e2e.md): own build, own data folder, reports
+.e2e-dist/
+.e2e-data/
+playwright-report/
+test-results/
+.syn-dist/
+.qa-dist/
+# user test build (npm run ut): own build with the tracker
+.ut-dist/

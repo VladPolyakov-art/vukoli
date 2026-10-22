@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interview-coach-server"
+version = "0.1.0"
+description = "Local backend for Vukoli: practise job interviews by voice or text with an AI interviewer."
+readme = "../README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "httpx>=0.27",
+  "pydantic>=2.7",
+  "platformdirs>=4.2",
+  "psutil>=5.9",
+  "numpy>=1.26",
+  "pypdf>=4.0",
+  "python-docx>=1.1",
+  "kokoro-onnx>=0.4",
+]
+
+[project.optional-dependencies]
+stt-mlx = ["mlx-whisper>=0.4; sys_platform == 'darwin' and platform_machine == 'arm64'"]
+stt = ["faster-whisper>=1.0"]
+gemini = ["google-genai>=1.0"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "pytest-timeout>=2.3"]
+
+[tool.setuptools]
+packages = ["server", "server.engines"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

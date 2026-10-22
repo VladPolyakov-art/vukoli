@@ -1,0 +1,94 @@
+/* Root covers the viewport (app, fixed) or the frame's overlay layer (review, absolute). Heights from the parent. */
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  pointer-events: auto;
+}
+:global([data-overlay-root]) > .root { position: absolute; }
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--color-scrim);
+  animation: global(fade-in) var(--duration-base) var(--ease-standard) backwards;
+}
+.scrimOut { animation: global(fade-out) var(--duration-exit) var(--ease-exit) forwards; pointer-events: none; }
+
+.panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-overlay);
+  transform: none;
+  transition: transform var(--duration-slow) var(--ease-standard);
+}
+.slower { transition-duration: var(--duration-slower); }
+.raised { background: var(--color-raised); }
+.sidebar { background: var(--color-sidebar); }
+
+.left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(var(--layout-rail), calc(100% - var(--space-12)));
+  border-right: var(--border-width) solid var(--color-border-subtle);
+}
+.right {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: min(var(--layout-panel), 100%);
+  border-left: var(--border-width) solid var(--color-border-subtle);
+}
+.bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: calc(100% - var(--layout-topbar));
+  border-top: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+/* Enter: slide from the edge (transition from @starting-style, no new keyframe). */
+@starting-style {
+  .left { transform: translateX(-100%); }
+  .right { transform: translateX(100%); }
+  .bottom { transform: translateY(100%); }
+}
+/* Exit: back to the edge, faster. */
+.out { transition-duration: var(--duration-exit); transition-timing-function: var(--ease-exit); pointer-events: none; }
+.left.out { transform: translateX(-100%); }
+.right.out { transform: translateX(100%); }
+.bottom.out { transform: translateY(100%); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-5);
+}
+.title { font-size: var(--text-md); font-weight: var(--weight-semibold); }
+.body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-4); }
+.header + .body { padding-top: var(--space-2); }
+.footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: var(--border-width) solid var(--color-border-subtle);
+}
+
+/* Inline (gallery, stories): the open panel in the flow, its edge shown by the border. */
+.inline {
+  position: relative;
+  inset: auto;
+  max-height: none;
+  transition: none;
+}
+.inline.left { width: var(--layout-rail); }
+.inline.right { width: min(var(--layout-panel), 100%); }
+.inline.bottom { width: 100%; }
+@starting-style {
+  .inline.left, .inline.right, .inline.bottom { transform: none; }
+}

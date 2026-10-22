@@ -1,0 +1,10 @@
+{"type":"object","required":["questions"],"properties":{"questions":{"type":"array","items":{
+ "type":"object","required":["id","recipe","anchor","question","competency","follow_ups"],
+ "properties":{
+  "id":{"type":"string"},
+  "recipe":{"enum":["R1","R2","R3","R4","R5","R6"]},
+  "anchor":{"type":"string"},
+  "question":{"type":"string"},
+  "competency":{"enum":["A","B","C","D","E","F","G","H"]},
+  "follow_ups":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"object","required":["tag","text"],
+    "properties":{"tag":{"enum":["YP","RN","WD","CT"]},"text":{"type":"string"}}}}}}}}}

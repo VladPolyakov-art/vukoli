@@ -1,0 +1,17 @@
+/* The frame-level overlay host. The root fills its parent (heights come from the parent, never vh). */
+.root {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Covers the root; overlays are its direct children and opt back into pointer events. */
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-overlay);
+  overflow: hidden;
+  pointer-events: none;
+  container: overlay / inline-size;
+}
+/* Each overlay opts back into pointer events itself (the toast region stays click-through). */

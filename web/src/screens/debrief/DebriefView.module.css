@@ -1,0 +1,29 @@
+/* Page rhythm comes from components/Page (sections --space-10, narrow --space-8). The Debrief only adds its own lists. */
+.page { min-width: 0; }
+.questions { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+/* D71: chat | breakdown. The breakdown sticks under the top of <main> and scrolls on its own when it is taller than
+ * the visible main (max-height is measured in DebriefView: a full-height review frame has no viewport to fit). */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: var(--space-8);
+}
+.single { grid-template-columns: minmax(0, 1fr); }
+.chat { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.detail {
+  position: sticky;
+  top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-margin-top: var(--space-6);
+  min-width: 0;
+}
+@container page (width < 840px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .detail { position: static; max-height: none; overflow: visible; }
+}
+.skipped { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }

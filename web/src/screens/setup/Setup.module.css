@@ -1,0 +1,73 @@
+/* Setup (D81): brand + three steps on top, one narrow column, the same SettingGroup blocks as Settings. */
+/* A container, so a 375 frame on the review page narrows like a phone does. */
+.screen { position: relative; isolation: isolate; container: setup / inline-size; min-height: 100dvh; display: flex; flex-direction: column; background: var(--color-canvas); }
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  flex-wrap: wrap;
+}
+/* D82: the Session's presence glow along the top edge of the screen during the voice check: under everything (the
+ * screen isolates, so -1 still paints over its own background), never takes a click. */
+.presenceBox { position: absolute; inset-inline: 0; top: 0; height: var(--presence-reach); z-index: -1; pointer-events: none; }
+.brand { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
+.steps { display: flex; gap: var(--space-2); margin: 0; padding: 0; list-style: none; flex-wrap: wrap; }
+.step {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-sm); color: var(--color-text-tertiary);
+  padding: var(--space-1) var(--space-3); min-height: var(--control-h-sm); border-radius: var(--radius-pill);
+}
+/* The current step: a see-through fill, so the voice check's glow shows through it. */
+.step[aria-current="step"] {
+  background: color-mix(in srgb, var(--color-selected) 55%, transparent);
+  color: var(--color-text-primary); font-weight: var(--weight-medium);
+}
+.stepDone { color: var(--color-text-secondary); }
+/* The number (or the done check) without a circle around it. */
+.num { display: inline-flex; align-items: center; justify-content: center; min-width: var(--icon-sm); font-variant-numeric: tabular-nums; }
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--layout-narrow) + var(--space-16));
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-8) var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+/* 13b (owner): the step's heading centred, at most one short line under it. */
+.head { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+.sub { color: var(--color-text-secondary); }
+/* QA-06: Continue stays in view when the choices are long: the footer sticks to the bottom of the screen. 13b (owner):
+ * no rule above it, the canvas fill alone separates it from what scrolls under. */
+.footer {
+  display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; align-items: center;
+  position: sticky; bottom: 0; z-index: var(--z-sticky);
+  padding-block: var(--space-3); background: var(--color-canvas);
+}
+.footerRight { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; margin-inline-start: auto; }
+.note { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.body { display: flex; flex-direction: column; gap: var(--space-6); }
+
+
+/* Check: the voice row, then under a divider the check itself. */
+.checkArea { border-top: var(--border-width) solid var(--color-border-subtle); padding-top: var(--space-4); }
+/* The mic, one line under it, then the two-line exchange. */
+.check { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); padding-block: var(--space-6); text-align: center; }
+.checkLine { color: var(--color-text-secondary); max-width: 32rem; }
+.exchange { width: 100%; text-align: start; }
+.telemetry { padding-block: var(--space-2); }
+
+/* About you: the chosen job as one row. */
+.job { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.jobTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nameInput { width: min(16rem, 100%); }
+@container setup (width < 768px) {
+  .header { padding: var(--space-3) var(--layout-gutter); }
+  .presenceBox { height: var(--presence-reach-sm); }
+  .main { padding: var(--space-6) var(--layout-gutter) var(--space-12); gap: var(--space-6); }
+  .stepLabel { display: none; }
+  .step[aria-current="step"] .stepLabel { display: inline; }
+}

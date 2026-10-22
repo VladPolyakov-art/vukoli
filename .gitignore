@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+
+# Node / web
+node_modules/
+web/dist/
+storybook-static/
+
+# Local data and secrets: never commit
+.env
+.env.*
+!.env.example
+.devdata/
+*.onnx
+voices-*.bin
+models/
+telemetry.jsonl
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+.tmp/

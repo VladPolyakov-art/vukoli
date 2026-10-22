@@ -1,0 +1,13 @@
+{
+  "interview_opening": "{hi} I'm Mike. Thanks for joining. This is a practice interview with {count} main questions. Take your time with each answer. Let's start. {question}",
+  "interview_closing": "Okay. That was my last question. Thank you for your time. You can end the session now to see your debrief.",
+  "english_opening": "{hi} I'm Mike, your English practice partner. What would you like to talk about today?",
+  "english_opening_topic": "{hi} I'm Mike, your English practice partner. Today's topic is {topic}. What comes to mind first?",
+  "short_answer": "Take your time. Would you like me to repeat the question?",
+  "repeat_question": "Sure. {question}",
+  "small_talk": "I'm good, thanks. {question}",
+  "long_silence": "Take your time.",
+  "redo_ack": "Sure, go ahead.",
+  "resume_opening": "Sorry about that, we got cut off. Let's pick up where we left off. {question}",
+  "voice_sample": "Hi, I'm Mike. Can you walk me through a project you're proud of?"
+}

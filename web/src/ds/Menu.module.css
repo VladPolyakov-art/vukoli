@@ -1,0 +1,143 @@
+.wrap { display: inline-flex; }
+/* Inline (gallery): the trigger, then the open popup in the flow under it. */
+.inlineWrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); max-width: 100%; }
+
+.popover {
+  display: flex;
+  flex-direction: column;
+  min-width: calc(var(--layout-rail) - var(--space-10));
+  max-width: var(--layout-panel);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-raised);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-overlay);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* App: fixed to the viewport; review frame: absolute in the OverlayRoot layer. Position comes from inline style. */
+.floating { position: fixed; z-index: var(--z-dialog); pointer-events: auto; }
+:global([data-overlay-root]) > .floating { position: absolute; }
+:global(dialog) > .floating { position: fixed; }
+/* Gap to the trigger as a margin (the placement math leaves it out). Motion origin at the trigger edge. */
+.floating.bottom { margin-top: var(--space-1); transform-origin: top left; }
+.floating.top { margin-top: calc(-1 * var(--space-1)); transform-origin: bottom left; }
+.floating.bottom.alignEnd { transform-origin: top right; }
+.floating.top.alignEnd { transform-origin: bottom right; }
+/* D79: beside the trigger (the account menu opens into the work area); the gap is already in the position. */
+.floating.right { transform-origin: top left; }
+.floating.right.alignEnd { transform-origin: bottom left; }
+.inline { position: relative; }
+
+.picker { padding: 0; min-width: var(--layout-panel); max-width: none; overflow: hidden; }
+.inline.picker { min-width: min(var(--layout-panel), 100%); }
+
+/* Items (menu) and options (listbox) share one row. */
+.item,
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-h-md);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.item:hover,
+.item:focus-visible,
+.option.active { background: var(--color-hover); }
+.item:disabled,
+.option[aria-disabled="true"] { color: var(--color-text-disabled); cursor: not-allowed; background: transparent; }
+.option[aria-selected="true"] { background: var(--color-selected); }
+.option[aria-selected="true"].active { background: var(--color-selected); }
+
+.check,
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--icon-sm);
+  height: calc(var(--text-sm) * var(--leading-normal));
+  color: var(--color-text-secondary);
+}
+.check { color: var(--color-text-primary); }
+.itemText { display: flex; flex-direction: column; gap: var(--space-0); min-width: 0; }
+.itemLabel { font-weight: var(--weight-medium); }
+.item[aria-checked="true"] .itemLabel { font-weight: var(--weight-semibold); }
+.itemDescription { color: var(--color-text-secondary); }
+.optionLabel { font-weight: var(--weight-semibold); }
+.optionMeta { color: var(--color-text-tertiary); }
+
+.item .itemText, .optionText { flex: 1 1 auto; }
+/* D82: the radio check closes the row on the right. */
+.checkEnd { margin-inline-start: var(--space-3); }
+.shortcut { flex: none; display: inline-flex; align-items: center; margin-inline-start: var(--space-3); height: calc(var(--text-sm) * var(--leading-normal)); }
+/* Checkbox item (v2): a small square box; checked = inverted fill, like Checkbox (G7). */
+.box {
+  align-self: flex-start;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  margin-block-start: calc((var(--text-sm) * var(--leading-normal) - var(--icon-sm)) / 2);
+  border: var(--border-width) solid var(--color-border-control);
+  border-radius: var(--radius-sm);
+}
+.item[aria-checked="true"] .box { background: var(--color-checked); border-color: var(--color-checked); color: var(--color-text-on-action); }
+.item[role="menuitemcheckbox"][aria-checked="true"] .itemLabel { font-weight: var(--weight-medium); }
+/* Header (v2 More menu): static context above the items. */
+.header { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-3); max-width: calc(var(--layout-panel) - var(--space-10)); }
+
+.separator { height: var(--border-width); margin: var(--space-1) var(--space-2); background: var(--color-border-subtle); }
+
+.search { padding: var(--space-2) var(--space-2) 0; }
+.searchIcon { display: inline-flex; padding-right: var(--space-2); color: var(--color-text-secondary); }
+.list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-1); }
+/* The listbox keeps focus (options are marked with aria-activedescendant); its ring sits inside the popover edge. */
+.list { outline-offset: calc(-1 * var(--focus-ring-width)); }
+.list:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); }
+.empty { padding: var(--space-3); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.footer { padding: var(--space-1) var(--space-2) var(--space-2); border-top: var(--border-width) solid var(--color-border-subtle); }
+
+/* 44px rows on touch screens (CONTRACT §5.3, DS-2). */
+@media (pointer: coarse) {
+  .item,
+  .option { min-height: var(--control-h-touch); }
+}
+
+/* Select (D78): the popup is as wide as its longest option (at least the trigger), options in regular weight. */
+.picker.fit { min-width: 0; max-width: var(--layout-panel); }
+.inline.picker.fit { min-width: 0; }
+.fit .optionLabel { font-weight: var(--weight-regular); }
+.fit .option[aria-selected="true"] .optionLabel { font-weight: var(--weight-medium); }
+.fit .option { align-items: center; white-space: nowrap; }
+
+/* Choice row (D78, the account menu's Theme): label left, small round icon choices right; the chosen one is filled. */
+.choiceRow { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-h-md); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); font-size: var(--text-sm); }
+.choiceLabel { flex: 1 1 auto; font-weight: var(--weight-medium); }
+.choices { display: inline-flex; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-pill); background: var(--color-surface-chip); }
+.choice {
+  display: inline-grid;
+  place-items: center;
+  width: calc(var(--control-h-sm) - var(--space-1));
+  height: calc(var(--control-h-sm) - var(--space-1));
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.choice:hover { color: var(--color-text-primary); }
+/* D79: label hidden, the three choices share the row as one segmented control. */
+.choiceFill { padding-inline: var(--space-1); }
+.choiceFill .choices { flex: 1 1 auto; }
+.choiceFill .choice { flex: 1 1 0; width: auto; }
+.choice[aria-checked="true"] { background: var(--color-surface-chip-selected); color: var(--color-text-on-checked); }

@@ -1,0 +1,65 @@
+.log { container: chat / inline-size; display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+
+.message { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.mike { align-items: stretch; }
+.user { align-items: flex-end; }
+
+/* The speaker's name: quiet small text at the start of a turn (Gemini style), not a heading. */
+.name { font-size: var(--text-sm); font-weight: var(--weight-medium); line-height: var(--leading-tight); color: var(--color-text-secondary); }
+
+.text {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+.bubble {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 75%;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-subtle);
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+/* A pressable bubble (D71): the fill deepens on hover and stays deeper while pressed; focus is the DS focus ring. */
+.press {
+  border: 0;
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.press:hover { background: var(--color-selected); }
+.press[aria-pressed="true"] { background: var(--color-surface-chip-hover); }
+.press:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); }
+.body { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.body p { margin: 0; }
+.errorIcon { flex: none; display: inline-flex; align-items: center; height: calc(var(--text-md) * var(--leading-relaxed)); color: var(--color-text-secondary); }
+
+.attachment { max-width: 75%; min-width: 0; }
+.mike .attachment { max-width: 100%; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.user .actions { justify-content: flex-end; }
+
+/* Interim (the user's words still being recognised): no stroke. The bubble's fill is 65% strength, the words stay
+ * --color-text-secondary (set in the Transcript); the fill and the words firm up once the answer is final. */
+.interim .bubble { background: color-mix(in srgb, var(--color-subtle) 65%, transparent); }
+
+/* Session transcript size (D49). */
+.lg .text, .lg .bubble { font-size: var(--text-lg); }
+.lg .text { line-height: var(--leading-relaxed); }
+.lg .errorIcon { height: calc(var(--text-lg) * var(--leading-relaxed)); }
+
+@container chat (max-width: 559px) {
+  .bubble, .attachment { max-width: 88%; }
+}
+@container chat (max-width: 479px) {
+  .lg .text, .lg .bubble { font-size: var(--text-md); }
+}

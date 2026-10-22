@@ -1,0 +1,120 @@
+/* Home v2 parts. Widths in @container are container widths: `page` = <main>, `chat` = the setup log (docs/frontend.md). */
+
+/* ---- link (looks like the DS `link` button) ---- */
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-link);
+  text-underline-offset: 0.2em;
+}
+
+/* ---- banners ---- */
+.banners { display: flex; flex-direction: column; gap: var(--space-3); }
+.banners:empty { display: none; }
+.bannerActions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bannerBody { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.bannerNote { color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+/* ---- start screen ---- */
+.start { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-4); width: 100%; }
+.greeting {
+  text-align: center;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+  margin-bottom: var(--space-4);
+}
+.greetingPending { visibility: hidden; }
+.composer { min-width: 0; }
+.fileLine { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.suggestions { display: flex; justify-content: center; min-height: var(--control-h-md); }
+.suggestionsSkeleton { width: 60%; }
+.chipLabel { display: inline-block; max-width: calc(var(--space-16) * 4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.footer { text-align: center; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.footer .link { font-size: inherit; }
+
+/* ---- setup chat ---- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-h-lg);
+  font-size: var(--text-sm);
+}
+.headerTitle { font-size: var(--text-sm); color: var(--color-text-secondary); font-weight: var(--weight-medium); line-height: var(--leading-tight); }
+.log { min-width: 0; }
+.turn { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+/* A Mike message that continues the previous one (same turn) sits closer. */
+.turnCont { margin-top: calc(var(--space-3) - var(--space-8)); }
+.text { margin: 0; }
+.headerStep { color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.headerSkip { margin-inline-start: auto; }
+.text strong { font-weight: var(--weight-semibold); }
+.aside { color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.repliesIn > * { animation: global(fade-in) var(--duration-base) var(--ease-enter) backwards; animation-delay: calc(var(--i, 0) * var(--duration-stagger) / 2 + var(--duration-slow)); }
+.repliesOut { animation: global(soft-out) var(--duration-exit) var(--ease-exit) forwards; pointer-events: none; }
+.pasted { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.pastedText { white-space: pre-line; overflow-wrap: anywhere; }
+.pastedText.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.pastedMeta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.linkText { overflow-wrap: anywhere; color: var(--color-text-primary); }
+.attachRow { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.attachIcon { flex: none; display: inline-grid; place-items: center; width: var(--control-h-md); height: var(--control-h-md); border-radius: var(--radius-md); background: var(--color-raised); }
+.attachText { display: flex; flex-direction: column; min-width: 0; }
+.attachName { font-size: var(--text-sm); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.attachMeta { font-size: var(--text-sm); color: var(--color-text-secondary); }
+
+/* ---- plan card ---- */
+.plan { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.planTitle { font-size: var(--text-md); font-weight: var(--weight-semibold); }
+.planTitle:focus { outline: none; }
+.planTitle:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--space-1); border-radius: var(--radius-sm); }
+.rows { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; }
+.row {
+  display: grid;
+  grid-template-columns: calc(var(--space-16) * 2) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  min-width: 0;
+}
+.term { color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.value { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); font-size: var(--text-sm); color: var(--color-text-primary); min-width: 0; overflow-wrap: anywhere; }
+.valueBody { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; min-width: 0; }
+.valueSub { color: var(--color-text-secondary); }
+.valueRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.rowAction { flex: none; margin-inline-start: auto; }
+.planLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.planLine > svg { flex: none; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-2); }
+.actionsNote { color: var(--color-text-secondary); font-size: var(--text-sm); }
+.startSlot { display: inline-flex; max-width: 100%; animation: global(fade-in) var(--duration-fast) var(--ease-enter) backwards; }
+
+/* ---- example ---- */
+.exampleCard { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+.exampleCard [data-review-id^="Badge/"] { background: var(--color-surface-chip); }
+.exampleRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); width: 100%; }
+.exampleRow { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.exampleRow > :first-child { flex: none; }
+.exampleText { font-size: var(--text-sm); min-width: 0; overflow-wrap: anywhere; }
+.exampleLevel { color: var(--color-text-tertiary); }
+
+/* ---- narrow page (< 560) ---- */
+@container page (width < 560px) {
+  .greeting { font-size: var(--text-2xl); }
+  /* "Setting up with Mike" stays for screen readers; the row keeps the step and Skip. */
+  .headerTitle { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .actions { flex-direction: column; align-items: stretch; }
+  .startSlot { width: 100%; }
+  .exampleRow { flex-direction: column; gap: var(--space-1); }
+}

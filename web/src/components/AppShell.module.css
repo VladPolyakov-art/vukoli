@@ -1,0 +1,325 @@
+/* AppShell. Root = container `shell` (widths below are container widths, docs/frontend.md — the one place literal
+ * px is allowed): ≥ 1024 full rail · 640–1023 top bar + drawer · < 640 top bar, badge only.
+ * Heights come from the parent (height: 100% from #root / the review frame), no vh. <main> scrolls. */
+.shell {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-canvas);
+  container: shell / inline-size;
+}
+/* The root can't query itself: the grid lives one level down. The rail column animates between the two widths (D57):
+ * layout does reflow here on purpose (the content takes the room), the one exception to "transform and opacity only". */
+.frame {
+  display: grid;
+  grid-template-columns: var(--layout-rail) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  transition: grid-template-columns var(--duration-slow) var(--ease-standard);
+}
+.frame[data-collapsed] { grid-template-columns: var(--layout-rail-collapsed) minmax(0, 1fr); }
+
+/* ---- Rail (≥ 1024): the claude.ai sidebar (D57) ---- */
+/* Brand + toggle · New practice · Recents (the middle scrolls) · engine warning + account at the bottom. Set off from the
+ * content by its fill only (--color-sidebar next to --color-canvas), no line. Rows are pills (D78): hover fill, current = selected fill. */
+.rail {
+  min-width: 0;
+  min-height: 0;
+  /* Tight rail (D47d): the selected row sits 8px from the rail edges. */
+  padding: var(--space-3) var(--space-2);
+  overflow: hidden;
+  background: var(--color-sidebar);
+}
+/* A fixed width per state: while the rail animates, the body is revealed, never squeezed. */
+.railBody {
+  /* One icon slot of the rail: the plus circle (icon-lg + space-1) with space-1 either side = 36px. */
+  --rail-slot: calc(var(--icon-lg) + 3 * var(--space-1));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: calc(var(--layout-rail) - 2 * var(--space-2));
+  height: 100%;
+  min-height: 0;
+}
+/* D80: folding moves nothing. Each icon sits the same distance from the rail edge in both states (the rows keep their
+ * left padding and height; only the labels go), and the collapsed column is exactly one icon slot wide. */
+.railBody[data-collapsed] {
+  width: calc(var(--layout-rail-collapsed) - 2 * var(--space-2));
+}
+.top {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-h-md);
+}
+.railBody[data-collapsed] .top { justify-content: center; }
+/* D78: the collapsed rail's toggle is the app mark; on hover or keyboard focus it shows the "open sidebar" icon. */
+.markToggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--rail-slot);
+  height: var(--rail-slot);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.markToggle > * { grid-area: 1 / 1; transition: opacity var(--duration-fast) var(--ease-standard); }
+.markOpen { display: inline-flex; opacity: 0; }
+.markToggle:hover, .markToggle:focus-visible { background: var(--color-hover); color: var(--color-text-primary); }
+.markToggle:hover .markGlyph, .markToggle:focus-visible .markGlyph { opacity: 0; }
+.markToggle:hover .markOpen, .markToggle:focus-visible .markOpen { opacity: 1; }
+.brand {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-md);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.nav { display: flex; flex: none; flex-direction: column; gap: var(--space-0); }
+
+/* New practice: a small round filled plus (the primary fill) and the label, like Claude's "New chat". */
+.newRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--rail-slot);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.newRow:hover { background: var(--color-hover); }
+.newRow[aria-current="page"] { background: var(--color-selected); }
+.plus {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--icon-lg) + var(--space-1));
+  height: calc(var(--icon-lg) + var(--space-1));
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-chip);
+  color: var(--color-text-primary);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.newRow:hover .plus { background: var(--color-surface-chip-hover); }
+/* D80: the Archive row's icon, in the same slot as New practice's circle (no fill). */
+.navIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--icon-lg) + var(--space-1));
+  height: calc(var(--icon-lg) + var(--space-1));
+  color: var(--color-text-secondary);
+}
+.newLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.railBody[data-collapsed] .newRow { width: var(--rail-slot); }
+
+/* Recents: the one part of the rail that scrolls. */
+.recent {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: 0;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.recentSpacer { flex: 1 1 auto; min-height: 0; }
+.recentLabel {
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.recentSkeleton { padding: var(--space-1) var(--space-2); }
+.recentEmpty { padding: 0 var(--space-2); color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.chats { display: flex; flex-direction: column; gap: var(--space-0); margin: 0; padding: 0; list-style: none; }
+.chatItem { position: relative; }
+/* A chat row: one line, the title cut with an ellipsis; no date or time (D57). */
+.chatItem .chat { gap: var(--space-2); padding: 0 var(--space-2); }
+/* English sessions: a quiet "EN" after the title (tertiary text, no fill). */
+.track { font-size: var(--text-sm); font-weight: var(--weight-medium); }
+/* The "…" menu sits over the end of the row on hover, keyboard focus or while its menu is open (always on touch screens). */
+.chatItem .chatActions {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.chatItem:hover .chatActions,
+.chatItem:focus-within .chatActions,
+.chatItem .chatActions:has([aria-expanded="true"]) { opacity: 1; }
+.chatItem:hover .chat,
+.chatItem:focus-within .chat,
+.chatItem:has([aria-expanded="true"]) .chat { padding-right: calc(var(--control-h-sm) + var(--space-1)); }
+.chatItem:hover .track,
+.chatItem:focus-within .track,
+.chatItem:has([aria-expanded="true"]) .track { display: none; }
+@media (hover: none) {
+  .chatItem .chatActions { opacity: 1; }
+  .chatItem .chat { padding-right: calc(var(--control-h-sm) + var(--space-1)); }
+  .chatItem .track { display: none; }
+}
+
+/* ---- Bottom: engine warning (only when not ready) + account ---- */
+.foot { display: flex; flex: none; flex-direction: column; gap: var(--space-1); }
+
+/* The engine row: the Not ready badge carries the warning (tone + icon + words). */
+.foot .engineWarn { gap: var(--space-2); }
+/* Collapsed: a warning icon (its words are the tooltip and the accessible name). */
+.engineIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rail-slot);
+  height: var(--rail-slot);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-tint);
+  color: var(--color-text-warning);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.engineIcon:hover { background: var(--color-hover); }
+/* The account row is one button: avatar | name over "Saved on this computer". It opens the menu upward. */
+.foot .accountWrap { display: flex; width: 100%; }
+.railBody[data-collapsed] .foot .accountWrap { width: auto; }
+.account {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-h-lg);
+  /* The avatar's centre lines up with the plus circle above (both at half a rail slot from the edge). */
+  padding: var(--space-1) var(--space-3) var(--space-1) calc((var(--rail-slot) - var(--control-h-sm)) / 2);
+  border: 0;
+  /* D78: a pill, like the rest of the rounded interface. */
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  line-height: var(--leading-tight);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.account:hover,
+.account[aria-expanded="true"] { background: var(--color-hover); }
+.railBody[data-collapsed] .account { width: var(--rail-slot); padding-inline-end: 0; }
+/* Collapsed, the row is one slot wide but taller than wide: the hover shows on the avatar circle, not as a tall pill. */
+.railBody[data-collapsed] .account:hover,
+.railBody[data-collapsed] .account[aria-expanded="true"] { background: transparent; }
+.railBody[data-collapsed] .account:hover .avatar,
+.railBody[data-collapsed] .account[aria-expanded="true"] .avatar { background: var(--color-hover); }
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-selected);
+  color: var(--color-text-secondary);
+}
+.accountText { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--space-0); min-width: 0; }
+.accountChevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-text-tertiary);
+}
+/* D80: with a name, the avatar shows its first letter. */
+.initial { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text-primary); line-height: 1; }
+/* D80: renaming a chat in place: the field takes the row. */
+.chatRename { width: 100%; }
+.accountName { font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.accountSub { color: var(--color-text-tertiary); font-size: var(--text-sm); overflow-wrap: anywhere; }
+/* The menu's header: the same two lines. */
+.menuName { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.menuSub { color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+@media (pointer: coarse) {
+  .account { min-height: var(--control-h-touch); }
+  .newRow { min-height: var(--control-h-touch); }
+}
+
+/* ---- Top bar (< 1024) ---- */
+.topbar { display: none; }
+.topbarName {
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topbarEngine { display: inline-flex; align-items: center; margin-left: auto; border-radius: var(--radius-pill); text-decoration: none; }
+
+/* The sidebar inside the drawer: the same rail body at the drawer's width, its own toggle closes the drawer. The Drawer
+ * body's padding is taken back, so the rows sit like in the rail; Recents scrolls, the top and the bottom stay. */
+.drawerRail {
+  height: calc(100% + 2 * var(--space-4));
+  margin: calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-2);
+}
+.drawerRail .railBody { width: 100%; }
+
+/* ---- Main: the page container and the scroll container ---- */
+.main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--color-canvas);
+  container: page / inline-size;
+}
+.main:focus { outline: none; }
+.page { display: flow-root; min-height: 100%; }
+
+.skip {
+  position: absolute;
+  top: calc(-1 * var(--control-h-lg) * 2);
+  left: var(--space-4);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  color: var(--color-text-on-action);
+}
+.skip:focus { top: var(--space-4); }
+
+@container shell (width < 1024px) {
+  .frame { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .rail { display: none; }
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--layout-topbar);
+    padding: 0 var(--layout-gutter) 0 var(--space-2);
+    background: var(--color-canvas);
+  }
+}

@@ -1,0 +1,4 @@
+{"type":"object","required":["gap","action","say"],"properties":{
+ "gap":{"enum":["own_part","result","reflection","tradeoff","none"]},
+ "action":{"enum":["follow_up","next_question","wait"]},
+ "say":{"type":"string"}}}

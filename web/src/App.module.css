@@ -1,0 +1,11 @@
+/* Heights come down from the root (no vh): AppShell and centred states fill #root (ds/screens/_index.md §2.3). */
+:global(html),
+:global(body),
+:global(#root) { height: 100%; }
+.center { display: flex; align-items: center; justify-content: center; height: 100%; }
+/* The route Swap fills <main> (its scrollport): each page layer is at least as tall as <main> and positioned, so a
+ * screen that fills the page itself (Home: absolute, inset 0) gets the full height instead of the swap's zero height.
+ * Taller pages overflow the layer and <main> scrolls as before. The outgoing layer covers the same box while it fades. */
+.routeSwap { position: absolute; inset: 0; }
+.routeSwap > * { position: relative; min-height: 100%; }
+.routeSwap > [inert] { position: absolute; inset: 0; }

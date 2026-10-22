@@ -1,0 +1,48 @@
+.skeleton { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bar {
+  --bar-w: 100%;
+  --bar-i: 0;
+  display: block;
+  width: var(--bar-w);
+  height: calc(var(--space-2) + var(--space-1) / 2); /* 10px on the space scale (components.md Skeleton) */
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-subtle) 0%, var(--color-selected) 50%, var(--color-subtle) 100%) 0 0 / 200% 100%;
+  animation: global(skeleton) var(--duration-loop-skeleton) ease-in-out infinite;
+  /* Bars sweep one after another, 120ms apart (v1 had them in sync). */
+  animation-delay: calc(var(--bar-i) * var(--duration-stagger) * 1.5);
+}
+/* Title bar of a card / row: same height, spaced from the body. */
+.strong { flex: none; }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+}
+.card .strong { margin-bottom: var(--space-1); }
+.rowWrap { gap: var(--space-3); }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+}
+.circle {
+  --bar-i: 0;
+  flex: none;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--color-subtle) 0%, var(--color-selected) 50%, var(--color-subtle) 100%) 0 0 / 200% 100%;
+  animation: global(skeleton) var(--duration-loop-skeleton) ease-in-out infinite;
+  animation-delay: calc(var(--bar-i) * var(--duration-stagger) * 1.5);
+}
+.rowBars { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-width: 0; }
+/* Reduced motion: flat grey, no sweep. */
+@media (prefers-reduced-motion: reduce) {
+  .bar, .circle { background: var(--color-subtle); }
+}

@@ -1,0 +1,23 @@
+/* Trash list (US-23 AC2). Layout by container `page` (the AppShell <main>); no viewport queries. */
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.row {
+  --row-i: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-card);
+  border-radius: var(--radius-lg);
+}
+.main { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.title { font-weight: var(--weight-semibold); color: var(--color-text-primary); overflow-wrap: anywhere; }
+.meta { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.side { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+.inlineLink { font-size: var(--text-sm); color: var(--color-text-primary); text-underline-offset: 0.2em; }
+@container page (width < 560px) {
+  .row { grid-template-columns: minmax(0, 1fr); padding: var(--space-3) var(--space-4); }
+  .side { justify-content: flex-start; }
+}
+/* First-load stagger: 40ms (half a stagger step) per row. */
+.row:global(.motion-row) { animation-delay: calc(var(--row-i) * var(--duration-stagger) / 2); }

@@ -1,0 +1,47 @@
+/* Home v2 layout. Home fills <main> (absolute, inset 0: <main> is position: relative) and lays out its own column, so
+ * only the part that should scroll does. Container names: `shell` (AppShell root), `page` (<main>); widths in
+ * docs/frontend.md. No vh / dvh. */
+.home {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-canvas);
+}
+.column {
+  width: 100%;
+  max-width: calc(var(--layout-narrow) + var(--layout-gutter) * 2);
+  margin-inline: auto;
+  padding-inline: var(--layout-gutter);
+  min-width: 0;
+}
+
+/* ---- start ---- */
+.startPage { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; }
+.startPage > .column { display: flex; flex-direction: column; gap: var(--space-6); padding-top: var(--space-6); }
+/* The group sits a little above the middle (Gemini R4, Ollama R6): centred with a bottom spacer. */
+.startCenter { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; padding-bottom: var(--space-16); }
+.startFooter { padding-bottom: var(--space-6); }
+
+/* ---- setup ---- */
+.top { flex: none; background: var(--color-canvas); }
+/* D90: the chat takes the whole height below the header and scrolls under the composer, which floats at the bottom on a
+ * short fade (the visible area was too small and the text vanished too early). `--dock-h` = the composer's
+ * height (HomeView measures it), so the last message can still scroll clear of it. */
+.body { --dock-h: 0px; position: relative; flex: 1 1 auto; min-height: 0; }
+.scroller { position: absolute; inset: 0; overflow-y: auto; }
+.chat { display: flex; flex-direction: column; gap: var(--space-6); padding-top: var(--space-4); padding-bottom: calc(var(--dock-h) + var(--space-4)); }
+.dock {
+  position: absolute; inset-inline: 0; bottom: 0;
+  padding-top: var(--space-6); padding-bottom: var(--space-4);
+  background: linear-gradient(to bottom, transparent, var(--color-canvas) var(--space-6));
+  pointer-events: none;
+}
+.dock > .column { display: flex; flex-direction: column; gap: var(--space-3); pointer-events: auto; }
+
+@container page (width < 560px) {
+  /* The phone keyboard covers the lower half: the group starts near the top instead of the middle. */
+  .startCenter { justify-content: flex-start; padding-top: var(--space-12); padding-bottom: var(--space-8); }
+  .startPage > .column { padding-top: var(--space-4); }
+}
