@@ -5,9 +5,10 @@ The app never handles Claude credentials; the user signs in to the unmodified CL
 from __future__ import annotations
 
 import asyncio
+import getpass
 import json
 import os
-import pwd
+import sys
 import tempfile
 from typing import AsyncIterator
 
@@ -43,12 +44,22 @@ def child_env() -> dict[str, str]:
     Claude Code can't find its sign-in and answers "Not logged in" (seen live with a bare env, D85)."""
     env = dict(os.environ)
     try:
+        if sys.platform == "win32":   # no pwd module on Windows
+            raise ImportError
+        import pwd
         user = pwd.getpwuid(os.getuid())
+        name, home = user.pw_name, user.pw_dir
     except KeyError:  # pragma: no cover - no passwd entry
         return env
-    env.setdefault("USER", user.pw_name)
-    env.setdefault("LOGNAME", user.pw_name)
-    env.setdefault("HOME", user.pw_dir)
+    except ImportError:   # Windows: the name from the login, the home folder from USERPROFILE
+        try:
+            name = getpass.getuser()
+        except (OSError, KeyError, ImportError):  # pragma: no cover - no user name at all
+            return env
+        home = os.path.expanduser("~")
+    env.setdefault("USER", name)
+    env.setdefault("LOGNAME", name)
+    env.setdefault("HOME", home)
     return env
 
 

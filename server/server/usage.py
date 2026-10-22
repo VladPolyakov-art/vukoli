@@ -40,7 +40,7 @@ def _path() -> Path:
 
 def _load() -> dict:
     try:
-        data = json.loads(_path().read_text())
+        data = json.loads(_path().read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return data
     except (OSError, ValueError):
@@ -52,7 +52,7 @@ def _save(data: dict) -> None:
     try:
         path = _path()
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data))
+        tmp.write_text(json.dumps(data), encoding="utf-8")
         tmp.replace(path)
     except OSError:
         pass

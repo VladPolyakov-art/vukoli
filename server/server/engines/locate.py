@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 COMMON_DIRS = ("/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin", "~/bin", "~/.npm-global/bin", "~/.bun/bin",
-               "~/.volta/bin")
+               "~/.volta/bin", "~/AppData/Roaming/npm", "~/AppData/Local/Programs/Ollama")
+WINDOWS_SUFFIXES = (".exe", ".cmd")
 
 
 def find_program(name: str, extra: tuple[str, ...] = ()) -> str | None:
@@ -18,8 +20,10 @@ def find_program(name: str, extra: tuple[str, ...] = ()) -> str | None:
     found = shutil.which(name)
     if found:
         return found
+    suffixes = ("", *WINDOWS_SUFFIXES) if sys.platform == "win32" else ("",)
     for candidate in (*extra, *(f"{d}/{name}" for d in COMMON_DIRS)):
-        path = Path(candidate).expanduser()
-        if path.is_file() and os.access(path, os.X_OK):
-            return str(path)
+        for suffix in suffixes:
+            path = Path(candidate + suffix).expanduser()
+            if path.is_file() and os.access(path, os.X_OK):
+                return str(path)
     return None

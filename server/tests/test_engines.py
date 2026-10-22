@@ -673,3 +673,37 @@ def test_antigravity_connect_checks_sign_in_then_sends_one_request(monkeypatch):
         assert len(sent) == 1
         client.post("/api/engines/antigravity_cli/disconnect", headers=same)
         assert "antigravity_cli" in config.load_settings()["disconnected"]
+
+
+def test_engines_import_without_pwd(monkeypatch):
+    """Windows has no `pwd`: the engine modules must import, and child_env must fall back (not crash)."""
+    import importlib
+    import sys
+    monkeypatch.setitem(sys.modules, "pwd", None)   # `import pwd` now raises ImportError
+    try:
+        for module in (claude_cli, antigravity_cli):
+            importlib.reload(module)
+        monkeypatch.delenv("USER", raising=False)
+        monkeypatch.delenv("LOGNAME", raising=False)
+        monkeypatch.delenv("HOME", raising=False)
+        monkeypatch.setattr(claude_cli.getpass, "getuser", lambda: "winuser")
+        env = claude_cli.child_env()
+        assert env["USER"] == "winuser" and env["LOGNAME"] == "winuser" and env["HOME"]
+    finally:
+        monkeypatch.undo()
+        importlib.reload(claude_cli)
+        importlib.reload(antigravity_cli)
+
+
+def test_kill_group_windows_uses_taskkill(monkeypatch):
+    calls = []
+
+    class Done:
+        returncode = 0
+    monkeypatch.setattr(antigravity_cli.sys, "platform", "win32")
+    monkeypatch.setattr(antigravity_cli.subprocess, "run", lambda cmd, **kw: calls.append(cmd) or Done())
+    antigravity_cli.kill_group(123)
+    assert calls == [["taskkill", "/PID", "123", "/T", "/F"]]
+    Done.returncode = 128
+    with pytest.raises(ProcessLookupError):
+        antigravity_cli.kill_group(123)

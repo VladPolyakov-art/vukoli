@@ -15,6 +15,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -93,10 +94,21 @@ def forget(conversation_ids: set[str]) -> None:
         shutil.rmtree(root / "brain" / cid, ignore_errors=True)
 
 
+def kill_group(pid: int) -> None:
+    """Kill the process group (POSIX) or the process tree (Windows, which has no killpg or SIGKILL)."""
+    if sys.platform == "win32":
+        done = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if done.returncode != 0:
+            raise ProcessLookupError(pid)
+        return
+    os.killpg(pid, signal.SIGKILL)
+
+
 def stop(proc: asyncio.subprocess.Process) -> None:
     """Kill the run with everything it started: a child left alive would hold the output open (and keep working)."""
     try:
-        os.killpg(proc.pid, signal.SIGKILL)
+        kill_group(proc.pid)
     except (ProcessLookupError, PermissionError):
         if proc.returncode is None:
             proc.kill()
@@ -175,7 +187,7 @@ class Run:
     def discard(self) -> None:
         """The same without waiting, for a run that belongs to another event loop (or a test's cleanup)."""
         try:
-            os.killpg(self.proc.pid, signal.SIGKILL)
+            kill_group(self.proc.pid)
         except (ProcessLookupError, PermissionError):
             pass
         forget(self.ids)

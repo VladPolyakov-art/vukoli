@@ -90,8 +90,10 @@ async def start(url: str, wait_s: float = 15.0) -> bool:
             if not binary:
                 return False
             host = url.split("://", 1)[-1]
+            detach = ({"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP}
+                      if sys.platform == "win32" else {"start_new_session": True})
             subprocess.Popen([binary, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True, env={**os.environ, "OLLAMA_HOST": host})
+                             env={**os.environ, "OLLAMA_HOST": host}, **detach)
     except OSError:
         return False
     async with httpx.AsyncClient(timeout=2) as client:

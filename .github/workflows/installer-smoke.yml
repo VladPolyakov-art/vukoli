@@ -84,7 +84,7 @@ jobs:
           IC_DATA_DIR: ${{ runner.temp }}/vukoli-data
         run: |
           set -euo pipefail
-          bash install/install.sh --uninstall --purge --prefix "$RUNNER_TEMP/vukoli"
+          bash install/install.sh --uninstall --purge --yes --prefix "$RUNNER_TEMP/vukoli"
           if [ -e "$RUNNER_TEMP/vukoli" ]; then echo "::error::install folder still exists"; ls -la "$RUNNER_TEMP/vukoli"; exit 1; fi
           if [ -e "$RUNNER_TEMP/vukoli-data" ]; then echo "::error::data folder still exists after --purge"; exit 1; fi
 
