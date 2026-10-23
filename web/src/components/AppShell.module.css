@@ -82,7 +82,9 @@
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-h-md);
-  padding: 0 var(--space-2);
+  /* D80: the mark sits where the collapsed toggle centres it (in one rail slot), so folding does not move the logo.
+   * Mark width = the lockup's: 0.65 em of --text-xl x 104/90 (Wordmark.module.css). */
+  padding: 0 var(--space-2) 0 calc((var(--rail-slot) - var(--text-xl) * 0.65 * 104 / 90) / 2);
   border-radius: var(--radius-pill);
   color: var(--color-text-primary);
   font-size: var(--text-md);

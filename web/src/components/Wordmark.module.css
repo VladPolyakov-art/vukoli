@@ -32,8 +32,9 @@
 .mark {
   display: block;
   flex: none;
-  width: var(--icon-lg);
-  height: var(--icon-lg);
-  object-fit: contain;
+  /* The lockup's mark at the rail's size (--text-xl), so it stays the same when the sidebar collapses. */
+  height: calc(var(--text-xl) * 0.65);
+  width: auto;
+  aspect-ratio: 104 / 90;
   user-select: none;
 }
