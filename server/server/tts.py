@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import io
+import os
 import re
+import shutil
+import sys
+import tempfile
 import threading
 import wave
 from pathlib import Path
@@ -36,6 +40,10 @@ VOICES = {
     "bf_alice": "Alice · UK, female",
     "bf_lily": "Lily · UK, female",
 }
+# espeak-ng keeps the data folder in a fixed buffer (about 160 characters, 230 on Windows). A longer path makes it fall
+# back to a path that does not exist and exit the whole process, so a deeper folder is copied to a short one first.
+ESPEAK_PATH_LIMIT = 220 if sys.platform == "win32" else 150
+ESPEAK_DATA_NAME = "espeak-ng-data"
 SENTENCE_END = re.compile(r"(.+?[.!?…])\s+", re.S)
 
 _kokoro = None
@@ -53,6 +61,36 @@ def model_files(settings: dict | None = None) -> tuple[Path, Path]:
     return folder / MODEL_FILE, folder / VOICES_FILE
 
 
+def espeak_data_path() -> tuple[str | None, bool]:
+    """(folder for EspeakConfig, usable). The folder is None when espeakng_loader's own path is short enough.
+    (None, False) when it is too long and no short place for a copy works: Kokoro must not start then."""
+    from espeakng_loader import get_data_path
+    source = Path(get_data_path())
+    if len(str(source)) <= ESPEAK_PATH_LIMIT:
+        return None, True
+    candidates = []
+    try:
+        candidates.append(config.data_dir() / ESPEAK_DATA_NAME)
+    except OSError:
+        pass
+    candidates.append(Path(tempfile.gettempdir()) / f"vukoli-{ESPEAK_DATA_NAME}")
+    for target in candidates:
+        if len(str(target)) > ESPEAK_PATH_LIMIT:
+            continue
+        try:
+            if not (target / "phontab").exists():      # missing or a broken copy: copy again
+                temp = target.with_name(f"{target.name}.tmp-{os.getpid()}")
+                shutil.rmtree(temp, ignore_errors=True)
+                shutil.copytree(source, temp)          # copy under another name, so a half copy is never used
+                shutil.rmtree(target, ignore_errors=True)
+                os.replace(temp, target)
+            if (target / "phontab").exists():
+                return str(target), True
+        except OSError:
+            continue
+    return None, False
+
+
 def kokoro_model(settings: dict | None = None):
     """Load Kokoro once; None if the package or model files are missing."""
     global _kokoro, _kokoro_dir
@@ -63,10 +101,13 @@ def kokoro_model(settings: dict | None = None):
         if not (model.exists() and voices.exists()):
             return None
         try:
-            from kokoro_onnx import Kokoro
+            from kokoro_onnx import EspeakConfig, Kokoro
+            folder, usable = espeak_data_path()
         except ImportError:
             return None
-        _kokoro = Kokoro(str(model), str(voices))
+        if not usable:
+            return None
+        _kokoro = Kokoro(str(model), str(voices), espeak_config=EspeakConfig(data_path=folder) if folder else None)
         _kokoro_dir = model.parent
         _cache.clear()
         try:   # the first synthesis initialises the ONNX session (about 2 s); do it now, not in Mike's first line
@@ -84,9 +125,20 @@ def status(settings: dict | None = None) -> dict:
         package = True
     except ImportError:
         package = False
-    return {"available": files and package, "engine": "kokoro", "package_installed": package,
-            "model_found": files, "model_dir": str(model.parent),
-            "hint": "" if files else f"Download {MODEL_FILE} and {VOICES_FILE} from {MODEL_URL} into {model.parent}"}
+    espeak_ok = True
+    if files and package:
+        try:
+            espeak_ok = espeak_data_path()[1]
+        except ImportError:
+            espeak_ok = False
+    hint = ""
+    if not files:
+        hint = f"Download {MODEL_FILE} and {VOICES_FILE} from {MODEL_URL} into {model.parent}"
+    elif not espeak_ok:
+        hint = ("The speech data folder path is too long for espeak-ng and no short copy could be made. "
+                "Install Vukoli in a shorter folder or free some space, then restart.")
+    return {"available": files and package and espeak_ok, "engine": "kokoro", "package_installed": package,
+            "model_found": files, "model_dir": str(model.parent), "hint": hint}
 
 
 def resolve_voice(voice: str) -> str:
