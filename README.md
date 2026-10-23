@@ -16,7 +16,7 @@ License: AGPL-3.0-or-later (see `LICENSE`).
 
 ## Install
 
-One command installs everything and opens the app in your browser. No Node, Python or admin password needed.
+One command installs everything and opens the app in its own window (Chrome or Edge app mode: no tabs, no address bar). No Node, Python or admin password needed.
 
 **macOS** (Terminal):
 
@@ -54,6 +54,10 @@ set `$env:VUKOLI_YES=1` before the command).
 macOS options (after `bash -s --`): `--yes`, `--from <vukoli.zip>` (install from a local file), `--no-ollama`,
 `--no-models`, `--no-launch`, `--prefix <folder>`. The Windows script has the same options as parameters
 (`-Yes`, `-From`, `-NoOllama`, `-NoModels`, `-NoLaunch`, `-Prefix`).
+
+Vukoli opens as its own window when Chrome, Edge, Chromium or Brave is installed (macOS) or Edge or Chrome (Windows),
+in your normal browser profile, so the microphone permission is remembered. Without them it opens a tab in your
+default browser. To always get a browser tab, set `VUKOLI_APP_WINDOW=0` (or start the launcher with `--browser` / `-Browser`).
 
 ## What's free
 

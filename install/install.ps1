@@ -12,7 +12,7 @@ or with parameters when the script is run as a file or as a scriptblock:
   -Yes                    accept the defaults, no questions (installs Ollama if missing)               (VUKOLI_YES=1)
   -NoOllama               do not install Ollama and do not pull language models                        (VUKOLI_NO_OLLAMA=1)
   -NoModels               skip speech models (Kokoro, Whisper) and Ollama model downloads              (VUKOLI_NO_MODELS=1)
-  -NoLaunch               do not start the app / open the browser at the end                           (VUKOLI_NO_LAUNCH=1)
+  -NoLaunch               do not start the app / open its window at the end                           (VUKOLI_NO_LAUNCH=1)
   -Prefix <dir>           install location, default %LOCALAPPDATA%\Vukoli                              (VUKOLI_PREFIX)
   -Uninstall [-Purge]     remove the app, launchers and shortcuts; -Purge also deletes your data. Ollama is never removed.
 
@@ -303,6 +303,7 @@ $null = & {
         $S.Bin = Join-Path $p 'bin'
         $S.StateFile = Join-Path $p 'install-state'
         $S.Launcher = Join-Path (Join-Path (Join-Path (Join-Path $p 'app') 'install') 'windows') 'vukoli.ps1'
+        $S.Icon = Join-Path $p 'Vukoli.ico'
         $S.UninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Vukoli'
     }
     function Get-ShortcutPaths {
@@ -752,12 +753,17 @@ $null = & {
         $lnk.WorkingDirectory = $S.Prefix
         $lnk.WindowStyle = 7
         $lnk.Description = $Description
+        if (Test-Path -LiteralPath $S.Icon) { $lnk.IconLocation = $S.Icon + ',0' }
         $lnk.Save()
     }
     function Step-Launchers {
         if (-not (Test-Path -LiteralPath $S.Launcher)) {
             Fail 'The launcher script is missing from the app folder.' 'The archive may be incomplete. Run the install command again without -From, or rebuild the zip.'
         }
+        # the icon lives in the install folder (not in app\), so it stays when the app folder is replaced on upgrade
+        $iconSrc = Join-Path (Split-Path -Parent $S.Launcher) 'Vukoli.ico'
+        try { if (Test-Path -LiteralPath $iconSrc) { Copy-Item -LiteralPath $iconSrc -Destination $S.Icon -Force } }
+        catch { Warn ('Could not copy the app icon: {0}' -f $_.Exception.Message) }
         $made = @()
         foreach ($lnk in (Get-ShortcutPaths)) {
             try { New-Shortcut $lnk 'Vukoli - practise interviews with an AI interviewer'; $made += $lnk }
@@ -783,6 +789,7 @@ $null = & {
             Set-ItemProperty -Path $key -Name 'DisplayVersion' -Value $ver
             Set-ItemProperty -Path $key -Name 'Publisher' -Value 'Vukoli'
             Set-ItemProperty -Path $key -Name 'InstallLocation' -Value $S.Prefix
+            if (Test-Path -LiteralPath $S.Icon) { Set-ItemProperty -Path $key -Name 'DisplayIcon' -Value $S.Icon }
             Set-ItemProperty -Path $key -Name 'UninstallString' -Value ('"' + $ps + '" -NoProfile -ExecutionPolicy Bypass -File "' + $installScript + '" -Uninstall -Prefix "' + $S.Prefix + '"')
             Set-ItemProperty -Path $key -Name 'NoModify' -Value 1 -Type DWord
             Set-ItemProperty -Path $key -Name 'NoRepair' -Value 1 -Type DWord
@@ -940,7 +947,7 @@ $null = & {
         if (-not $S.NoLaunch) {
             $shownPort = '8000'
             if ($env:IC_PORT -and ($env:IC_PORT.Trim() -match '^\d+$')) { $shownPort = $env:IC_PORT.Trim() }
-            Write-Host ('  Vukoli is open in your browser: http://127.0.0.1:{0}  (the first-run wizard guides you).' -f $shownPort)
+            Write-Host ('  Vukoli opens in its own window (Edge or Chrome app mode): http://127.0.0.1:{0}  (the first-run wizard guides you).' -f $shownPort)
         }
         Write-Host '  Next time: Start menu > Vukoli, or the Desktop shortcut.'
         if ($S.NoOllama) {

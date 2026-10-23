@@ -1,11 +1,14 @@
 #!/bin/bash
 # Vukoli launcher (macOS). Installed as <prefix>/bin/vukoli.
-#   vukoli            start the app if it is not running, then open it in the browser
+#   vukoli            start the app if it is not running, then open it in its own window
+#                     (Chrome / Edge / Chromium / Brave app mode: no tabs, no address bar)
+#   vukoli --browser  same, but open a normal tab in the default browser (or set VUKOLI_APP_WINDOW=0)
 #   vukoli stop       stop the app
 #   vukoli status     say whether the app is running
 #   vukoli logs       print the log file path
 #   vukoli autostart off|status   stop (or check) "start Ollama with the computer" if the installer set it up
 # Port: IC_PORT (default 8000). The app listens on this computer only (127.0.0.1).
+# VUKOLI_NO_BROWSER=1 opens nothing. VUKOLI_APP_WINDOW=0 opens the default browser instead of an app window.
 set -u
 
 # Resolve this script's real location (follows symlinks) -> <prefix>/bin/vukoli.
@@ -24,6 +27,7 @@ PY="$PREFIX/venv/bin/python"
 LOGDIR="$PREFIX/logs"
 LOG="$LOGDIR/server.log"
 PIDFILE="$PREFIX/server.pid"
+USE_TAB=0
 
 say() { printf '%s\n' "$*"; }
 notify() {   # started from the app icon (VUKOLI_GUI=1) there is no terminal: show a dialog as well
@@ -64,11 +68,40 @@ server_pid() {   # pid from the pid file if it is really our server, else whoeve
   return 1
 }
 
-open_browser() {
-  if [ "${VUKOLI_NO_BROWSER:-}" = 1 ]; then return 0; fi
+# Print the path of the first Chromium-based browser found (Chrome, Edge, Chromium, Brave), or nothing.
+find_chromium() {
+  local entry name id d app
+  for entry in "Google Chrome|com.google.Chrome" "Microsoft Edge|com.microsoft.edgemac" "Chromium|org.chromium.Chromium" "Brave Browser|com.brave.Browser"; do
+    name="${entry%%|*}"; id="${entry##*|}"
+    for d in /Applications "$HOME/Applications"; do
+      if [ -d "$d/$name.app" ]; then echo "$d/$name.app"; return 0; fi
+    done
+    if command -v mdfind >/dev/null 2>&1; then   # installed somewhere else
+      app="$(mdfind "kMDItemCFBundleIdentifier == '$id'" 2>/dev/null | head -n 1)"
+      if [ -n "$app" ] && [ -d "$app" ]; then echo "$app"; return 0; fi
+    fi
+  done
+  return 1
+}
+
+open_default_browser() {
   if command -v open >/dev/null 2>&1; then open "$URL"
   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
   fi
+}
+
+# Own window (Chromium app mode) in the user's normal profile, so the microphone permission is remembered.
+# open -n starts a new process that hands the window to the running browser, if there is one.
+open_browser() {
+  if [ "${VUKOLI_NO_BROWSER:-}" = 1 ]; then return 0; fi
+  if [ "${VUKOLI_APP_WINDOW:-1}" != 0 ] && [ "$USE_TAB" != 1 ] && command -v open >/dev/null 2>&1; then
+    local app
+    if app="$(find_chromium)" && open -na "$app" --args "--app=$URL" --window-size=1280,860 >/dev/null 2>&1; then
+      return 0
+    fi
+    say "Vukoli works best in Chrome or Edge, which open it as its own window. Opening your default browser instead."
+  fi
+  open_default_browser
 }
 
 cmd_start() {
@@ -133,12 +166,14 @@ cmd_autostart() {
   esac
 }
 
+if [ "${1:-}" = "--browser" ]; then USE_TAB=1; shift; fi
+
 case "${1:-start}" in
   start|open|"") cmd_start ;;
   stop) cmd_stop ;;
   status) if is_vukoli; then say "Vukoli is running: $URL"; else say "Vukoli is not running."; exit 1; fi ;;
   logs) say "$LOG" ;;
   autostart) shift; cmd_autostart "${1:-status}" ;;
-  -h|--help|help) sed -n 2,8p "$src" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n 2,11p "$src" | sed 's/^# \{0,1\}//' ;;
   *) say "Unknown command: $1 (use: start, stop, status, logs)"; exit 2 ;;
 esac

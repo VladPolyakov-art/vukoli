@@ -2,17 +2,20 @@
 .SYNOPSIS
 Vukoli launcher for Windows: opens the app (starting the local server first if needed), or stops it.
 
-  Vukoli.cmd            start the server if it is not running, then open the browser
+  Vukoli.cmd            start the server if it is not running, then open the app in its own window
+                        (Edge or Chrome app mode: no tabs, no address bar)
   Vukoli.cmd stop       stop the server
   Vukoli.cmd status     say whether it is running
-  -NoBrowser            do not open the browser (or set VUKOLI_NO_BROWSER=1)
+  -NoBrowser            open nothing (or set VUKOLI_NO_BROWSER=1)
+  -Browser              open a normal tab in the default browser instead of an app window (or set VUKOLI_APP_WINDOW=0)
 
 Port: IC_PORT (default 8000). Wait for the server: VUKOLI_START_TIMEOUT seconds (default 30).
 Plain ASCII on purpose (Windows PowerShell 5.1 reads other encodings wrongly).
 #>
 param(
     [Parameter(Position = 0)][string]$Command = 'open',
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$Browser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +40,7 @@ $url = 'http://127.0.0.1:{0}' -f $port
 $timeout = 30
 if ($env:VUKOLI_START_TIMEOUT -and ($env:VUKOLI_START_TIMEOUT -match '^\d+$')) { $timeout = [int]$env:VUKOLI_START_TIMEOUT }
 $noBrowser = ($NoBrowser.IsPresent -or ($env:VUKOLI_NO_BROWSER -and $env:VUKOLI_NO_BROWSER -notmatch '^(0|false|no|off)$'))
+$useTab = ($Browser.IsPresent -or ($env:VUKOLI_APP_WINDOW -and $env:VUKOLI_APP_WINDOW -match '^(0|false|no|off)$'))
 # A hidden shortcut has no console, so problems are shown in a message box (not in CI / scripted runs)
 $useDialog = (-not $noBrowser) -and (-not $env:CI)
 
@@ -140,8 +144,39 @@ function Stop-Server {
     return 0
 }
 
+# Edge first (every Windows 10/11 has it), then Chrome: App Paths registry entry, then the usual folders
+function Find-Chromium {
+    foreach ($exe in 'msedge.exe', 'chrome.exe') {
+        foreach ($hive in 'HKLM', 'HKCU') {
+            try {
+                $reg = Get-ItemProperty -Path ('{0}:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{1}' -f $hive, $exe) -ErrorAction Stop
+                $path = $reg.'(default)'
+                if ($path -and (Test-Path -LiteralPath $path)) { return $path }
+            } catch { $null = $_ }
+        }
+        $sub = if ($exe -eq 'msedge.exe') { 'Microsoft\Edge\Application' } else { 'Google\Chrome\Application' }
+        foreach ($root in ${env:ProgramFiles(x86)}, $env:ProgramFiles, $env:LOCALAPPDATA) {
+            if (-not $root) { continue }
+            $cand = Join-Path (Join-Path $root $sub) $exe
+            if (Test-Path -LiteralPath $cand) { return $cand }
+        }
+    }
+    return $null
+}
+
 function Open-Browser {
     if ($noBrowser) { Write-Host ('Vukoli is running: {0}' -f $url); return }
+    # Own window (Chromium app mode) in the normal browser profile, so the microphone permission is remembered
+    if (-not $useTab) {
+        $exe = Find-Chromium
+        if ($exe) {
+            try {
+                Start-Process -FilePath $exe -ArgumentList @("--app=$url", '--window-size=1280,860')
+                return
+            } catch { $null = $_ }
+        }
+        Write-Host 'Vukoli works best in Chrome or Edge, which open it as its own window. Opening your default browser instead.'
+    }
     try { Start-Process $url } catch { Write-Host ('Open this address in your browser: {0}' -f $url) }
 }
 
@@ -210,7 +245,7 @@ switch -Regex ($Command.ToLower()) {
         break
     }
     default {
-        Write-Host ('Unknown command "{0}". Use: Vukoli.cmd [open|stop|status] [-NoBrowser]' -f $Command)
+        Write-Host ('Unknown command "{0}". Use: Vukoli.cmd [open|stop|status] [-NoBrowser] [-Browser]' -f $Command)
         $code = 64
     }
 }

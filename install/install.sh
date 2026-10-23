@@ -9,10 +9,11 @@
 #   --yes                 accept the defaults, ask nothing (Ollama install = yes)                    [VUKOLI_YES=1]
 #   --no-ollama           do not install Ollama and do not pull models                               [VUKOLI_NO_OLLAMA=1]
 #   --no-models           skip speech models (Kokoro, Whisper) and Ollama model pulls               [VUKOLI_NO_MODELS=1]
-#   --no-launch           do not start the app or open the browser at the end                        [VUKOLI_NO_LAUNCH=1]
+#   --no-launch           do not start the app or open its window at the end                         [VUKOLI_NO_LAUNCH=1]
 #   --prefix <dir>        install location (default ~/.vukoli)                                       [VUKOLI_PREFIX]
 #   --uninstall [--purge] remove the app and launchers; --purge also deletes your sessions and data
 #   -h, --help
+# The app opens in its own window (Chrome / Edge / Chromium / Brave app mode); VUKOLI_APP_WINDOW=0 opens a browser tab instead.
 # Test switch: VUKOLI_DRY_RUN=1 prints the Ollama actions (download, install, login agent, model pulls)
 # instead of doing them. VUKOLI_APP_DIR=<dir> puts Vukoli.app there instead of ~/Applications (tests).
 #
@@ -712,6 +713,7 @@ TOTAL=$((SECONDS - START_SECS))
 say ""
 say "Vukoli $VERSION_INSTALLED is installed."
 say "  Install folder : $PREFIX"
+say "  Window         : Vukoli opens in its own window (Chrome or Edge app mode); other browsers get a normal tab."
 say "  Start later    : open Vukoli from Launchpad / Applications (in your home folder), or run: $BIN"
 say "  Stop           : $BIN stop"
 say "  Uninstall      : bash $APPDIR/install/install.sh --uninstall   (add --purge to delete your sessions too)"
