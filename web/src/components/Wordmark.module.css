@@ -1,24 +1,39 @@
+/* Lockup geometry from docs/brand/logo/README.md, in em of the lockup's font size: mark height = 1.2 x the word's
+ * x-height (Manrope x-height 0.54 em -> 0.65 em), the round bottom sits on the letter line (o overshoot 0.015 em),
+ * gap = 0.27 of the mark height. The word is the heaviest weight and the tightest tracking the tokens have. */
 .wordmark {
+  --lockup-mark-h: 0.65em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: calc(var(--lockup-mark-h) * 0.27);
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-primary);
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);
-  text-overflow: ellipsis;
-  text-transform: lowercase;
+  line-height: var(--leading-tight);
   white-space: nowrap;
 }
+.lockupMark {
+  flex: none;
+  height: var(--lockup-mark-h);
+  width: auto;
+  aspect-ratio: 104 / 90;
+  margin-bottom: -0.015em;
+  user-select: none;
+}
+.word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: lowercase;
+}
 .mark {
-  display: inline-grid;
-  place-items: center;
-  width: var(--control-h-sm);
-  height: var(--control-h-sm);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-chip-selected);
-  color: var(--color-text-on-checked);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  line-height: 1;
-  padding-bottom: 0.12em;
+  display: block;
+  flex: none;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  object-fit: contain;
+  user-select: none;
 }

@@ -1,4 +1,9 @@
-# Vukoli
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/vukoli-lockup-dark.svg">
+    <img src=".github/assets/vukoli-lockup.svg" alt="Vukoli" height="56">
+  </picture>
+</h1>
 
 Practise job interviews out loud with **Mike**, an AI interviewer, on your own computer.
 Mike asks real interview questions (general ones, or questions built from your CV and a job posting), follows up
