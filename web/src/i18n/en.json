@@ -489,7 +489,7 @@
     "start": "Start interview",
     "starting": "Starting…",
     "example": {
-      "title": "Example: what you get after each question",
+      "title": "Example: what you get after the call",
       "label": "Example",
       "content": "Missing result: end with what changed.",
       "language": "\"I am responsible of\" → \"I'm responsible for\"",
@@ -596,7 +596,7 @@
       "small": "Small talk"
     },
     "start": "Start talking",
-    "after": "After each of your turns you'll see up to 3 corrections with a reason. Nothing appears while you speak.",
+    "after": "After the call you'll see your corrections with a reason. Nothing appears while you speak.",
     "free": "Free forever: no limits on English practice.",
     "levelPick": "Pick one. You can change it any time.",
     "lastChoice": "{level}: your last choice. Change it any time.",
@@ -701,25 +701,21 @@
       "yourTurn": "Your turn",
       "muted": "Muted",
       "ended": "Ended",
-      "between": "Your feedback is ready",
+      "between": "Round complete",
       "paused": "Paused",
       "preparingFeedback": "Preparing your feedback",
       "saved": "Your answer is saved"
     },
-    "heard": "What we heard. A wrong word? Fix it after you answer.",
+    "heard": "What we heard. A wrong word? You can fix it in the debrief.",
     "firstTime": {
       "title": "First time here",
       "voice1": "Answer aloud when Mike stops. Pause to think: he waits up to {sec} s.",
       "voice2": "When you're done, stop talking or press Enter.",
-      "voice3": "The conversation shows what we heard. You can fix a wrong word after you answer.",
+      "voice3": "The conversation shows what we heard. You can fix a wrong word in the debrief.",
       "text1": "Type your answer in the box below.",
       "text2": "When you're done, press Send (Enter).",
-      "text3": "Feedback appears on the right after each question.",
-      "text3Mid": "After each question a dot shows on the feedback button. Press it and the feedback slides in from the right.",
-      "text3Narrow": "After each question a dot shows on the feedback button. Press it and the feedback slides up from the bottom.",
-      "text3English": "Feedback appears on the right after each turn.",
-      "text3MidEnglish": "After each turn a dot shows on the feedback button. Press it and the feedback slides in from the right.",
-      "text3NarrowEnglish": "After each turn a dot shows on the feedback button. Press it and the feedback slides up from the bottom.",
+      "text3": "Feedback comes after the call, so Mike stays fast.",
+      "text3English": "Corrections come after the call, so Mike stays fast.",
       "voice1Manual": "Answer aloud when Mike stops. Take your time: Mike waits until you press Send now."
     },
     "controls": {
@@ -756,7 +752,7 @@
     },
     "closing": {
       "title": "That's the end of the round",
-      "body": "Mike has finished. Your debrief takes a few seconds.",
+      "body": "Mike has finished. Your feedback and debrief are prepared when you end the session.",
       "debrief": "See your debrief"
     },
     "saving": "Saving your session…",
@@ -950,6 +946,8 @@
     },
     "afterEnd": {
       "saving": "Saving your session… It'll be ready in a moment",
+      "preparing_one": "Preparing feedback · {done} of {n} answer",
+      "preparing_other": "Preparing feedback · {done} of {n} answers",
       "ready": "Your session is saved",
       "open": "Open debrief",
       "failed": "Couldn't find the saved session yet. Check Recents in a minute."
@@ -957,9 +955,11 @@
   },
   "feedback": {
     "panel": "Feedback",
-    "p0": "Feedback appears here after each question: one fix for content, language and delivery. Nothing will pop up while you're talking.",
-    "p0English": "Corrections appear here after each of your turns. Nothing will pop up while you're talking.",
-    "p1": "Still in progress. Feedback for this question appears here once your answer is done.",
+    "later": {
+      "title": "Feedback comes after the call",
+      "body": "So Mike stays fast while you talk. When you end the session you get content, language and delivery for every answer.",
+      "bodyEnglish": "So Mike stays fast while you talk. When you end the session you get the corrections for every turn."
+    },
     "p2": "Preparing feedback for question {n}…",
     "p2English": "Checking your last turn…",
     "p4": "Feedback isn't available for this answer. Your answer is saved.",
@@ -1108,6 +1108,9 @@
     "title": "Debrief",
     "loading": "Loading your debrief…",
     "pending": "Writing your debrief. This takes a few seconds…",
+    "preparing_one": "Preparing feedback · {done} of {n} answer",
+    "preparing_other": "Preparing feedback · {done} of {n} answers",
+    "preparingHint": "You can leave this page. The work goes on and the debrief opens here when it is ready.",
     "verdict": "Verdict",
     "weakSpots": "What to fix first",
     "strength": "What worked",
@@ -1371,7 +1374,7 @@
     "none": {
       "english": {
         "title": "No English sessions yet",
-        "body": "English practice is a relaxed talk at your level, with corrections after each turn.",
+        "body": "English practice is a relaxed talk at your level, with corrections after the call.",
         "start": "Start English practice"
       },
       "interview": {
@@ -1438,7 +1441,7 @@
       "layerOrder": "Feedback order",
       "contentFirst": "Content first",
       "deliveryFirst": "Delivery first",
-      "layerOrderHint": "The order of the three feedback blocks after each question.",
+      "layerOrderHint": "The order of the three feedback blocks in the debrief.",
       "level": "Default English level",
       "strictness": "Default strictness",
       "questions": "Questions per interview",
@@ -1563,7 +1566,7 @@
         "aria": "Practice type: {mode}",
         "interview": "Interview",
         "english": "English practice",
-        "interviewDesc": "Mike asks interview questions, with feedback after each answer.",
+        "interviewDesc": "Mike asks interview questions, with feedback after the call.",
         "englishDesc": "Just talk at your level. Corrections after each of your turns."
       }
     },
@@ -1661,7 +1664,7 @@
       "drillAsk": "What should we drill?",
       "drillDirect": "Here's a drill on the weak spots we found. Check the plan and start when you're ready.",
       "drillAll": "All {n}",
-      "example": "This is what you get after each question. It's an example from Sam, a product manager, not you.",
+      "example": "This is what you get after the call. It's an example from Sam, a product manager, not you.",
       "exampleTry": "Want to try? Paste a job, or start with general questions.",
       "nothingElse": "Nothing else",
       "beGentle": "Be gentle with me",
@@ -1729,7 +1732,7 @@
       "lengthValue": "{n} questions, about {min} minutes. Each question can have a follow-up.",
       "lengthEnglish": "As long as you like · end any time",
       "drillLength": "{n} questions, about {min} minutes",
-      "correctionsValue": "After each of your turns, up to 3, with a reason. Nothing appears while you speak.",
+      "correctionsValue": "After the call, each one with a reason. Nothing appears while you speak.",
       "noCv": "Add your CV so questions use your own experience.",
       "addCv": "Add CV",
       "startDrill": "Start drill",

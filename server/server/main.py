@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, api, config, stt, tts, ws
+from . import __version__, api, config, postcall, stt, tts, ws
 from .engines import antigravity_cli
 
 log = logging.getLogger("uvicorn.error")
@@ -32,6 +32,11 @@ def preload_speech() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = None
+    try:
+        if (fixed := await asyncio.to_thread(postcall.repair_all)):        # D96: sessions the last run left half prepared
+            log.info("Closed %d session(s) whose feedback was interrupted", fixed)
+    except Exception as exc:
+        log.warning("Repair of interrupted sessions failed: %s", type(exc).__name__)
     antigravity_cli.forget_left_over()                   # D87: chats a killed Vukoli left in Antigravity's history
     if os.getenv("IC_PRELOAD", "1") != "0":
         task = asyncio.ensure_future(asyncio.to_thread(preload_speech))

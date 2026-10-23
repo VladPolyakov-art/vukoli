@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chunkPcm, durationSeconds, float32ToPcm16, MAX_FRAME_BYTES, pcm16ToFloat32, rmsPcm16 } from "./framing";
 import { VadMachine } from "./vad";
+import * as fx from "./voiceFixtures";
 
 describe("PCM framing", () => {
   it("round-trips float <-> PCM16 with clipping", () => {
@@ -33,16 +34,18 @@ describe("PCM framing", () => {
   });
 });
 
-const frame = () => new ArrayBuffer(1024);
+// A voiced (vowel) frame: the VAD only counts loud frames that sound like a voice; `rms` below is what the machine is told.
+const VOICED = (fx.frames(fx.vowel(150, 0.6, 0.2))[8] as Int16Array).buffer as ArrayBuffer;
+const frame = () => VOICED;
 const LOUD = 0.05;
 const QUIET = 0.001;
 
 describe("VadMachine", () => {
-  it("starts after 3 loud frames and sends the pre-roll with the start", () => {
+  it("starts after 4 loud voiced frames and sends the pre-roll with the start", () => {
     const vad = new VadMachine(1000);
-    const out = [QUIET, QUIET, LOUD, LOUD, LOUD].flatMap((rms, i) => vad.feed({ buffer: frame(), rms, now: i * 32, echoRisk: false }));
+    const out = [QUIET, QUIET, LOUD, LOUD, LOUD, LOUD].flatMap((rms, i) => vad.feed({ buffer: frame(), rms, now: i * 32, echoRisk: false }));
     const start = out.find((e) => e.type === "start");
-    expect(start && start.type === "start" && start.preRoll.length).toBe(5);
+    expect(start && start.type === "start" && start.preRoll.length).toBe(6);
     expect(vad.recording).toBe(true);
   });
 
@@ -61,6 +64,7 @@ describe("VadMachine", () => {
     const vad = new VadMachine(500);
     vad.begin(0);
     vad.feed({ buffer: frame(), rms: LOUD, now: 10, echoRisk: false });
+    vad.feed({ buffer: frame(), rms: LOUD, now: 42, echoRisk: false }); // a turn only counts as spoken after 2 voiced frames in a row
     expect(vad.feed({ buffer: frame(), rms: QUIET, now: 400, echoRisk: false }).some((e) => e.type === "commit")).toBe(false);
     expect(vad.feed({ buffer: frame(), rms: QUIET, now: 600, echoRisk: false }).some((e) => e.type === "commit")).toBe(true);
     vad.finish();

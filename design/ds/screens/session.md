@@ -4,6 +4,7 @@
 > Inputs: `docs/ia/wireframes/session.md`, `ds/CONTRACT.md`, `ds/components.md`, `docs/motion.md`, `docs/moodboard.md` (R1–R11, P1–P8), `docs/prd.md` US-13–19, US-04 AC5, US-24, US-58. Redesigns `app/web/src/screens/Session.tsx` + `components/Feedback.tsx`.
 > Legend: G<n> = gap from `ds/components.md` §4 · G19 Disclosure, G20 InlineMark = new DS candidates from this map · 🟡 = assumption · Owner decisions are at the end (yes/no only).
 > **Fixture:** `docs/ia.md` §6 as is — Alex Morgan, **Kestrel Pay · Senior Product Designer**, every §6 number (Q2 of 5, 07:12, 11 fillers, 289 words, 124 wpm, the same flags). Same fixture as Home and Debrief (orchestrator, 2026-10-20: the PM role in the first brief was a mistake; PM answers live only in the Sam Rivera example).
+> **D96 (2026-10-23) overrides the per-answer feedback below:** during a call no feedback is made; the panel shows the note «Feedback comes after the call · Mike stays fast» (`PanelBody`), never auto-opens and its dot stays off. After End the ending screen shows «Preparing feedback · n of N answers». **D97:** a voice turn starts only on voiced sound (pitch), knocks and noise do not open it (`web/src/audio/voicing.ts`).
 
 ## Changelog v1 → v2 (D47, 2026-10-20)
 

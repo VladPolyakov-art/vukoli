@@ -122,14 +122,21 @@ export function conversation(page: Page) {
   return page.getByRole("log", { name: /^(Conversation|Transcript)$/ });
 }
 
-/** Open the live feedback panel if it is closed (F). */
-export async function showFeedback(page: Page) {
+/** D96: during the call the panel holds no feedback, only a calm note that it comes after the call. Opens it if it is
+ * closed (F) and returns it. */
+export async function showFeedbackLater(page: Page) {
   const show = page.getByRole("button", { name: "Show feedback (F)" });
   if (await show.isVisible()) await show.click();
   // Desktop: a side panel (complementary). Phone: the same panel as a dialog over the session.
   const panel = page.getByRole("complementary", { name: "Feedback" }).or(page.getByRole("dialog", { name: "Feedback" }));
   await expect(panel).toBeVisible();
   return panel;
+}
+
+/** The breakdown card of question `n` on the debrief page (the radio picks it). */
+export async function debriefCard(page: Page, n: number) {
+  await page.getByRole("radio", { name: String(n), exact: true }).click();
+  return page.getByRole("region", { name: "Breakdown" }).getByRole("article");
 }
 
 /** End the session and wait for the "saved" toast; returns its "Open debrief" button. */

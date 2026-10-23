@@ -1,12 +1,10 @@
 /* First-time tips (Question 1 only): static, never animated while speaking, removed after the first answer. */
 import { Card, Icon } from "../../../ds";
 import { t } from "../../../i18n";
-import type { SessionLayout } from "../useSessionLayout";
 import type { SessionInput } from "../types";
 import s from "./parts.module.css";
 
-export function FirstTime({ input, pauseSec, layout = "wide", english = false }: { input: SessionInput; pauseSec: number; layout?: SessionLayout; /** English practice has turns, not questions (F-13-9). */ english?: boolean }) {
-  const tail = english ? "English" : "";
+export function FirstTime({ input, pauseSec, english = false }: { input: SessionInput; pauseSec: number; /** English practice has turns, not questions (F-13-9). */ english?: boolean }) {
   return (
     <Card tone="subtle" padding="sm" className={s.tips}>
       <div data-review-id="Session/Tips" data-review-section="Session · First-time tips" data-comment-target className={s.tipsInner}>
@@ -22,7 +20,7 @@ export function FirstTime({ input, pauseSec, layout = "wide", english = false }:
             <>
               <li>{t("session.firstTime.text1")}</li>
               <li>{t("session.firstTime.text2")}</li>
-              <li>{t(layout === "wide" ? `session.firstTime.text3${tail}` : layout === "mid" ? `session.firstTime.text3Mid${tail}` : `session.firstTime.text3Narrow${tail}`)}</li>
+              <li>{t(english ? "session.firstTime.text3English" : "session.firstTime.text3")}</li>
             </>
           )}
         </ul>

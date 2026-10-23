@@ -66,18 +66,34 @@ function LiveDebrief() {
   if (record) loadedOnce.current = true;
   useDocumentTitle(record?.title || t("debrief.title")); // QA-11: the tab carries the session's name
 
-  // The debrief may still be being written right after a session: poll for up to a minute.
-  const waiting = Boolean(record && record.mode === "interview" && !record.debrief && record.feedback.length && polls < 20);
+  // D96: right after a session the server makes the feedback answer by answer, then the debrief (`post_call` on the
+  // record). The page asks again every few seconds for as long as that marker is there (the server drops it itself when
+  // the work is over or its job died). A saved session with no marker and no debrief is polled for up to a minute.
+  const preparing = Boolean(record?.post_call);
+  const waiting = preparing || Boolean(record && record.mode === "interview" && !record.debrief && record.feedback.length && polls < 20);
   useInterval(() => {
     setPolls((n) => n + 1);
     api.session(id).then((r) => session.setData(r)).catch(() => {});
-  }, 3000, waiting);
+  }, preparing ? 2000 : 3000, waiting);
   useEffect(() => { setPolls(0); setStronger({}); setNotice(""); setRechecking(null); }, [id]);
 
   const model = useMemo(
     () => (record ? mapRecord(record, { obsidian: Boolean(settings?.obsidian_dir), stronger, waiting }) : undefined),
     [record, settings?.obsidian_dir, stronger, waiting],
   );
+
+  /* The feedback and the debrief are still being made: say how far it is (the model below is not shown until it is done). */
+  if (record?.post_call) {
+    const { done, total, stage } = record.post_call;
+    return (
+      <DebriefView
+        variant={record.mode === "english" ? "english" : "interview"}
+        state="preparing"
+        progress={{ done, total, stage }}
+        layerOrder={settings?.layer_order ?? "content-first"}
+      />
+    );
+  }
 
   if (!record) {
     const gone = session.error instanceof ApiError && session.error.status === 404;

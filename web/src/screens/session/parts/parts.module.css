@@ -54,6 +54,8 @@
 
 /* ---------- panel content ---------- */
 .panelHint { margin: 0; font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-text-secondary); }
+.panelLater { display: flex; flex-direction: column; gap: var(--space-2); }
+.panelLaterTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: var(--leading-tight); color: var(--color-text-primary); }
 .panelWait { display: flex; flex-direction: column; gap: var(--space-4); }
 .panelWait > p { margin: 0; }
 .panelFeedback { display: flex; flex-direction: column; gap: var(--space-5); }

@@ -4,6 +4,7 @@
 > Inputs: `docs/ia/wireframes/debrief.md`, `docs/ia.md` §2, §4, §6 (mock S1–S3, invariants 1–10), `docs/prd.md` US-18, US-19, US-20, US-21, US-23, US-24 AC4, US-29, US-58 AC5, `ds/CONTRACT.md`, `ds/components.md` (G1–G18), `docs/motion.md`, moodboard P1–P8 / R1–R11, D37, D45, D46.
 > Replaces today's `screens/Debrief.tsx` (verdict and weak spots split over 3 cards, transcript at the bottom, Delete as a loose ghost button) and `screens/History.tsx` (meta as a "·" line, delete IconButton only, no rename, no filter, success-green notice).
 > Legend: 🟡 assumption · **G<n>** = gap from `ds/components.md` §4 · **G19+** = new candidate from this map · R<n> / P<n> = moodboard.
+> **D96 (2026-10-23):** feedback is made after the call. While it is being prepared the Debrief shows a preparing state with progress («n of N answers») and the hint that the page can be left; it polls every 2 s until the `post_call` marker clears. Edits return 409 `still_preparing` meanwhile.
 
 ## 0. Principles this screen applies
 - **Otter summary structure, not its look (R5, Q3):** Overview → key points → per-item detail with quotes and timestamps → here: **Verdict** (overview) → **Weak spots + actions** (key points / action items) → **Question by question** (outline with quotes). No tokens from Otter.

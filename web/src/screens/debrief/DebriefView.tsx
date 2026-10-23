@@ -66,7 +66,7 @@ export function DebriefView(props: DebriefViewProps) {
     return (
       <div className={root} aria-busy="true">
         {heading}
-        <LoadingBody preparing={state === "preparing"} />
+        <LoadingBody preparing={state === "preparing"} progress={props.progress} />
       </div>
     );
   }

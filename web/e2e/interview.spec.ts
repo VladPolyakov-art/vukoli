@@ -1,4 +1,4 @@
-/* Flow B: a text interview. A question, follow-ups, one feedback panel per question thread, End, the debrief.
+/* Flow B: a text interview. A question, follow-ups, no feedback during the call (D96), End, the debrief with all of it.
  * US-10 (tailored questions), US-13 (session), US-14 (follow-ups), US-15 (feedback panel), US-20 (debrief). */
 import { expect, test } from "@playwright/test";
 import {
@@ -11,7 +11,8 @@ import {
   questionCounter,
   resetApp,
   sendAnswer,
-  showFeedback,
+  debriefCard,
+  showFeedbackLater,
   skipSetup,
   startTextInterview,
   steerEngine,
@@ -23,7 +24,7 @@ test.beforeEach(async ({ page, request }) => {
 });
 
 test.describe("US-14 / US-15 / US-20 A text interview", () => {
-  test("happy path: answer, follow-up, per-thread feedback, end, debrief", async ({ page }) => {
+  test("happy path: answer, follow-up, no feedback during the call, end, debrief with the feedback", async ({ page }) => {
     const errors = collectPageErrors(page);
     await startTextInterview(page);
 
@@ -43,18 +44,10 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
     await expect(questionCounter(page, 2, 5)).toBeVisible();
 
-    // US-15 AC1: one panel for the whole thread (main answer + its follow-up), three layers, one fix at most each.
-    const panel = await showFeedback(page);
-    await expect(panel.getByRole("heading", { name: /^Question 1 · Your answer \+ 1 follow-up$/ })).toBeVisible();
-    const summary = panel.getByRole("list", { name: "Summary" });
-    await expect(summary).toContainText("Content");
-    await expect(summary).toContainText("Language");
-    await expect(summary).toContainText("Delivery");
-    await expect(panel.getByRole("region", { name: "Content" })).toContainText("Finish with what happened");
-    // AC3: a layer with nothing to fix says so in one line instead of inventing a fix.
-    await expect(panel.getByRole("region", { name: "Language" })).toContainText("Nothing to fix in this answer.");
-    // US-19: delivery in text mode shows the length and says what is not available.
-    await expect(panel.getByRole("region", { name: "Delivery" })).toContainText("Pace and fillers aren't available in text mode.");
+    // D96: Mike goes on at once and makes no feedback during the call; the panel says it comes after.
+    const panel = await showFeedbackLater(page);
+    await expect(panel).toContainText("Feedback comes after the call");
+    await expect(panel.getByRole("list", { name: "Summary" })).toHaveCount(0);
 
     // Two more questions answered with a result, then the session ends.
     await sendAnswer(page, ANSWER_WITH_RESULT);
@@ -76,6 +69,13 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await expect(breakdown.getByRole("radiogroup", { name: "Question" }).getByRole("radio")).toHaveCount(3); // answered
     await expect(breakdown.getByRole("article")).toContainText(ANSWER_NO_RESULT);
     await expect(breakdown.getByRole("heading", { name: "Content", level: 4 })).toBeVisible();
+    // US-15 AC1 (D96: made after the call): one card for the whole thread, three layers, one fix at most each.
+    const card = await debriefCard(page, 1);
+    await expect(card).toContainText("Finish with what happened");
+    // AC3: a layer with nothing to fix says so in one line instead of inventing a fix.
+    await expect(card).toContainText("Nothing to fix in this answer.");
+    // US-19: delivery in text mode says what is not available.
+    await expect(card).toContainText("Pace and fillers aren't available in text mode.");
     expect(errors).toEqual([]);
   });
 
@@ -108,19 +108,17 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await expect(page.getByRole("region", { name: "What to work on" })).toHaveCount(0);
   });
 
-  test("negative: the model fails on the content and language layers, the session goes on and the answer is saved (US-15 AC5)", async ({
+  test("negative: the model fails on the content and language layers after the call, the answer is still saved (US-15 AC5)", async ({
     page,
     request,
   }) => {
     await steerEngine(request, { fail: ["p2a", "p2b"] }); // the content and language layers fail on purpose
     await startTextInterview(page);
 
+    // D96: nothing is made during the call, so the failure cannot reach the session: Mike moves on at once.
     await sendAnswer(page, ANSWER_WITH_RESULT);
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    const panel = await showFeedback(page);
-    // The panel is still there and the layer that could not be made is marked, not given a made-up fix.
-    await expect(panel.getByRole("list", { name: "Summary" })).toContainText("Content · n/a");
-    await expect(panel.getByRole("region", { name: "Delivery" })).toContainText("words");
+    await expect(await showFeedbackLater(page)).toContainText("Feedback comes after the call");
 
     // The session is not stuck: the next answer is accepted, and the first answer is still in the conversation.
     await sendAnswer(page, ANSWER_WITH_RESULT);
@@ -131,40 +129,39 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await expect(page.getByRole("region", { name: "Breakdown" }).getByRole("article")).toContainText(ANSWER_WITH_RESULT);
   });
 
-  test("negative: when a layer cannot be made the live panel says so instead of 'Nothing to fix' or 'Good' (US-15 AC5)", async ({
+  test("negative: when a layer cannot be made the debrief says so instead of 'Nothing to fix' or 'Good' (US-15 AC5)", async ({
     page,
     request,
   }) => {
     await steerEngine(request, { fail: ["p2a", "p2b"] });
     await startTextInterview(page);
     await sendAnswer(page, ANSWER_WITH_RESULT);
-    const panel = await showFeedback(page);
-    for (const layer of ["Content", "Language"]) {
-      const block = panel.getByRole("region", { name: layer });
-      await expect(block).toContainText("Not available for this answer.");
-      await expect(block).not.toContainText("Nothing to fix");
-    }
-    // The summary chips say n/a, never Good; delivery (computed locally) still reports.
-    const summary = panel.getByRole("list", { name: "Summary" });
-    await expect(summary).toContainText("Content · n/a");
-    await expect(summary).toContainText("Language · n/a");
-    await expect(summary).not.toContainText("Good");
-    // Mike moves on and the session is not stuck.
-    await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible(); // Mike moves on
+    await sendAnswer(page, ANSWER_WITH_RESULT);
+    await sendAnswer(page, ANSWER_WITH_RESULT);
+    await (await endSession(page)).click();
+    await expect(page).toHaveURL(/\/sessions\/s-/);
+    const card = await debriefCard(page, 1);
+    // The debrief shows no made-up fix for the layers that failed: they are left out, and delivery (computed locally) reports.
+    await expect(card.getByRole("heading", { name: "Content", level: 4 })).toHaveCount(0);
+    await expect(card.getByRole("heading", { name: "Language", level: 4 })).toHaveCount(0);
+    await expect(card).not.toContainText("Nothing to fix");
+    await expect(card.getByRole("heading", { name: "Delivery", level: 4 })).toBeVisible();
+    await expect(card).not.toContainText("Good");
   });
 
   test("a language slip is a weak spot in the debrief, with a reason (US-17 AC1, US-20 AC1)", async ({ page }) => {
     await startTextInterview(page);
     await sendAnswer(page, ANSWER_WITH_SLIP);
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    const language = (await showFeedback(page)).getByRole("region", { name: "Language" });
-    await expect(language).toContainText("since five years");
-    await expect(language).toContainText("for five years");
-    await expect(language).toContainText("Use 'for' with periods of time"); // the reason is explained (US-17 AC1)
-
     await sendAnswer(page, ANSWER_WITH_RESULT);
     await sendAnswer(page, ANSWER_WITH_RESULT);
     await (await endSession(page)).click();
+
+    const card = await debriefCard(page, 1);
+    await expect(card).toContainText("since five years");
+    await expect(card).toContainText("for five years");
+    await expect(card).toContainText("Use 'for' with periods of time"); // the reason is explained (US-17 AC1)
     await page.getByRole("button", { name: /^Verdict/ }).click();
     await expect(page.getByRole("region", { name: "What to work on" })).toContainText("Language");
   });
@@ -175,14 +172,14 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await startTextInterview(page);
     await sendAnswer(page, ANSWER_WITH_SLIP);
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    const language = (await showFeedback(page)).getByRole("region", { name: "Language" });
-    await expect(language).toContainText("since five years");
-    await language.getByRole("button", { name: "I wrote it right" }).click();
-    await expect(language).not.toContainText("since five years");
-
     await sendAnswer(page, ANSWER_WITH_RESULT);
     await sendAnswer(page, ANSWER_WITH_RESULT);
     await (await endSession(page)).click();
+
+    const card = await debriefCard(page, 1);
+    await expect(card).toContainText("since five years");
+    await card.getByRole("button", { name: "Dismiss" }).click();
+    await expect(card.getByText("You typed")).toHaveCount(0);
     await page.getByRole("button", { name: /^Verdict/ }).click();
     await expect(page.getByRole("region", { name: "What to work on" })).not.toContainText("Language");
   });
@@ -198,72 +195,41 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
   });
 });
 
-test.describe("US-15 The first-time hint names where feedback appears", () => {
-  const WORDING = {
-    wide: "Feedback appears on the right after each question.",
-    mid: "a dot shows on the feedback button. Press it and the feedback slides in from the right.",
-    narrow: "a dot shows on the feedback button. Press it and the feedback slides up from the bottom.",
-  } as const;
+test.describe("US-15 D96 The first-time hint says feedback comes after the call", () => {
+  const WORDING = "Feedback comes after the call, so Mike stays fast.";
   for (const [layout, width] of [["narrow", 375], ["mid", 900], ["wide", 1440]] as const) {
-    test(`${layout} layout (${width} px): the hint matches where the panel opens`, async ({ page }) => {
+    test(`${layout} layout (${width} px): one line, the same everywhere`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await startTextInterview(page);
-      // The session reports the layout it measured; the hint must follow it, not the viewport.
       const measured = await page.locator("[data-layout]").first().getAttribute("data-layout");
       expect(measured).toBe(layout);
       const tips = page.getByText("First time here").locator("xpath=ancestor::div[1]");
-      await expect(tips).toContainText(WORDING[layout]);
-      for (const other of Object.values(WORDING).filter((w) => w !== WORDING[layout])) {
-        await expect(tips).not.toContainText(other);
-      }
+      await expect(tips).toContainText(WORDING);
+      await expect(tips).not.toContainText("dot shows");
+      await expect(tips).not.toContainText("slides");
     });
   }
 });
 
 test.describe("US-18 AC3 Edit my answer", () => {
-  test("happy path: correct the typed answer, only that answer is checked again", async ({ page }) => {
+  test("happy path: correct the typed answer in the debrief, only that answer is checked again", async ({ page }) => {
     await startTextInterview(page);
     await sendAnswer(page, ANSWER_WITH_SLIP);
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    const panel = await showFeedback(page);
-    await expect(panel.getByRole("region", { name: "Language" })).toContainText("since five years");
+    await sendAnswer(page, ANSWER_WITH_RESULT);
+    await sendAnswer(page, ANSWER_WITH_RESULT);
+    await (await endSession(page)).click();
+    const card = await debriefCard(page, 1);
+    await expect(card).toContainText("since five years");
 
-    await panel.getByRole("button", { name: "Edit my answer" }).click();
-    await expect(panel.getByText("Only this answer is checked again.")).toBeVisible();
+    // D96: there is nothing to edit during the call (no feedback yet); the editor lives in the debrief.
+    await card.getByRole("button", { name: "Edit what I said" }).click();
     const fixed = "I have worked on this team for five years and activation went up by twelve percent in one quarter.";
-    await panel.getByRole("textbox", { name: "Your answer" }).fill(fixed);
-    await panel.getByRole("button", { name: "Save and check again" }).click();
+    await card.getByRole("textbox").fill(fixed);
+    await card.getByRole("button", { name: "Save and check again" }).click();
 
-    // The new text replaces the old one in the transcript and the language layer is made again.
-    await expect(conversation(page)).toContainText(`You typed: ${fixed}`);
-    await expect(conversation(page)).not.toContainText("I am working on this team since five years");
-    await expect(panel.getByRole("region", { name: "Language" })).toContainText("Nothing to fix in this answer.");
-    await expect(panel.getByRole("region", { name: "Language" })).not.toContainText("since five years");
-    // The session carries on: the next question is still waiting for an answer.
-    await expect(questionCounter(page, 2, 5)).toBeVisible();
-  });
-
-  test("negative: Cancel keeps the answer and its corrections as they were", async ({ page }) => {
-    await startTextInterview(page);
-    await sendAnswer(page, ANSWER_WITH_SLIP);
-    await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    const panel = await showFeedback(page);
-    await panel.getByRole("button", { name: "Edit my answer" }).click();
-    await panel.getByRole("textbox", { name: "Your answer" }).fill("Something else entirely.");
-    await panel.getByRole("button", { name: "Cancel" }).click();
-    await expect(conversation(page)).toContainText(`You typed: ${ANSWER_WITH_SLIP}`);
-    await expect(panel.getByRole("region", { name: "Language" })).toContainText("since five years");
-  });
-
-  test("negative: the engine fails while checking again, the answer is not changed", async ({ page, request }) => {
-    await startTextInterview(page);
-    await sendAnswer(page, ANSWER_WITH_SLIP);
-    await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    const panel = await showFeedback(page);
-    await panel.getByRole("button", { name: "Edit my answer" }).click();
-    await steerEngine(request, { fail: ["p2a", "p2b"] });
-    await panel.getByRole("textbox", { name: "Your answer" }).fill("Activation went up by twelve percent.");
-    await panel.getByRole("button", { name: "Save and check again" }).click();
-    await expect(conversation(page)).toContainText(`You typed: ${ANSWER_WITH_SLIP}`);
+    await expect(card).toContainText(fixed);
+    await expect(card).not.toContainText("since five years");
+    await expect(card.getByText("Edited by you")).toBeVisible();
   });
 });

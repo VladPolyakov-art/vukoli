@@ -18,8 +18,19 @@ Source of truth: `server/ws.py` (socket loop), `server/session.py` (local interv
   recorded for at most 4 minutes. A violation ends the session with `error` `session_failed` (the transcript so
   far is still saved).
 - **Save on exit.** When the socket closes for any reason, the server saves the session if the user answered at
-  least once, then computes the debrief. If the socket is still open it sends `saving`, `session_saved`,
-  `debrief_pending` and `debrief`, then closes.
+  least once, then makes the feedback and the debrief (D96, below). If the socket is still open it sends `saving`,
+  `session_saved`, `feedback_progress` / `feedback` per answer, `debrief_pending` and `debrief`, then closes.
+- **Feedback after the call (D96).** While a session is live the server runs nothing but Mike, speech recognition
+  and speech synthesis: no feedback event and no feedback model call, and no second (word-timing) recognition pass.
+  It only keeps each answer's record and, for a voice answer, its recording (at most 45 minutes of audio in memory
+  for the whole session; an answer that does not fit just gets no word timings). After End the answers are worked
+  through in the order they were given: word pass, delivery, language, content. The record is saved first (with
+  `post_call`, below) and again after every answer, so the work is finished and saved even when the window or the
+  socket is closed right after End. The working time is `60 s + 120 s per answer`, at most 1 hour; time spent
+  waiting because another live call has the machine is not counted. An answer that does not get all its layers in
+  time is closed with those layers `unavailable` (`code`: `timeout`). If the server itself stops, the next start
+  (or the next time the session is opened) closes the unfinished answers with `code: "interrupted"` and builds the
+  debrief without a model.
 
 ## Client to server
 
@@ -69,9 +80,33 @@ Then binary PCM frames, then:
 ```json
 {"type": "audio_stream_end"}
 ```
-`activity_start` interrupts Mike if he is speaking (barge-in: the server sends `interrupted` and records the
-cut-off line). `turn_id` is a non-negative integer chosen by the client; it is echoed in `speech_preview`,
-`user_transcript`, `turn_complete` and `feedback_pending`.
+`activity_start` only says the microphone heard something (a breath or a click counts). If Mike is speaking or
+preparing his reply, the local-engine server pauses him (text and audio) and waits for the verdict on the clip.
+The Interrupt button sends `"manual": true`: that is a barge-in by definition, Mike stops at once and nothing waits.
+
+- speech: the server cancels the reply, records the cut-off line and sends `interrupted` with the turn's `turn_id`,
+  then the answer goes on as usual (`user_transcript`, `turn_complete`). `interrupted` is sent for every recognised
+  voice answer, also when nothing was cut off. Without a `turn_id` (typed text, redo) it settles every open turn;
+- no speech (empty text, Whisper's "Thank you." on silence or noise, Mike's own echo): the server sends
+  `voice_turn_dropped` with the `turn_id` and Mike's reply goes on from where it stopped. Nothing is added to the
+  transcript. A `notice` `not_heard` follows only when Mike was neither speaking nor replying.
+
+Every `activity_start` gets exactly one of the two, whatever happens (recognition missing or failing, `activity_cancel`,
+the Interrupt button). Turns may overlap (a new clip while the last one is still being recognised): Mike speaks only
+while no turn is open, so a verdict for an old turn never frees him while a newer one is open. Two safety nets keep
+noise from silencing him for good: the server drops open turns that got no verdict 15 s after recording ended
+(`FLOW_MAX_S`), and a turn whose live captions stay empty for a few seconds of audio is announced by
+`{"type": "voice_turn_noise", "turn_id": 3}` (not a verdict: it stops holding Mike back, its verdict still follows).
+
+The client holds Mike's audio per open turn from `activity_start` (it keeps what was not yet played), plays it again
+when the last held turn gets `voice_turn_dropped` / `voice_turn_noise` and discards it on `interrupted`; a turn that
+ended 8 s ago without a verdict stops holding on its own. Gemini Live decides on its own and sends `interrupted`
+at once (no `turn_id`).
+`turn_id` is a non-negative integer chosen by the client; it is echoed in `speech_preview`, `user_transcript`,
+`turn_complete` and `voice_turn_dropped`.
+
+With browser recognition the verdict is the client's: `user_turn` (text, as below) or, when it heard nothing,
+`{"type": "activity_cancel", "turn_id": 3}`, which gives `voice_turn_dropped`.
 
 ### Typed or browser-recognised answer
 
@@ -95,10 +130,11 @@ cut-off line). `turn_id` is a non-negative integer chosen by the client; it is e
 ```
 
 - `redo_answer`: drop the last answer (and Mike's reply to it); Mike says "Sure, go ahead." and the same question
-  is open again. Feedback for the dropped answer is removed.
+  is open again. The dropped answer leaves the after-call queue and its recording is released.
 - `flag_action` `action`: `confirm` (I did say that: the item now counts), `dismiss` (not an error, or misheard:
   never counted, and the same phrase is not flagged again this session), `restore`.
-- `recheck` ("Edit what I said", US-18 AC3): `text` is the whole corrected answer or, with `flag_id`, what the user
+- `recheck` ("Edit what I said", US-18 AC3; D96: during a call only for an answer of a continued session whose
+  feedback is already complete, otherwise `recheck_failed` `not_found`; the debrief page uses the REST call): `text` is the whole corrected answer or, with `flag_id`, what the user
   really said instead of that correction's "Heard as" fragment (at least 5 words after the swap). Only this answer
   is checked again: language and content are asked again, delivery keeps the audio's length and pace and recounts
   the fillers, a stronger version that existed is written again. The server answers with `feedback` (the record,
@@ -107,7 +143,7 @@ cut-off line). `turn_id` is a non-negative integer chosen by the client; it is e
 - `input_mode`: the user switched how they answer mid-session (`voice`, `browser_stt` or `text`). A session that
   started with `text` gets server speech recognition on `voice`; Mike's speech stays as the session started.
 - `silence`: the user has been quiet for a long time; Mike says only "Take your time." (local engines).
-- `end_session`: finish normally; the server saves and debriefs.
+- `end_session`: finish normally; the server saves, then makes the feedback and the debrief.
 
 ## Server to client
 
@@ -133,7 +169,9 @@ cut-off line). `turn_id` is a non-negative integer chosen by the client; it is e
 {"type": "turn_complete", "speaker": "model", "full_text": "Okay. What was the result of that launch?",
  "kind": "follow_up", "question_id": "B2", "thread_id": "B2"}
 {"type": "response_complete"}
-{"type": "interrupted"}
+{"type": "interrupted", "turn_id": 3}
+{"type": "voice_turn_dropped", "turn_id": 3}
+{"type": "voice_turn_noise", "turn_id": 3}
 ```
 - Mike's text arrives sentence by sentence (`delta` is one sentence, `full_text` the turn so far). With Gemini Live,
   deltas are transcription fragments and user deltas also arrive (`speaker: "user"`).
@@ -154,9 +192,9 @@ User side (voice input):
 {"type": "notice", "code": "not_heard", "message": "I didn't catch that. Please try again a little louder or closer to the microphone."}
 ```
 `speech_preview` is display-only. `low_conf` lists words below 0.5 recogniser confidence ("possibly misheard").
-Speech is recognised in two passes so Mike can answer sooner: the first `user_transcript` has the text and an
-empty `low_conf`; word confidence is computed in the background, and if any word is below 0.5 the same
-`user_transcript` (same `turn_id` and text) is sent again with `low_conf` filled. Replace it by `turn_id`.
+Speech is recognised in two passes so Mike can answer sooner (D96): `user_transcript` has the text and an empty
+`low_conf`; the word pass (word confidence and timings) is made after the call, for the feedback, so `low_conf` stays
+empty during the call.
 
 ```json
 {"type": "turn_metrics", "turn_id": 3, "stt_ms": 640, "path": "model", "first_text_ms": 820,
@@ -166,10 +204,10 @@ empty `low_conf`; word confidence is computed in the background, and if any word
 follow-ups for a question are used up). `moved_on: true` is added when the model moved on by itself and the code
 asked the next question (see Turns). Times are measured from the moment the server has the user's text.
 
-### Feedback (one record per answer of 5 words or more)
+### Feedback (one record per answer of 5 words or more; sent after End, D96)
 
 ```json
-{"type": "feedback_pending", "feedback_id": "fb-1a2b3c4d", "turn_id": 3}
+{"type": "feedback_progress", "done": 2, "total": 5}
 {"type": "feedback", "feedback": {
   "id": "fb-1a2b3c4d", "turn_id": 3, "question": "Tell me about a project you owned.", "question_id": "B1",
   "competency": "B", "answer_kind": "main", "answer": "Last year we has redesigned ...", "source": "voice",
@@ -193,6 +231,8 @@ asked the next question (see Turns). Times are measured from the moment the serv
 {"type": "feedback_unavailable", "feedback_id": "fb-1a2b3c4d", "code": "ollama_not_running",
  "message": "Feedback is not available for this answer. Your answer is still saved."}
 ```
+- `feedback_progress` opens the after-call work (`done: 0`) and follows each finished answer (`done` of `total`).
+  `feedback_pending` is gone: nothing is pending per answer during the call.
 - The same record is sent several times as layers fill in: delivery first (computed in code, instant), then
   language, then content (interview only). `complete: true` marks the last one. Replace the record by `id`.
 - A layer that failed is `{"layer": "content", "status": "unavailable", "code": "timeout"}`.
@@ -205,9 +245,13 @@ asked the next question (see Turns). Times are measured from the moment the serv
   (main answer: tip below 25 words or above 420; strong tip below 12 or above 560) with text-mode copy; restarts
   are counted for voice only.
 - On engines that run one local model (Ollama, a local OpenAI-compatible server), Mike always has priority:
-  feedback, suggestions and stronger versions wait until Mike has finished replying, and a job that is running
-  when the user answers again is stopped and run again afterwards. Feedback for a voice answer starts after word
-  confidence is ready. Feedback may therefore arrive a few seconds later than the reply; it never slows Mike down.
+  suggestions (the only model work a user can ask for during a call) wait until Mike has finished replying, and a
+  job that is running when the user answers again is stopped and run again afterwards. The after-call feedback of a
+  session also waits while another live call is running.
+- A saved session that is still being prepared carries `"post_call": {"state": "running", "stage": "feedback" |
+  "debrief", "done": 2, "total": 5}` (`GET /api/sessions/{id}`). It is removed when the
+  debrief is saved. While it is there, `POST /api/sessions/{id}/debrief`, `/flags/{flag_id}`, `/stronger` and
+  `/recheck` answer `409` `still_preparing`; a rename or archive is allowed and kept.
 
 ```json
 {"type": "flag_updated", "feedback_id": "fb-1a2b3c4d", "flag": {"id": "f9e8d7c6", "status": "confirmed", "...": "..."},
@@ -235,6 +279,7 @@ asked the next question (see Turns). Times are measured from the moment the serv
 ```json
 {"type": "saving"}
 {"type": "session_saved", "session_id": "s-20261020-101530-4f5e6d"}
+{"type": "feedback_progress", "done": 0, "total": 5}
 {"type": "debrief_pending", "session_id": "s-20261020-101530-4f5e6d"}
 {"type": "debrief", "session_id": "s-20261020-101530-4f5e6d", "debrief": {
   "verdict": "You answered clearly, but most stories stopped before the result.",
@@ -272,12 +317,15 @@ asked the next question (see Turns). Times are measured from the moment the serv
 **Interview, voice, local engine**
 
 1. `start` -> `session_started` -> `ready` -> Mike's opening (fixed copy with the first question, no model call).
-2. `activity_start` + PCM + `audio_stream_end` -> `user_transcript` -> `turn_complete` (user) -> `feedback_pending`.
+2. `activity_start` + PCM + `audio_stream_end` -> `user_transcript` -> `turn_complete` (user). No feedback yet.
 3. Mike replies: a follow-up (streamed sentence by sentence, with audio) or "Okay." plus the next question (the
    code speaks it verbatim as soon as the model chooses `next_question`) -> `turn_metrics`.
-4. `user_transcript` again if some words are possibly misheard, then `feedback` x3 (delivery, language,
-   content) after Mike's reply. The user may `flag_action` or `request_stronger`.
-5. After the last question Mike gives the closing line. `end_session` -> `saving` -> `session_saved` -> `debrief`.
+4. Steps 2-3 repeat for every question. Nothing but Mike, recognition and speech runs; the answers and their
+   recordings are only kept.
+5. After the last question Mike gives the closing line. `end_session` -> `saving` -> `session_saved` ->
+   `feedback_progress` (0 of N) -> per answer `feedback` x3 (delivery, language, content) and `feedback_progress`
+   -> `debrief_pending` -> `debrief`. The user may `flag_action` / `request_stronger` / `recheck` from the debrief
+   page (REST) once `post_call` is gone.
 
 **Gemini Live.** Same messages; Mike's voice and both transcripts come from Gemini, `speech_preview` and
 `user_transcript` are not sent (user captions arrive as `transcript_delta` with `speaker: "user"`), feedback uses

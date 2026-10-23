@@ -1,5 +1,6 @@
-/* The feedback column's content (US-15): P0 first-use hint · P1 listening hint · P2 preparing · P3 layered feedback ·
- * P4 unavailable · Edit what I said · rechecking. The same content fills the wide column's Panel and the mid / narrow
+/* The feedback column's content (US-15): P0/P1 "feedback comes after the call" (D96: nothing is made during the call,
+ * so this is what the column says all the way through) · P2 preparing · P3 layered feedback · P4 unavailable · Edit
+ * what I said · rechecking. The same content fills the wide column's Panel and the mid / narrow
  * Drawer; the footer (Next question) is built by the caller. */
 import { Callout, Disclosure, Skeleton, TextShimmer } from "../../../ds";
 import { t } from "../../../i18n";
@@ -27,9 +28,13 @@ export function PanelBody({ mode, variant, input, data, layerOrder, withChecks, 
   const number = data.thread?.number ?? 0;
   switch (mode) {
     case "p0":
-      return <p className={s.panelHint}>{english ? t("feedback.p0English") : t("feedback.p0")}</p>;
     case "p1":
-      return <p className={s.panelHint}>{t("feedback.p1")}</p>;
+      return (
+        <div className={s.panelLater} data-review-id="Session/Panel/Later">
+          <p className={s.panelLaterTitle}>{t("feedback.later.title")}</p>
+          <p className={s.panelHint}>{english ? t("feedback.later.bodyEnglish") : t("feedback.later.body")}</p>
+        </div>
+      );
     case "p2":
       return (
         <div className={s.panelWait}>

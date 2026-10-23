@@ -2,7 +2,7 @@
 
 Practise job interviews out loud with **Mike**, an AI interviewer, on your own computer.
 Mike asks real interview questions (general ones, or questions built from your CV and a job posting), follows up
-like a real interviewer, and after each answer you get short feedback on content, English and delivery.
+like a real interviewer, and when the call ends you get feedback on every answer: content, English and delivery.
 There is also an English conversation mode.
 
 - Runs locally. With Ollama, nothing leaves your computer.

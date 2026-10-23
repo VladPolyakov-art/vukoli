@@ -10,7 +10,7 @@ import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from . import __version__, config, content, engines, feedback, memory, planner, storage, stt, telemetry, tts, usage
+from . import __version__, config, content, engines, feedback, memory, planner, postcall, storage, stt, telemetry, tts, usage
 from .engines.base import BACKGROUND, EngineError, LLMEngine
 from .engines.gemini_live import GeminiLiveDriver, basic_status
 from .priority import ModelGate
@@ -160,7 +160,7 @@ async def session_socket(websocket: WebSocket) -> None:
     await websocket.accept()
     outgoing: asyncio.Queue = asyncio.Queue(maxsize=1024)
     audio_queue: asyncio.Queue = asyncio.Queue(maxsize=80)
-    feedback_queue: asyncio.Queue = asyncio.Queue(maxsize=16)
+    backlog: list[tuple[dict, stt.Transcript | None]] = []   # D96: answers waiting for feedback, until the call is over
     suggest_queue: asyncio.Queue = asyncio.Queue(maxsize=1)
     overflow = asyncio.Event()
     saved_event = asyncio.Event()      # set once this socket's session is written (a resume waits for it)
@@ -238,13 +238,16 @@ async def session_socket(websocket: WebSocket) -> None:
                   "layers": {}, "complete": False}
         transcript = meta.get("transcript")
         if len(feedback.WORD.findall(text)) < 5:
+            release_audio(transcript)
             return                                      # too short to coach (Mike asks to elaborate)
-        try:
-            feedback_queue.put_nowait((record, transcript))
-            records.append(record)
-            emit("feedback_pending", feedback_id=record["id"], turn_id=record["turn_id"])
-        except asyncio.QueueFull:
-            emit("notice", code="feedback_busy", message="Feedback is catching up. This answer is still saved.")
+        # D96: no feedback work runs during the call. The record and the recording wait for End (post_call below).
+        backlog.append((record, transcript))
+        records.append(record)
+
+    def release_audio(transcript: stt.Transcript | None) -> None:
+        """Release a recording that no feedback will use (a too-short answer, a redone one)."""
+        if isinstance(driver, TextDriver):
+            driver.audio_keep.free(transcript)
 
     def user_transcript(transcript: stt.Transcript, turn_id: int | None) -> None:
         emit("user_transcript", turn_id=turn_id, text=transcript.text, backend=transcript.backend,
@@ -277,64 +280,6 @@ async def session_socket(websocket: WebSocket) -> None:
 
     def public_record(record: dict) -> dict:
         return {k: v for k, v in record.items() if k != "history_index"}
-
-    async def feedback_worker() -> None:
-        terms_source = opts.get("context_terms", [])
-        while True:
-            record, transcript = await feedback_queue.get()
-            started = time.perf_counter()
-            try:
-                if record["id"] in dropped:
-                    continue
-                if transcript is not None:
-                    await transcript.wait_words()          # word timings come from the background pass
-                low = transcript.low_confidence() if transcript is not None else []
-                record["heard_as_words"] = [w.public() for w in low]
-                record["layers"]["delivery"] = feedback.delivery_layer(
-                    record["answer"], transcript, main_answer=record["answer_kind"] == "main")
-                emit("feedback", feedback=public_record(record))
-                failures = []
-                try:
-                    record["layers"]["language"] = await asyncio.wait_for(in_background(
-                        lambda: feedback.analyze_language(
-                            llm, record["answer"], level=opts["level"], known=terms_source, low=low,
-                            english_track=opts["mode"] == "english", ignored=ignored_terms)), timeout=180)
-                except (EngineError, asyncio.TimeoutError) as exc:
-                    code = getattr(exc, "code", "timeout")
-                    failures.append(code)
-                    record["layers"]["language"] = {"layer": "language", "status": "unavailable", "code": code}
-                if record["id"] in dropped:
-                    continue
-                emit("feedback", feedback=public_record(record))
-                if opts["mode"] == "interview":
-                    try:
-                        record["layers"]["content"] = await asyncio.wait_for(in_background(
-                            lambda: feedback.analyze_content(
-                                llm, question=record["question"], competency=record["competency"],
-                                transcript=record["answer"], low=low)), timeout=180)
-                    except (EngineError, asyncio.TimeoutError) as exc:
-                        code = getattr(exc, "code", "timeout")
-                        failures.append(code)
-                        record["layers"]["content"] = {"layer": "content", "status": "unavailable", "code": code}
-                record["cascade"] = feedback.cascade_note(record["layers"])
-                record["complete"] = True
-                if record["id"] in dropped:
-                    continue
-                expected = 2 if opts["mode"] == "interview" else 1
-                if len(failures) >= expected:
-                    emit("feedback_unavailable", feedback_id=record["id"], code=failures[0],
-                         message="Feedback is not available for this answer. Your answer is still saved.")
-                emit("feedback", feedback=public_record(record))
-                telemetry.record("feedback", settings, engine=opts["engine"], ok=not failures,
-                                 feedback_ms=round((time.perf_counter() - started) * 1000))
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                log.warning("Feedback failed: %s", type(exc).__name__)
-                emit("feedback_unavailable", feedback_id=record["id"], code="internal",
-                     message="Feedback is not available for this answer. Your answer is still saved.")
-            finally:
-                feedback_queue.task_done()
 
     async def suggest_worker() -> None:
         while True:
@@ -438,7 +383,15 @@ async def session_socket(websocket: WebSocket) -> None:
                 await asyncio.wait_for(audio_queue.join(), timeout=3)
                 state["voice_turn"] = turn_id
                 state["pending_voice"] = True
-                await driver.begin_audio_turn()
+                if isinstance(driver, TextDriver):
+                    await driver.begin_audio_turn(turn_id, manual=data.get("manual") is True)
+                else:
+                    await driver.begin_audio_turn()
+            elif kind == "activity_cancel":
+                # Browser recognition heard nothing: the voice turn opened by activity_start has no speech in it.
+                if isinstance(driver, TextDriver):
+                    cancelled = data.get("turn_id")
+                    await driver.cancel_audio_turn(cancelled if isinstance(cancelled, int) else None)
             elif kind == "audio_stream_end":
                 await asyncio.wait_for(audio_queue.join(), timeout=3)
                 if isinstance(driver, TextDriver):
@@ -452,6 +405,10 @@ async def session_socket(websocket: WebSocket) -> None:
                     removed = [r["id"] for r in records if r["history_index"] >= keep]
                     dropped.update(removed)
                     records[:] = [r for r in records if r["id"] not in dropped]
+                    for _record, transcript in backlog:
+                        if _record["id"] in dropped:
+                            release_audio(transcript)
+                    backlog[:] = [item for item in backlog if item[0]["id"] not in dropped]
                     emit("answer_reset", question=question, removed_feedback_ids=removed)
             elif kind == "suggest":
                 state["suggest"] = bool(data.get("on")) and settings["answer_suggester"]
@@ -585,7 +542,7 @@ async def session_socket(websocket: WebSocket) -> None:
             on_transcript_delta=lambda speaker, delta, full: emit("transcript_delta", speaker=speaker,
                                                                   delta=delta, full_text=full),
             on_turn_complete=turn_complete,
-            on_interrupted=lambda: emit("interrupted"),
+            on_interrupted=lambda turn_id=None: emit("interrupted", **({} if turn_id is None else {"turn_id": turn_id})),
             on_ready=lambda: emit("ready"),
             on_response_complete=lambda: emit("response_complete"),
         )
@@ -613,6 +570,8 @@ async def session_socket(websocket: WebSocket) -> None:
                 on_notice=lambda code, text: emit("notice", code=code, message=text),
                 on_preview=lambda text: emit("speech_preview", turn_id=state["voice_turn"], text=text),
                 on_error=lambda code, message, hint, retryable: error(code, message, hint, retryable),
+                on_voice_dropped=lambda turn_id: emit("voice_turn_dropped", turn_id=turn_id),
+                on_voice_noise=lambda turn_id: emit("voice_turn_noise", turn_id=turn_id),
                 on_user_transcript=user_transcript, on_metrics=metrics, gate=gate, resume=resume_info, **callbacks)
             stt_info = recogniser.info() if recogniser else {"available": False, "backend": "none"}
         session = {"id": storage.new_id("s-"), "mode": opts["mode"], "round_type": opts["round_type"],
@@ -639,11 +598,12 @@ async def session_socket(websocket: WebSocket) -> None:
             for record in records:
                 emit("feedback", feedback=public_record(record))        # the page may have missed the last ones
                 if not record.get("complete"):
-                    feedback_queue.put_nowait((record, None))
+                    backlog.append((record, None))                      # made after this call, like the new answers
         live_task = asyncio.create_task(driver.run(mic_generator()))
         reader_task = asyncio.create_task(reader())
-        tasks = [live_task, reader_task, asyncio.create_task(feedback_worker()),
-                 asyncio.create_task(suggest_worker()), asyncio.create_task(overflow.wait())]
+        tasks = [live_task, reader_task, asyncio.create_task(suggest_worker()), asyncio.create_task(overflow.wait())]
+        postcall.LIVE_SESSIONS["n"] += 1
+        state["live"] = True
         done, _ = await asyncio.wait([live_task, reader_task, writer_task, tasks[-1]],
                                      return_when=asyncio.FIRST_COMPLETED)
         for task in done:
@@ -659,27 +619,40 @@ async def session_socket(websocket: WebSocket) -> None:
         log.warning("Session ended: %s", type(exc).__name__)
         error("session_failed", "Could not continue the session. Check the AI engine and try again.")
     finally:
+        if state.get("live"):
+            postcall.LIVE_SESSIONS["n"] = max(0, postcall.LIVE_SESSIONS["n"] - 1)
+            state["live"] = False
         if driver is not None:
             driver.stop()
-        # Let feedback already in progress finish (bounded) so it is saved with the session.
-        if records and tasks:
-            try:
-                await asyncio.wait_for(feedback_queue.join(), timeout=90)
-            except (asyncio.TimeoutError, Exception):
-                pass
         for task in [*tasks, *side_tasks]:
             task.cancel()
         await asyncio.gather(*tasks, *side_tasks, return_exceptions=True)
         history = list(driver.transcript_history) if driver is not None else []
+
+        def release_session() -> None:
+            saved_event.set()
+            if SAVED.get(session.get("id", "")) is saved_event:
+                SAVED.pop(session["id"], None)
+            if OWNER.get(session.get("id", "")) is state["owner"]:
+                OWNER.pop(session["id"], None)
+
         if session and any(t["role"] == "user" for t in history):
-            await save_and_debrief(session, history, records, llm, settings, emit, state, t_start)
-        elif session:
-            emit("session_ended", saved=False, reason="no_answers")
-        saved_event.set()
-        if SAVED.get(session.get("id", "")) is saved_event:
-            SAVED.pop(session["id"], None)
-        if OWNER.get(session.get("id", "")) is state["owner"]:
-            OWNER.pop(session["id"], None)
+            # D96: the feedback is made now, after the call, by a job that does not belong to this socket: it keeps
+            # going if the window closes, and this handler only forwards its events while the socket is open.
+            ctx = postcall.Context(
+                llm=llm, stt=getattr(driver, "stt", None), run=in_background, emit=emit, settings=settings,
+                mode=opts.get("mode", "interview"), level=opts.get("level", "B1"), engine=opts.get("engine", ""),
+                known_terms=opts.get("context_terms", []), ignored=ignored_terms, dropped=dropped,
+                owner_ok=lambda: OWNER.get(session["id"]) is state["owner"])
+            job = asyncio.create_task(save_and_debrief(session, history, records, backlog, llm, settings, emit, state,
+                                                       t_start, ctx, release_session))
+            postcall.JOBS.add(job)
+            job.add_done_callback(postcall.JOBS.discard)
+            await wait_for_job(job)
+        else:
+            if session:
+                emit("session_ended", saved=False, reason="no_answers")
+            release_session()
         if state["connected"] and not writer_task.done():
             try:
                 await asyncio.wait_for(outgoing.join(), timeout=5)
@@ -693,19 +666,69 @@ async def session_socket(websocket: WebSocket) -> None:
             pass
 
 
+async def wait_for_job(job: asyncio.Task) -> None:
+    """The socket handler waits for the after-call job so its events reach an open socket, but only waits: if the
+    handler is cancelled or the socket is gone the job carries on (shield), and its own errors are logged there."""
+    try:
+        await asyncio.shield(job)
+    except asyncio.CancelledError:
+        if job.done():
+            return
+        raise
+    except Exception as exc:
+        log.warning("After-call work failed: %s", type(exc).__name__)
+
+
 def codex_binary(llm: LLMEngine | None) -> str | None:
     from .engines import codex_cli
     return getattr(llm, "_binary", None) or codex_cli.find_codex() if isinstance(llm, codex_cli.CodexCLIEngine) else None
 
 
-async def save_and_debrief(session: dict, history: list[dict], records: list[dict], llm: LLMEngine | None,
-                           settings: dict, emit, state: dict, t_start: float) -> None:
+def public_feedback(records: list[dict]) -> list[dict]:
+    return [{k: v for k, v in r.items() if k != "history_index"} for r in records]
+
+
+def sync_user_edits(session: dict) -> bool:
+    """The user may rename or archive the session while it is being prepared (REST): keep that in our copy. False when
+    the record is gone (deleted to Trash): nothing more is written."""
+    try:
+        disk = storage.read_record("sessions", session["id"])
+    except (OSError, ValueError):
+        return False
+    session["title"] = disk.get("title", session.get("title", ""))
+    for key in ("archived", "archived_at"):
+        if key in disk:
+            session[key] = disk[key]
+        else:
+            session.pop(key, None)
+    return True
+
+
+async def save_and_debrief(session: dict, history: list[dict], records: list[dict],
+                           backlog: list[tuple[dict, stt.Transcript | None]], llm: LLMEngine | None,
+                           settings: dict, emit, state: dict, t_start: float, ctx: postcall.Context,
+                           release=lambda: None) -> None:
+    """After the call (D96): save the session at once, make the feedback of every answer in order (saving after each),
+    then the debrief. Runs as its own task (see the end of `session_socket`)."""
+    sid = session["id"]
+    total = len(backlog)
+    live = postcall.status(0, total) if total else None
     emit("saving")
     session.update({"ended_at": storage.now_iso(), "duration_s": round(time.perf_counter() - t_start),
-                    "transcript": history,
-                    "feedback": [{k: v for k, v in r.items() if k != "history_index"} for r in records],
-                    "debrief": None,
+                    "transcript": history, "feedback": public_feedback(records), "debrief": None,
                     "stats": {"answers": sum(1 for t in history if t["role"] == "user"), "turns": len(history)}})
+    if live is not None:
+        session["post_call"] = live
+        postcall.POST_CALL[sid] = live            # before the first write: a page that loads it sees a job running
+    try:
+        await _save_and_debrief(session, history, records, backlog, llm, settings, emit, state, ctx, live)
+    finally:
+        postcall.POST_CALL.pop(sid, None)
+        release()
+
+
+async def _save_and_debrief(session, history, records, backlog, llm, settings, emit, state, ctx, live) -> None:
+    sid = session["id"]
     try:
         await asyncio.to_thread(storage.save_session, session)
     except Exception as exc:
@@ -715,19 +738,40 @@ async def save_and_debrief(session: dict, history: list[dict], records: list[dic
              message="Could not save the session. Copy the transcript before leaving this page.")
         return
     state["saved"].set()                               # a resume may read the record now
-    emit("session_saved", session_id=session["id"])
-    emit("debrief_pending", session_id=session["id"])
+    emit("session_saved", session_id=sid)
+    if backlog:
+        async def save_progress(done: int) -> bool:
+            if ctx.owner_ok() is False:
+                return False
+            if not await asyncio.to_thread(sync_user_edits, session):
+                return False                           # deleted while being prepared
+            live["done"] = done
+            session["feedback"] = public_feedback(records)
+            try:
+                await asyncio.to_thread(storage.save_session, session)
+            except Exception as exc:
+                log.warning("Saving progress failed: %s", type(exc).__name__)
+            return True
+        ctx.save = save_progress
+        if not await postcall.run_answers(backlog, ctx):
+            return                                     # continued on a new socket, or deleted: not ours to write now
+        live["stage"] = "debrief"
+        await save_progress(len(backlog))
+    emit("debrief_pending", session_id=sid)
     try:
-        past = await asyncio.to_thread(memory.past_weak_spots_text, session["id"])
+        past = await asyncio.to_thread(memory.past_weak_spots_text, sid)
         result = await asyncio.wait_for(feedback.debrief(
             llm if session["mode"] == "interview" else None, session["feedback"],
             layer_order=settings["layer_order"], past=past), timeout=150)
     except Exception as exc:
         log.warning("Debrief failed: %s", type(exc).__name__)
         result = feedback.fallback_debrief(session["feedback"], settings["layer_order"])
-    if OWNER.get(session["id"]) is not state["owner"]:
+    if OWNER.get(sid) is not state["owner"]:
         return                                         # the session was continued on a new socket: it writes the record now
     session["debrief"] = result
+    session.pop("post_call", None)
+    if not await asyncio.to_thread(sync_user_edits, session):
+        return                                         # deleted while being prepared
     if (meter := usage.SESSION.get()) is not None:
         if session["engine"] == "codex_cli" and (binary := codex_binary(llm)):
             await usage.read_codex(binary, fresh=True)
@@ -738,6 +782,6 @@ async def save_and_debrief(session: dict, history: list[dict], records: list[dic
             await asyncio.to_thread(storage.export_obsidian, session, settings["obsidian_dir"])
     except Exception as exc:
         log.warning("Saving the debrief failed: %s", type(exc).__name__)
-    emit("debrief", session_id=session["id"], debrief=result)
+    emit("debrief", session_id=sid, debrief=result)
     telemetry.record("session_ended", settings, engine=session["engine"], mode=session["mode"],
                      answers=session["stats"]["answers"], duration_s=session["duration_s"])

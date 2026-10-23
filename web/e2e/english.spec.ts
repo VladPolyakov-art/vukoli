@@ -10,7 +10,7 @@ import {
   openMenu,
   resetApp,
   sendAnswer,
-  showFeedback,
+  showFeedbackLater,
   skipSetup,
 } from "./helpers";
 
@@ -49,7 +49,7 @@ test.describe("US-24 English practice", () => {
 
     const plan = page.getByRole("region", { name: "Here's the plan" });
     await expect(plan).toContainText("B1: familiar topics, more corrections");
-    await expect(plan).toContainText("After each of your turns, up to 3, with a reason. Nothing appears while you speak.");
+    await expect(plan).toContainText("After the call, each one with a reason. Nothing appears while you speak.");
     // AC5: no cap, paywall or upsell.
     // 13 (F-13-13): "Free forever" is said once (the footer), and the plan has a Length row.
     await expect(page.getByText("Free forever: no limits on English practice.")).toHaveCount(1);
@@ -68,22 +68,12 @@ test.describe("US-24 English practice", () => {
     await expect(transcript).toContainText("Mike: That sounds interesting.");
     await expect(page.getByText("Turn 2")).toBeVisible();
 
-    // AC3: corrections come after the turn, with a reason and the level label; no interview layers.
-    const panel = await showFeedback(page);
-    await expect(panel.getByRole("heading", { name: "Turn 1", level: 3 })).toBeVisible();
-    await expect(panel.getByRole("list", { name: "Summary" })).toHaveText(/Language · 2 phrasings/);
-    const language = panel.getByRole("region", { name: "Language" });
-    await expect(language).toContainText("since five years");
-    await expect(language).toContainText("for five years");
-    await expect(language).toContainText("Use 'for' with periods of time");
-    // The second slip: the corrected phrase is split into spans for the heard-as label, so assert on its reason.
-    await expect(language).toContainText("Agree is itself the verb");
-    await expect(language).toContainText("B1 rule");
+    // AC3 / D96: corrections come after the call, not after the turn: the panel only says so.
+    const panel = await showFeedbackLater(page);
+    await expect(panel).toContainText("Feedback comes after the call");
+    await expect(panel).not.toContainText("since five years");
     await expect(panel.getByRole("region", { name: "Content" })).toHaveCount(0);
     await expect(panel.getByRole("region", { name: "Delivery" })).toHaveCount(0);
-
-    // A phrase worth keeping is named too.
-    await expect(panel).toContainText("Phrase to keep");
 
     // End: the debrief lists the corrections in order, and the session is in the history under English.
     await (await endSession(page, "End practice")).click();
@@ -93,6 +83,8 @@ test.describe("US-24 English practice", () => {
     const corrections = page.getByRole("region", { name: "Corrections" });
     await expect(corrections).toContainText("since five years");
     await expect(corrections).toContainText("Agree is itself the verb");
+    // The reason is there too (no interview layers).
+    await expect(corrections).toContainText("Use 'for' with periods of time");
 
     await openMenu(page);
     await page.getByRole("button", { name: "Actions for English practice" }).click();
@@ -113,31 +105,25 @@ test.describe("US-24 English practice", () => {
     await expect(page.getByRole("region", { name: "Here's the plan" })).toContainText("A2: everyday topics, slow pace");
   });
 
-  test("a correction can be dismissed: 'I wrote it right' takes it off the panel and out of the debrief (US-17 AC2)", async ({
-    page,
-  }) => {
+  test("a correction can be dismissed in the debrief and stops counting (US-17 AC2)", async ({ page }) => {
     await startEnglishInText(page);
     await sendAnswer(page, ENGLISH_TURN);
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
-    const language = (await showFeedback(page)).getByRole("region", { name: "Language" });
-    await expect(language).toContainText("since five years");
-    await language.getByRole("button", { name: "I wrote it right" }).first().click();
-    await expect(language).not.toContainText("since five years");
-    await expect(language).toContainText("Agree is itself the verb"); // the other correction stays
 
     await (await endSession(page, "End practice")).click();
     const corrections = page.getByRole("region", { name: "Corrections" });
-    await expect(corrections).toContainText("Agree is itself the verb");
+    await expect(corrections).toContainText("since five years");
+    await corrections.getByRole("button", { name: "Dismiss" }).first().click();
     await expect(corrections).not.toContainText("Use 'for' with periods of time");
+    await expect(corrections).toContainText("Agree is itself the verb"); // the other correction stays
   });
 
   test("negative: a turn with nothing to correct says so instead of inventing a correction", async ({ page }) => {
     await startEnglishInText(page);
     await sendAnswer(page, "I run the checkout team and I like the work. We shipped on time.");
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
-    const panel = await showFeedback(page);
-    await expect(panel.getByRole("region", { name: "Language" })).toContainText("Nothing to fix");
-    await expect(panel.getByRole("list", { name: "Summary" })).toContainText("Good");
+    await (await endSession(page, "End practice")).click();
+    await expect(page.getByRole("region", { name: "Corrections" })).toContainText("No corrections this time.");
   });
 
   test("negative: an English debrief with no phrases to review never says 'uses these 0 phrases'", async ({ page }) => {

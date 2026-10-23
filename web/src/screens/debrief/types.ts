@@ -196,6 +196,9 @@ export interface DebriefViewProps extends DebriefActions {
   buildUp?: boolean;
   /** Storage is not writable (US-23 AC4). */
   storageError?: boolean;
+  /** D96, `state="preparing"`: where the work after the call stands ("Preparing feedback · 2 of 5 answers"). Without it the
+   * screen only says the debrief is being written. */
+  progress?: { done: number; total: number; stage: "feedback" | "debrief" };
   /** Live: the rerun is in flight. */
   rerunning?: boolean;
   /** Live: an action failed (flag, stronger answer, trash); shown as an error callout under the header. */

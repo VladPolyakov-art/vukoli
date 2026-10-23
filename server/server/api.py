@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from . import (DATA_VERSION, __version__, config, content, engines, feedback, memory, planner, storage, stt,
+from . import (DATA_VERSION, __version__, config, content, engines, feedback, memory, planner, postcall, storage, stt,
                telemetry, tts, usage)
 from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
@@ -509,6 +509,23 @@ def _session_or_404(session_id: str) -> dict:
         raise fail(404, "not_found", "Session not found.")
 
 
+def _repair_if_orphaned(session: dict) -> dict:
+    """D96: a record marked as being prepared although no job runs and no call is continuing it (the server stopped, or
+    the job died) is closed as interrupted, so its page does not wait for ever."""
+    from . import ws
+    marker = session.get("post_call")
+    if marker and not postcall.is_running(session["id"]) and session["id"] not in ws.OWNER:
+        if postcall.repair(session, config.load_settings()["layer_order"]):
+            storage.save_session(session)
+    return session
+
+
+def _not_while_preparing(session_id: str) -> None:
+    """The feedback of a session being prepared still changes: edits wait for it (409, the page tries again)."""
+    if postcall.is_running(session_id):
+        raise fail(409, "still_preparing", "The feedback for this session is still being prepared.")
+
+
 @router.get("/sessions")
 async def list_sessions() -> dict:
     items = sorted(storage.list_records("sessions"), key=lambda s: s.get("started_at", ""), reverse=True)
@@ -561,7 +578,7 @@ async def purge_session(trash_id: str, request: Request) -> dict:
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str) -> dict:
-    record = _session_or_404(session_id)
+    record = _repair_if_orphaned(_session_or_404(session_id))
     return {**record, "title": storage.display_title(record.get("title", ""))}
 
 
@@ -609,6 +626,7 @@ async def delete_session(session_id: str, request: Request) -> dict:
 @router.post("/sessions/{session_id}/debrief")
 async def rerun_debrief(session_id: str, request: Request) -> dict:
     check_origin(request)
+    _not_while_preparing(session_id)
     session = _session_or_404(session_id)
     settings = config.load_settings()
     llm = None
@@ -632,6 +650,7 @@ class FlagBody(BaseModel):
 @router.post("/sessions/{session_id}/flags/{flag_id}")
 async def session_flag(session_id: str, flag_id: str, body: FlagBody, request: Request) -> dict:
     check_origin(request)
+    _not_while_preparing(session_id)
     session = _session_or_404(session_id)
     record = next((r for r in session.get("feedback", []) if r.get("id") == body.feedback_id), None)
     if record is None:
@@ -657,6 +676,7 @@ class StrongerBody(BaseModel):
 @router.post("/sessions/{session_id}/stronger")
 async def session_stronger(session_id: str, body: StrongerBody, request: Request) -> dict:
     check_origin(request)
+    _not_while_preparing(session_id)
     session = _session_or_404(session_id)
     record = next((r for r in session.get("feedback", []) if r.get("id") == body.feedback_id), None)
     if record is None:
@@ -696,6 +716,7 @@ async def session_recheck(session_id: str, body: RecheckBody, request: Request) 
     (language, content, delivery recounted, stronger answer if there was one); the session is saved."""
     from .documents import known_terms
     check_origin(request)
+    _not_while_preparing(session_id)
     session = _session_or_404(session_id)
     feedbacks = session.get("feedback", [])
     record = next((r for r in feedbacks if r.get("id") == body.feedback_id), None)

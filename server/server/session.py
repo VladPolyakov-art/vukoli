@@ -6,7 +6,8 @@ Latency plan (D33, target 2-3 s per turn):
 - the interviewer reply is JSON (P1) streamed; `action` arrives first, and for `next_question` the code
   speaks "Okay." plus the next question verbatim without waiting for the model;
 - `say` is spoken sentence by sentence while the model is still writing;
-- speech is recognised in two passes: the reply starts from the text, word timings follow in the background;
+- speech is recognised in two passes: the reply starts from the text, word timings are made after the call (D96:
+  the recording is kept, nothing but Mike and the live captions uses the machine during the call);
 - Mike holds the model gate (priority.py) from the end of the answer until his reply text is written, so
   feedback and suggestions on the same local model never delay him.
 
@@ -28,7 +29,7 @@ from .engines.gemini_live import drop_last_answer
 from .feedback import WORD, JsonFieldStreamer, mark_misheard, hints, norm, sanitize_sentence, trim_words
 from .planner import max_follow_ups
 from .priority import ModelGate
-from .stt import STT, Transcript
+from .stt import STT, AudioKeep, Transcript
 
 log = logging.getLogger("uvicorn.error")
 SENTENCE_END = re.compile(r"(.+?[.!?…])(?:\s+|$)", re.S)
@@ -46,6 +47,15 @@ MOVE_ON = re.compile(r"\b(?:next|another|new)[ _]question\b|\b(?:my|our) (?:last
                      r"\b(?:let'?s|let us|we'?ll|I'?ll|now) (?:move|go) on\b|\blet'?s (?:turn|move) to\b", re.I)
 DRIFT_OVERLAP = 0.7      # share of the next question's words that marks a sentence as that question
 PREVIEW_SECONDS = 12
+ECHO_WINDOW_S = 5        # a short transcript that repeats Mike's last words, heard this soon after them, is his echo
+ECHO_MAX_WORDS = 6
+ECHO_MATCH = 0.8
+# Mike waits while a voice turn is open (see begin_audio_turn). Never for good:
+FLOW_MAX_S = 15          # no verdict this long after the user stopped talking: Mike goes on, the turns are dropped
+FLOW_POLL_S = 1.0        # how often a waiting Mike looks at that clock
+# A turn that stays noise (previews find no words) must not keep him quiet while it goes on:
+PREVIEW_EMPTY_RESUME = 2         # this many empty live captions in a row ...
+NOISE_TURN_MIN_S = 4             # ... after at least this much audio: it is noise, Mike goes on
 MAX_RECORD_BYTES = 16000 * 2 * 240      # up to 4 minutes per answer
 
 
@@ -61,6 +71,7 @@ class TextDriver:
                  on_audio_chunk: Optional[Callable] = None, on_notice: Optional[Callable] = None,
                  on_preview: Optional[Callable] = None, on_error: Optional[Callable] = None,
                  on_user_transcript: Optional[Callable] = None, on_metrics: Optional[Callable] = None,
+                 on_voice_dropped: Optional[Callable] = None, on_voice_noise: Optional[Callable] = None,
                  gate: ModelGate | None = None, resume: dict | None = None, **_ignored) -> None:
         self.llm = llm
         self.mode = mode
@@ -89,6 +100,8 @@ class TextDriver:
         self.on_error = on_error
         self.on_user_transcript = on_user_transcript
         self.on_metrics = on_metrics
+        self.on_voice_dropped = on_voice_dropped
+        self.on_voice_noise = on_voice_noise
         self.gate = gate or ModelGate(enabled=False)
 
         self.transcript_history: list[dict] = []
@@ -114,7 +127,23 @@ class TextDriver:
         self._metrics: dict = {}
         self._holding = False
         self._hold_token = 0
-        self._word_tasks: set[asyncio.Task] = set()
+        self._word_tasks: set[asyncio.Task] = set()      # warm-ups only: the word pass runs after the call (D96)
+        self.audio_keep = AudioKeep()           # the recordings the after-call word pass needs, within a memory budget
+        # A voice turn opens before anyone knows it is speech (a breath or a click opens one too). Until the
+        # recogniser has heard it Mike's reply waits (`_flow` cleared) instead of being cancelled.
+        # Each voice turn (activity_start) gets exactly one verdict: dropped (no speech) or interrupted (speech).
+        # Mike speaks only while no turn is open, so a verdict for an old turn never frees him while a newer
+        # one is still being recorded or recognised.
+        self._turns: list[int] = []
+        self._noisy: set[int] = set()           # open turns whose live captions stayed empty: they no longer hold Mike
+        self._turn = 0                          # the voice turn being recorded now (or last)
+        self._turn_seq = 0
+        self._flow = asyncio.Event()
+        self._flow.set()
+        self._quiet_since = 0.0                 # when the open turns last changed or stopped recording (FLOW_MAX_S)
+        self._said, self._said_at = "", 0.0     # Mike's latest line and when it was written (echo check)
+        self._audio_until = 0.0                 # when the audio sent so far has been played (the client plays faster
+        #                                         than real time is sent, so this is an estimate)
 
     # ---------- interface shared with GeminiLiveDriver ----------
 
@@ -146,8 +175,9 @@ class TextDriver:
         clean = norm(text)[:4000]
         if not clean:
             self._release()
+            self._drop_voice_turn(turn_id)
             return
-        await self._cancel_reply(interrupted=True)
+        await self._cancel_reply(interrupted=True, turn_id=turn_id)
         self._hold()
         self._snapshots.append((self.q_index, list(self.follow_ups), self.finished))
         question = self.current_question()
@@ -179,61 +209,79 @@ class TextDriver:
             self._word_tasks.add(task)
             task.add_done_callback(self._word_tasks.discard)
 
-    async def begin_audio_turn(self) -> None:
-        await self._cancel_reply(interrupted=True)
+    async def begin_audio_turn(self, turn_id: int | None = None, manual: bool = False) -> None:
+        """The client heard something. That is not yet a barge-in: it may be a breath, a click or Mike's echo, and
+        Whisper turns those into "Thank you.". Mike's reply (text and audio) waits here; real speech cancels it
+        in handle_user_text_turn, anything else lets it carry on (`_drop_voice_turn`).
+        The Interrupt button (`manual`) is a barge-in by definition: Mike stops now."""
+        if manual:
+            await self._cancel_reply(interrupted=True)
+            self._audio_until = 0.0
+        if turn_id is None:
+            self._turn_seq += 1
+            turn_id = -self._turn_seq           # the socket always sends one; this keeps direct callers apart
+        self._turn = turn_id
+        if turn_id not in self._turns:
+            self._turns.append(turn_id)
+        self._sync_flow()
         self._buffer = bytearray()
         self._recording = True
         self._stop_preview()
         if self.on_preview and self.stt is not None and self.stt.available:
-            self._preview_task = asyncio.create_task(self._preview_loop())
+            self._preview_task = asyncio.create_task(self._preview_loop(turn_id))
+
+    async def cancel_audio_turn(self, turn_id: int | None = None) -> None:
+        """The client ended its voice turn without audio (browser recognition heard nothing)."""
+        turn = self._turn if turn_id is None else turn_id
+        if turn == self._turn:
+            self._recording = False
+            self._buffer = bytearray()
+            self._stop_preview()
+        self._drop_voice_turn(turn)
 
     async def end_audio_stream(self, turn_id: int | None = None) -> None:
         if not self._recording:
             return
         self._recording = False
+        self._quiet_since = time.monotonic()
+        turn = self._turn
         self._stop_preview()
         pcm, self._buffer = bytes(self._buffer), bytearray()
         if self.stt is None or not self.stt.available:
+            self._drop_voice_turn(turn)
             self._error("stt_unavailable", "Speech recognition is not installed on this computer. Type your answer "
                                            "or use the browser's speech recognition.", retryable=False)
             return
+        was_holding, token = self._holding, self._hold_token
         self._hold()
         started = time.perf_counter()
         try:
             transcript = await asyncio.to_thread(self.stt.transcribe, pcm, False)   # text first (latency)
         except Exception as exc:
-            self._release()
+            self._unhold(was_holding, token)
+            self._drop_voice_turn(turn)
             log.warning("STT failed: %s", type(exc).__name__)
             self._error("stt_failed", "Could not recognise speech. Try again or type your answer.")
             return
         stt_ms = round((time.perf_counter() - started) * 1000)
+        if transcript.text.strip() and self._is_echo(transcript.text):
+            log.info("STT dropped Mike's own voice coming back through the microphone")
+            transcript.text = ""
         if not transcript.text.strip():
-            self._release()
-            if self.on_notice:
+            # Nothing was said (or only noise): Mike's reply, if there is one, goes on. The notice is for a user
+            # who is expected to answer, not for one who made a noise while Mike was speaking or thinking.
+            busy = self.replying() or time.monotonic() < self._audio_until
+            self._unhold(was_holding, token)
+            self._drop_voice_turn(turn)
+            if not busy and self.on_notice:
                 self.on_notice("not_heard", "I didn't catch that. Please try again a little louder or closer to the "
                                             "microphone.")
             return
-        transcript.words_ready = asyncio.Event()
-        task = asyncio.create_task(self._word_pass(pcm, transcript, turn_id))
-        self._word_tasks.add(task)
-        task.add_done_callback(self._word_tasks.discard)
+        if not self.audio_keep.keep(transcript, pcm):
+            log.info("Kept-audio budget is full: this answer gets no word timings")
         if self.on_user_transcript:
             self.on_user_transcript(transcript, turn_id)
-        await self.handle_user_text_turn(transcript.text, transcript, turn_id, stt_ms)
-
-    async def _word_pass(self, pcm: bytes, transcript: Transcript, turn_id: int | None) -> None:
-        """Word timings and confidence for feedback ("possibly misheard", pace), after Mike's reply text."""
-        try:
-            full = await self.gate.background(lambda: asyncio.to_thread(self.stt.transcribe, pcm, True),
-                                              preemptible=False)
-            transcript.words = full.words
-            if transcript.low_confidence() and self.on_user_transcript:
-                self.on_user_transcript(transcript, turn_id)
-        except Exception as exc:
-            log.warning("STT word pass failed: %s", type(exc).__name__)
-        finally:
-            if transcript.words_ready is not None:
-                transcript.words_ready.set()
+        await self.handle_user_text_turn(transcript.text, transcript, turn_id if turn_id is not None else turn, stt_ms)
 
     async def redo_answer(self) -> str:
         await self._cancel_reply(interrupted=False)
@@ -254,6 +302,9 @@ class TextDriver:
     def stop(self) -> None:
         self._running = False
         self._recording = False
+        self._turns.clear()
+        self._noisy.clear()
+        self._flow.set()
         self._stop_preview()
         self._release()
         for task in (self._reply_task, self._warm_task):
@@ -556,12 +607,14 @@ class TextDriver:
         token = self._hold_token
         try:
             async for sentence in sentences:
+                await self._may_speak()         # a voice turn is open: wait for the verdict before saying more
                 if not started:
                     started = True
                     self._metrics.setdefault("first_text_ms", self._ms())
                     if self.on_turn_start:
                         self.on_turn_start("model")
                 full = f"{full} {sentence}".strip()
+                self._said, self._said_at = full, time.monotonic()
                 if self.on_transcript_delta:
                     self.on_transcript_delta("model", sentence, full)
                 if voice:
@@ -571,8 +624,10 @@ class TextDriver:
                 await speech.put(None)
                 # Background jobs wait for Mike's first audio too: speech synthesis shares the machine with them.
                 first = asyncio.ensure_future(heard.wait())
-                await asyncio.wait({voice, first}, return_when=asyncio.FIRST_COMPLETED)
-                first.cancel()
+                try:
+                    await asyncio.wait({voice, first}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    first.cancel()              # also when the reply is cancelled here (no pending task left behind)
             self._release(token)                # text written and first audio out: background jobs may run now
             if voice:
                 await voice
@@ -607,9 +662,12 @@ class TextDriver:
                 log.warning("TTS failed: %s", type(exc).__name__)
                 continue
             for i in range(0, len(pcm), tts.CHUNK_BYTES):
+                await self._may_speak()
                 self._metrics.setdefault("first_audio_ms", self._ms())
+                chunk = pcm[i:i + tts.CHUNK_BYTES]
+                self._audio_until = max(self._audio_until, time.monotonic()) + len(chunk) / (2 * tts.SAMPLE_RATE)
                 if self.on_audio_chunk:
-                    self.on_audio_chunk(pcm[i:i + tts.CHUNK_BYTES])
+                    self.on_audio_chunk(chunk)
                 if heard:
                     heard.set()
 
@@ -626,13 +684,82 @@ class TextDriver:
         self._metrics = {}
         self.on_metrics(data)
 
-    async def _cancel_reply(self, interrupted: bool) -> None:
+    async def _cancel_reply(self, interrupted: bool, turn_id: int | None = None) -> None:
+        """Stop Mike's reply. `turn_id`: the voice turn that proved to be speech (only that turn gets its verdict;
+        newer ones stay open). None (typed text, redo, Interrupt button): every open voice turn is settled."""
         task = self._reply_task
-        if task and not task.done():
+        running = bool(task and not task.done())
+        if running:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-            if interrupted and self.on_interrupted:
-                self.on_interrupted()
+        targeted = turn_id in self._turns
+        had_turns = bool(self._turns)
+        if targeted:
+            self._turns.remove(turn_id)
+            self._noisy.discard(turn_id)
+        else:
+            self._turns.clear()
+            self._noisy.clear()
+        # Speech also tells the client to drop the audio it held back for Mike (it may still be playing a line
+        # the server finished long ago, so also while his audio is estimated to be playing).
+        if interrupted and (running or had_turns or time.monotonic() < self._audio_until) and self.on_interrupted:
+            self.on_interrupted(turn_id if targeted else None)
+        self._sync_flow()
+
+    def _drop_voice_turn(self, turn_id: int | None = None) -> None:
+        """The voice turn was no speech: its verdict is sent once. Mike goes on when no other turn is open (the
+        client resumes the audio it held back)."""
+        if turn_id not in self._turns:
+            return
+        self._turns.remove(turn_id)
+        self._noisy.discard(turn_id)
+        self._sync_flow()
+        if self.on_voice_dropped:
+            self.on_voice_dropped(turn_id)
+
+    def _mark_noise(self, turn_id: int) -> None:
+        """Not a verdict: the turn is still open and gets its one verdict when it ends. Until then it does not hold
+        Mike back (the client is told to play his audio on)."""
+        if turn_id not in self._turns or turn_id in self._noisy:
+            return
+        self._noisy.add(turn_id)
+        self._sync_flow()
+        if self.on_voice_noise:
+            self.on_voice_noise(turn_id)
+
+    def _sync_flow(self) -> None:
+        self._quiet_since = time.monotonic()
+        if any(turn not in self._noisy for turn in self._turns):
+            self._flow.clear()
+        else:
+            self._flow.set()
+
+    async def _may_speak(self) -> None:
+        """Wait for Mike's turn to speak. If the verdicts never come (the user stopped talking FLOW_MAX_S ago and
+        recognition has not answered), the open turns are dropped: noise must not silence him for good."""
+        while not self._flow.is_set():
+            try:
+                await asyncio.wait_for(self._flow.wait(), FLOW_POLL_S)
+            except asyncio.TimeoutError:
+                if not self._recording and time.monotonic() - self._quiet_since > FLOW_MAX_S:
+                    log.info("No verdict on %d voice turn(s) for %d s; Mike goes on", len(self._turns), FLOW_MAX_S)
+                    for turn in list(self._turns):
+                        self._drop_voice_turn(turn)
+
+    def _is_echo(self, text: str) -> bool:
+        """Mike's own voice through the microphone: a short transcript made of his last words, soon after them."""
+        if not self.produces_audio or not self._said:
+            return False
+        now = time.monotonic()
+        last_heard = now if now < self._audio_until else max(self._said_at, self._audio_until)
+        return now - last_heard <= ECHO_WINDOW_S and echo_of(text, self._said)
+
+    def _unhold(self, was_holding: bool, token: int) -> None:
+        """Undo the hold taken for a voice turn that was no speech. A reply that already held the model keeps it."""
+        if was_holding:
+            self._hold_token = token
+        else:
+            self._release()
 
     def _hold(self) -> None:
         """Mike takes the model (from the end of the user's answer until his reply is written and audible)."""
@@ -670,10 +797,13 @@ class TextDriver:
             self._preview_task.cancel()
         self._preview_task = None
 
-    async def _preview_loop(self) -> None:
-        """Captions while the user speaks: re-read the growing answer about once a second (display only)."""
+    async def _preview_loop(self, turn: int) -> None:
+        """Captions while the user speaks: re-read the growing answer about once a second (display only).
+        A turn whose captions stay empty is noise (a long knocking, a fan): after a few the verdict is given early so
+        Mike is not kept quiet for as long as it lasts. If it turns out to be speech after all, the final
+        recognition still cancels his reply, as any barge-in."""
         window = 16000 * 2 * PREVIEW_SECONDS
-        done = 0
+        done, empty = 0, 0
         try:
             while self._recording:
                 await asyncio.sleep(0.8)
@@ -682,12 +812,34 @@ class TextDriver:
                     continue
                 done = size
                 result = await asyncio.to_thread(self.stt.transcribe_if_idle, bytes(self._buffer[-window:]))
-                if result is not None and self._recording and result.text and self.on_preview:
+                if result is None or not self._recording or self._turn != turn:
+                    continue
+                empty = 0 if result.text else empty + 1
+                if result.text and self.on_preview:
                     self.on_preview(("… " if size > window else "") + result.text)
+                elif empty >= PREVIEW_EMPTY_RESUME and size >= 32000 * NOISE_TURN_MIN_S:
+                    log.info("Voice turn with no words in %d s of audio; Mike goes on", size // 32000)
+                    self._mark_noise(turn)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             log.info("Live caption skipped: %s", type(exc).__name__)
+
+
+def echo_of(text: str, said: str) -> bool:
+    """True when a short transcript is made of words Mike just said, in his order (>= 80 %, at least two words)."""
+    heard = [w.lower() for w in WORD.findall(text)]
+    spoken = [w.lower() for w in WORD.findall(said)]
+    if not 2 <= len(heard) <= ECHO_MAX_WORDS:
+        return False
+    at, matched = 0, 0
+    for word in heard:
+        try:
+            at = spoken.index(word, at) + 1
+        except ValueError:
+            continue
+        matched += 1
+    return matched / len(heard) >= ECHO_MATCH
 
 
 def _sentences(text: str) -> list[str]:

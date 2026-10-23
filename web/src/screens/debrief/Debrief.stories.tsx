@@ -52,6 +52,8 @@ export const Loading = desktop("loading");
 export const LoadingMobile = mobile("loading");
 /** Right after a session: "Writing your debrief…" above the skeleton. */
 export const Preparing = desktop("preparing");
+/** D96: feedback is made after the call; "Preparing feedback · 2 of 5 answers" above the skeleton. */
+export const PreparingFeedback = desktop("preparingFeedback");
 /** US-23 AC4: the warning comes first, Download is the primary action, Drill steps back. */
 export const StorageNotWritable = desktop("storageNotWritable");
 export const NotFound = desktop("notFound");

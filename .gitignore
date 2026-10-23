@@ -30,3 +30,6 @@ telemetry.jsonl
 .vscode/
 *.swp
 .tmp/
+
+# Ruflo runtime state
+.claude-flow/

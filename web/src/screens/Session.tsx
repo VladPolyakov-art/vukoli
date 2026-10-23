@@ -1,7 +1,7 @@
 /* Session route: the live container. It owns the socket / audio (useSession) and maps the reducer to the pure
  * SessionView (screens/session/SessionView.tsx); the review page and Storybook render the same view from fixtures.
  * Terminal states (failed, saving, not started from Practice) stay here as centred messages. */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button, Callout, EmptyState, motionMemory } from "../ds";
 import { t, tMaybe } from "../i18n";
@@ -15,6 +15,7 @@ import type { EngineId } from "../lib/types";
 import { selectThreads, type SessionState } from "../session/reducer";
 import { editTargets, heardEdit, recheckEdits } from "../session/recheck";
 import { useSession, type SessionConfig } from "../session/useSession";
+import { endingLine } from "./session/ending";
 import { SessionView } from "./session/SessionView";
 import type { PanelMode, SessionData, SessionHandlers, SessionOverlay, SessionPhase, TranscriptTurn } from "./session/types";
 import s from "./Session.module.css";
@@ -133,7 +134,8 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   const geminiGone = paused?.ended && state.engine === "gemini_live";
   const canResume = !geminiGone && (paused?.kind === "voice" || engineReady || !!paused?.ended);
 
-  /* US-23 AC1 / D73 guard: closing the tab mid-session would lose the unsaved answers' feedback; ask first. */
+  /* US-23 AC1 / D73 guard: closing the tab mid-session would lose the answers (nothing is saved before End); ask first.
+   * After End the work goes on in the server, so the guard is off then. */
   const guard = live && userTurns > 0 && !state.interrupted;
   useEffect(() => {
     if (!guard) return;
@@ -142,16 +144,8 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     return () => window.removeEventListener("beforeunload", onLeave);
   }, [guard]);
 
-  /* Announce when a thread's feedback is complete (polite live region, not while the user talks). */
-  const announced = useRef(new Set<string>());
-  useEffect(() => {
-    for (const th of threads) {
-      if (th.records.length && !th.pendingIds.length && th.records.every((r) => r.complete) && !announced.current.has(th.key)) {
-        announced.current.add(th.key);
-        if (!state.recording) setReadyMsg(english ? t("feedback.turn", { n: th.number }) : t("feedback.ready", { n: th.number }));
-      }
-    }
-  }, [threads, state.recording, english]);
+  /* D96: no feedback is made during the call, so nothing is announced as "ready" here. The polite live region below
+   * only carries the muted-mic tip. */
 
   /* D72: the muted-speech tooltip over the mic goes away once the mic is on again or after a few seconds; screen
    * readers hear it through the polite live region (a tooltip is not announced). */
@@ -217,7 +211,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     return (
       <main className={s.center} id="main">
         <p className="shimmer-text" role="status" aria-busy="true">
-          {state.phase === "debrief_pending" || state.phase === "done" ? t("session.debriefPending") : t("session.saving")}
+          {endingLine(state)}
         </p>
         {state.saveError ? <Callout tone="error">{t("session.errors.saveFailed")} {state.saveError}</Callout> : null}
       </main>
@@ -309,16 +303,14 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     notices.push({ id: "recheck", tone: "error", text: tMaybe(`session.edit.err.${state.recheckError.code}`, t("session.edit.failed")), onDismiss: actions.dismissRecheckError });
   }
 
-  /* The panel keeps the latest feedback while Mike asks the next question; nothing new appears while the user speaks. */
+  /* D96: the panel says "Feedback comes after the call" for every new answer (p0). Only a continued session shows the
+   * feedback it already had (p3, the "Edit what I said" editor and its check); nothing new appears while the user speaks. */
   const rechecking = Boolean(current?.records.some((r) => state.rechecking[r.id]));
   const canEdit = Boolean(current && !state.recording && !rechecking && current.records.length && !current.pendingIds.length && current.records.every((r) => r.complete));
-  const panel: PanelMode = state.recording ? "p1"
+  const panel: PanelMode = state.recording ? "p0"
     : editing ? "edit"
     : rechecking ? "recheck"
-    : !current ? (userTurns > 0 ? "p1" : "p0")
-    : current.records.length ? "p3"
-    : current.pendingIds.length ? "p2"
-    : current.unavailable.length ? "p4" : "p0";
+    : current?.records.length && canEdit ? "p3" : "p0";
 
   const micHelp = micError ? MIC_HELP[micError] : undefined;
   const overlay: SessionOverlay = paused ? (paused.kind === "engine" ? "interrupted-engine" : "interrupted-voice") : micHelp ? "mic-help" : "none";

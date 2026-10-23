@@ -184,6 +184,16 @@ export interface SessionRecord {
   stats?: { answers: number; turns: number };
   /** D88: requests this session sent, and how far the plan's own counter moved (Codex, Claude). */
   usage?: SessionUsage;
+  /** D96: present while the feedback and the debrief are still being made after the call. */
+  post_call?: PostCall;
+}
+
+/** Where the work after the call stands: `feedback` (answer by answer), then `debrief`. */
+export interface PostCall {
+  state: "running";
+  stage: "feedback" | "debrief";
+  done: number;
+  total: number;
 }
 
 export interface SessionUsage {
@@ -333,8 +343,11 @@ export interface StartMessage {
 
 export type ClientMessage =
   | StartMessage
-  | { type: "activity_start"; turn_id: number }
+  /** `manual`: the Interrupt button, so Mike stops for good (no waiting to see whether it was speech). */
+  | { type: "activity_start"; turn_id: number; manual?: boolean }
   | { type: "audio_stream_end" }
+  /** Browser recognition heard nothing in a voice turn opened by activity_start. */
+  | { type: "activity_cancel"; turn_id?: number }
   | { type: "user_turn"; text: string; turn_id: number; source: "text" | "browser_stt" }
   | { type: "redo_answer" }
   | { type: "suggest"; on: boolean }
@@ -390,12 +403,19 @@ export type ServerMessage =
       interrupted?: boolean;
     }
   | { type: "response_complete" }
-  | { type: "interrupted" }
+  /** Speech: Mike's reply is cut off. `turn_id`: the voice turn that proved to be speech (none: all open turns). */
+  | { type: "interrupted"; turn_id?: number }
+  /** The voice turn was no speech (noise, Whisper's "Thank you." on silence, Mike's echo): Mike's reply goes on.
+   * Exactly one of `interrupted` / `voice_turn_dropped` closes every activity_start. */
+  | { type: "voice_turn_dropped"; turn_id?: number }
+  /** Not a verdict: the live captions of a long turn stay empty, so it no longer holds Mike back. */
+  | { type: "voice_turn_noise"; turn_id: number }
   | { type: "speech_preview"; turn_id: number; text: string }
   | { type: "user_transcript"; turn_id: number; text: string; backend?: string; low_conf?: LowConfWord[] }
   | { type: "notice"; code: string; message: string }
   | { type: "turn_metrics"; turn_id?: number; total_ms?: number; first_text_ms?: number; path?: string }
-  | { type: "feedback_pending"; feedback_id: string; turn_id: number | null }
+  /** D96: feedback is made after End. `done` of `total` answers are finished (done 0 opens the work). */
+  | { type: "feedback_progress"; done: number; total: number }
   | { type: "feedback"; feedback: FeedbackRecord }
   | { type: "feedback_unavailable"; feedback_id: string; code: string; message: string }
   | { type: "flag_updated"; feedback_id: string; flag: LanguageItem; language: LanguageLayer }

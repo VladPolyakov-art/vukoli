@@ -63,7 +63,7 @@ def test_session_is_continued_from_its_saved_record(client, monkeypatch, fake_ll
         started, _ = receive_until(s, "session_started")
         receive_until(s, "turn_complete")
         s.send_json({"type": "user_turn", "text": ANSWER, "turn_id": 1})
-        receive_until(s, "feedback_pending")
+        receive_until(s, "turn_complete")
         receive_until(s, "turn_complete")                           # Mike's reply (the next question)
         session_id = started["session_id"]
         s.send_json({"type": "end_session"})                        # the record a cut-off session leaves behind

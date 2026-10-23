@@ -15,7 +15,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { Link, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 import { Badge, Button, Dialog, Drawer, Icon, IconButton, InlineRename, Menu, NavRow, Skeleton, Tooltip, ToastProvider, useToast } from "../ds";
 import type { LinkComponent, MenuEntry, ToastOptions } from "../ds";
-import { t } from "../i18n";
+import { t, tp } from "../i18n";
 import { api } from "../lib/api";
 import { pendingSave } from "../lib/pendingSave";
 import { prefs } from "../lib/prefs";
@@ -452,8 +452,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 const SAVE_POLL_MS = 2000;
 const SAVE_WAIT_MS = 3 * 60_000;
 
+/** D96: what the "saving" toast says. Before the server reports progress: "Saving…"; then "Preparing feedback · 2 of 5
+ * answers"; the debrief last. It reads the shell's progress store itself (the toast has no update call), and the
+ * numbers are not a live region of their own: the toast announces a change once, politely. */
+export function SavingMessage() {
+  const progress = useSyncExternalStore(pendingSave.subscribe, pendingSave.getProgress, pendingSave.getProgress);
+  const text = !progress ? t("session.afterEnd.saving")
+    : progress.stage === "debrief" ? t("session.debriefPending")
+      : tp("session.afterEnd.preparing", progress.total, { done: progress.done });
+  return <span className="shimmer-text">{text}</span>;
+}
+
 /** D73 toasts, shared with the review frames: "Saving…" stays (shimmer: real work is going on), "saved" offers the debrief. */
-export const savingToast = (): ToastOptions => ({ message: <span className="shimmer-text">{t("session.afterEnd.saving")}</span>, duration: null });
+export const savingToast = (): ToastOptions => ({ message: <SavingMessage />, duration: null });
 export const savedToast = (onOpen: () => void): ToastOptions => ({
   message: t("session.afterEnd.ready"), action: { label: t("session.afterEnd.open"), onClick: onOpen },
 });
@@ -496,9 +507,12 @@ function useSaveWatch(toast: ReturnType<typeof useToast>, loadRecent: () => Prom
       try {
         const record = await api.session(id);
         if (stopped) return;
-        // Saved: it shows in Recents now; the toast waits for the debrief.
+        // Saved: it shows in Recents now; the toast waits for the feedback and the debrief (D96: minutes, not seconds;
+        // the server marks the record `post_call` until it is done, and closes it itself if its job died).
         if (!listed) { listed = true; void loadRecent(); }
-        if (record.debrief || late) { finish(true); return; }
+        if (record.post_call) {
+          pendingSave.setProgress(id, { done: record.post_call.done, total: record.post_call.total, stage: record.post_call.stage });
+        } else if (record.debrief || late) { finish(true); return; }
       } catch {
         if (stopped) return;
         if (late) { finish(false); return; }

@@ -316,7 +316,7 @@ export function SessionView(props: SessionViewProps) {
                 />
               ) : null}
               {interrupted ? <Interrupted kind={overlay === "interrupted-voice" ? "voice" : "engine"} handlers={handlers} info={data.interrupted} /> : null}
-              {showTips ? <FirstTime input={input} pauseSec={data.pauseSec} layout={layout} english={variant === "english"} /> : null}
+              {showTips ? <FirstTime input={input} pauseSec={data.pauseSec} english={variant === "english"} /> : null}
               {showSuggester && suggestOn && !interrupted ? <Suggester suggestion={data.suggestion} /> : null}
             </div>
           </div>

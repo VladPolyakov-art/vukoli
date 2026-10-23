@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "interview-coach-server"
-version = "0.2.0"
+version = "0.2.1"
 description = "Local backend for Vukoli: practise job interviews by voice or text with an AI interviewer."
 readme = "../README.md"
 license = "AGPL-3.0-or-later"

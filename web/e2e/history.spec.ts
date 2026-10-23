@@ -35,7 +35,9 @@ test.describe("US-21 One history", () => {
     await expect(filter.getByRole("radio", { name: "English 0" })).toBeVisible();
     const row = page.getByRole("listitem").filter({ hasText: "Northwind Logistics" });
     await expect(row).toContainText("Interview");
-    await expect(row).toContainText("Oct 14");
+    // The seed puts this interview 8 days back from today.
+    const eightDaysAgo = new Date(Date.now() - 8 * 86_400_000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    await expect(row).toContainText(eightDaysAgo);
 
     // AC3: opening a session shows its debrief.
     await row.getByRole("link", { name: /Northwind Logistics · Product Owner/ }).click();

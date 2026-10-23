@@ -1,5 +1,5 @@
 """Edit what I said (US-18 AC3): one answer is checked again from the corrected text; saved sessions over REST,
-live sessions over the socket. The fake engine answers by what the prompt contains."""
+a resumed call over the socket. The fake engine answers by what the prompt contains."""
 from __future__ import annotations
 
 import pytest
@@ -151,16 +151,33 @@ def receive_until(socket, kind, accept=lambda m: True, limit=120):
     raise AssertionError(f"{kind} not received")
 
 
+START = {"type": "start", "mode": "interview", "input": "text", "questions": 3}
+
+
+def finished_call(client):
+    """A first call: one answer, End. D96: its feedback is made after End, so it is complete when the debrief is."""
+    with client.websocket_connect("/ws/session", headers=SAME) as s:
+        s.send_json(START)
+        receive_until(s, "turn_complete")
+        s.send_json({"type": "user_turn", "text": HEARD, "turn_id": 1})
+        receive_until(s, "turn_complete")
+        s.send_json({"type": "end_session"})
+        session_id = receive_until(s, "session_saved")["session_id"]
+        receive_until(s, "debrief")                      # feedback is done after the debrief: nothing is still running
+        return session_id
+
+
 def test_live_recheck_updates_the_record_the_history_and_the_saved_session(client, monkeypatch, fake_llm):
+    """D96: nothing is checked during a call, so there is no feedback to edit until a call is picked up again; then
+    the explicit request still works over the socket, on demand."""
     llm = fake_llm({
         "p1": {"gap": "none", "action": "next_question", "say": "Okay."},
         "p2b": lambda messages: {"items": [] if "we redesigned" in messages[-1]["content"] else [ITEM]},
         "p2a": CONTENT_OK})
     live_engine(monkeypatch, llm)
+    session_id = finished_call(client)
     with client.websocket_connect("/ws/session", headers=SAME) as s:
-        s.send_json({"type": "start", "mode": "interview", "input": "text", "questions": 3})
-        receive_until(s, "turn_complete")
-        s.send_json({"type": "user_turn", "text": HEARD, "turn_id": 1})
+        s.send_json({**START, "resume_session_id": session_id})
         first = receive_until(s, "feedback", lambda m: m["feedback"]["complete"])["feedback"]
         flag_id = first["layers"]["language"]["items"][0]["id"]
         s.send_json({"type": "recheck", "feedback_id": first["id"], "flag_id": flag_id, "text": "we redesigned"})
@@ -176,7 +193,8 @@ def test_live_recheck_updates_the_record_the_history_and_the_saved_session(clien
         assert receive_until(s, "recheck_failed")["code"] == "too_short"
         s.send_json({"type": "end_session"})
         saved = receive_until(s, "session_saved")
-    record = storage.read_record("sessions", saved["session_id"])
+    assert saved["session_id"] == session_id
+    record = storage.read_record("sessions", session_id)
     assert record["feedback"][0]["answer"] == again["answer"] and record["feedback"][0]["edited"] is True
     assert record["transcript"][1]["text"] == again["answer"]       # what Mike answers from, and the saved chat
 
@@ -190,16 +208,15 @@ def test_live_recheck_failure_leaves_the_answer_as_it_was(client, monkeypatch, f
     llm = fake_llm({"p1": {"gap": "none", "action": "next_question", "say": "Okay."},
                     "p2b": {"items": [ITEM]}, "p2a": p2a})
     live_engine(monkeypatch, llm)
+    session_id = finished_call(client)
     with client.websocket_connect("/ws/session", headers=SAME) as s:
-        s.send_json({"type": "start", "mode": "interview", "input": "text", "questions": 3})
-        receive_until(s, "turn_complete")
-        s.send_json({"type": "user_turn", "text": HEARD, "turn_id": 1})
+        s.send_json({**START, "resume_session_id": session_id})
         first = receive_until(s, "feedback", lambda m: m["feedback"]["complete"])["feedback"]
         s.send_json({"type": "recheck", "feedback_id": first["id"], "text": SAID})
         failed = receive_until(s, "recheck_failed")
         assert failed["feedback_id"] == first["id"] and failed["code"] == "timeout"
         s.send_json({"type": "end_session"})
-        saved = receive_until(s, "session_saved")
-    record = storage.read_record("sessions", saved["session_id"])
+        receive_until(s, "session_saved")
+    record = storage.read_record("sessions", session_id)
     assert record["feedback"][0]["answer"] == HEARD and not record["feedback"][0].get("edited")
     assert record["transcript"][1]["text"] == HEARD

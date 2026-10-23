@@ -52,6 +52,8 @@ export interface DebriefSceneSpec {
   storageError?: boolean;
   /** An action failed: the error callout under the header. */
   notice?: string;
+  /** D96, `state: "preparing"`: the work after the call. */
+  progress?: { done: number; total: number; stage: "feedback" | "debrief" };
   route?: string;
 }
 
@@ -109,6 +111,8 @@ export const DEBRIEF_SCENES = {
   partial: { ...base, model: interviewPartial, ui: { open: DEFAULT_OPEN["s-partial"] }, route: "/sessions/s-partial" },
   loading: { ...base, state: "loading" },
   preparing: { ...base, state: "preparing" },
+  /** D96: the feedback is made after the call, answer by answer. */
+  preparingFeedback: { ...base, state: "preparing", progress: { done: 2, total: 5, stage: "feedback" } },
   storageNotWritable: { ...base, model: interviewS2, storageError: true, ui: { open: DEFAULT_OPEN.s2 } },
   notFound: { ...base, state: "notFound", route: "/sessions/gone" },
   error: { ...base, state: "error" },
@@ -132,6 +136,7 @@ export function DebriefScene({ id }: { id: DebriefSceneId }) {
           ui={spec.ui}
           storageError={spec.storageError}
           notice={spec.notice}
+          progress={spec.progress}
         />
       </AppShellView>
     </MemoryRouter>

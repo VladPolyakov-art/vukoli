@@ -341,12 +341,8 @@ test.describe("QA-10 The session controls on a narrow phone", () => {
   }
 });
 
-test.describe("F-13-9 The English first-time hint says 'after each turn'", () => {
-  for (const [layout, width, wording] of [
-    ["narrow", 375, "After each turn a dot shows on the feedback button. Press it and the feedback slides up from the bottom."],
-    ["mid", 900, "After each turn a dot shows on the feedback button. Press it and the feedback slides in from the right."],
-    ["wide", 1440, "Feedback appears on the right after each turn."],
-  ] as const) {
+test.describe("F-13-9 / D96 The English first-time hint says corrections come after the call", () => {
+  for (const [layout, width] of [["narrow", 375], ["mid", 900], ["wide", 1440]] as const) {
     test(`${layout} layout (${width} px)`, async ({ page }: { page: Page }) => {
       await skipSetup(page);
       await page.setViewportSize({ width, height: 900 });
@@ -359,8 +355,8 @@ test.describe("F-13-9 The English first-time hint says 'after each turn'", () =>
       const measured = await page.locator("[data-layout]").first().getAttribute("data-layout");
       expect(measured).toBe(layout);
       const tips = page.getByText("First time here").locator("xpath=ancestor::div[1]");
-      await expect(tips).toContainText(wording);
-      await expect(tips).not.toContainText("after each question");
+      await expect(tips).toContainText("Corrections come after the call, so Mike stays fast.");
+      await expect(tips).not.toContainText("dot shows");
     });
   }
 });
