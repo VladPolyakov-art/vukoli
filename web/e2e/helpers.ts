@@ -133,18 +133,54 @@ export async function showFeedbackLater(page: Page) {
   return panel;
 }
 
-/** The breakdown card of question `n` on the debrief page (the radio picks it). */
-export async function debriefCard(page: Page, n: number) {
-  await page.getByRole("radio", { name: String(n), exact: true }).click();
-  return page.getByRole("region", { name: "Breakdown" }).getByRole("article");
+/** A saved session opens on its debrief (D101); "Debrief | Conversation" under the title switches (`?view=conversation`).
+ * Makes sure the Debrief view shows (a click only when another view is on). */
+export async function showDebrief(page: Page) {
+  const debrief = page.getByRole("radio", { name: "Debrief", exact: true });
+  await expect(debrief).toBeVisible();
+  if ((await debrief.getAttribute("aria-checked")) !== "true") await debrief.click();
+  await expect(debrief).toBeChecked();
 }
 
-/** End the session and wait for the "saved" toast; returns its "Open debrief" button. */
+/** The Conversation view of a saved session (the switch's second option). */
+export async function showConversation(page: Page) {
+  const chat = page.getByRole("radio", { name: "Conversation", exact: true });
+  await expect(chat).toBeVisible();
+  if ((await chat.getAttribute("aria-checked")) !== "true") await chat.click();
+  await expect(chat).toBeChecked();
+}
+
+/** The viewer of the Debrief view (layout D): the sticky switcher, one question at a time and Previous / Next. */
+export const viewer = (page: Page) => page.getByRole("region", { name: "Question by question" });
+
+/** The switcher's tab for question `n` (its name is the number and the question's text, or only the number when the labels are hidden). */
+export const questionTab = (page: Page, n: number) => page.getByRole("tab", { name: new RegExp(`^${n}(?!\\d)`) });
+
+/** The question `n` shown in the viewer (opens the Debrief view; the tab picks the question). */
+export async function debriefCard(page: Page, n: number) {
+  await showDebrief(page);
+  await questionTab(page, n).click();
+  await expect(questionTab(page, n)).toHaveAttribute("aria-selected", "true");
+  return viewer(page).getByRole("article");
+}
+
+/** Open the card with the seven skills (hover on the score; the same on a phone with a mouse-like pointer). */
+export async function openSkills(page: Page) {
+  await page.getByRole("button", { name: /Average score/ }).hover();
+  const card = page.getByRole("dialog", { name: "Your skills, weakest first" });
+  await expect(card).toBeVisible();
+  return card;
+}
+
+/** End the session (D73: it goes Home at once, no full-screen "Saving…" and no "Saving" toast; the session loads in
+ * Recents) and wait for the "ready" toast; returns its "Open debrief" button. */
 export async function endSession(page: Page, label: "End" | "End practice" = "End") {
   // On a phone the feedback panel is a dialog over the session; close it before reaching the End button.
   const feedbackDialog = page.getByRole("dialog", { name: "Feedback" });
   if (await feedbackDialog.isVisible()) await feedbackDialog.getByRole("button", { name: "Hide feedback (F)" }).click();
   await page.getByRole("button", { name: label, exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText(/Saving your session|Writing your debrief/)).toHaveCount(0);
   const open = page.getByRole("button", { name: "Open debrief" });
   await expect(open).toBeVisible();
   return open;

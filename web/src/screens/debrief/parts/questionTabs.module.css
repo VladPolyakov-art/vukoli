@@ -1,0 +1,82 @@
+/* The question switcher: stays at the top of <main> while a long answer scrolls. Tokens only (CONTRACT §1). */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding-block: var(--space-2) 0;
+  background: var(--color-canvas);
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+/* --tab-min: the least width a labelled tab gets before the switcher drops to numbers only (VariantD useSwitcherLayout). */
+.bar { --tab-min: 8rem; }
+.barCompact { display: flex; align-items: center; gap: var(--space-1); padding-block: var(--space-1) 0; }
+.step { flex: none; margin-bottom: var(--space-1); }
+.tabs { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1); min-width: 0; }
+/* Numbers only: tabs share the row, never narrower than a touch target; past that the strip scrolls sideways. */
+.tabsCompact {
+  flex: 1 1 auto;
+  grid-auto-columns: minmax(var(--control-h-touch), 1fr);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.tabsCompact::-webkit-scrollbar { display: none; }
+.tabsCompact .tab { grid-template-columns: minmax(0, 1fr); justify-items: center; padding: var(--space-2) 0 var(--space-3); }
+.tabsCompact .text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Edge fade on the side that has more tabs (alpha mask; any opaque colour works). */
+.fadeStart { mask-image: linear-gradient(to right, transparent, var(--color-canvas) var(--space-10)); }
+.fadeEnd { mask-image: linear-gradient(to left, transparent, var(--color-canvas) var(--space-10)); }
+.fadeBoth {
+  mask-image: linear-gradient(to right, transparent, var(--color-canvas) var(--space-10), var(--color-canvas) calc(100% - var(--space-10)), transparent);
+}
+.tab {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  margin-bottom: calc(-1 * var(--border-width));
+  border: 0;
+  border-bottom: var(--border-width-strong) solid transparent;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.tab:hover { color: var(--color-text-primary); background: var(--color-hover); }
+.tab[aria-selected="true"] { color: var(--color-text-primary); border-bottom-color: var(--color-border-selected); }
+.tab:focus-visible { outline: var(--border-width-strong) solid var(--color-focus); outline-offset: calc(-1 * var(--border-width-strong)); }
+.num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.tab[aria-selected="true"] .num { background: var(--color-action); color: var(--color-text-on-action); }
+.text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding-top: calc(var(--space-1) / 2);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+

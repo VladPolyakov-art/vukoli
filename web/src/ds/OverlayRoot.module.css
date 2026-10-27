@@ -10,7 +10,9 @@
   position: absolute;
   inset: 0;
   z-index: var(--z-overlay);
-  overflow: hidden;
+  /* clip, not hidden: the layer is never a scroll container, so focusing or a swipe can't shift it sideways. */
+  overflow: clip;
+  overscroll-behavior: contain;
   pointer-events: none;
   container: overlay / inline-size;
 }

@@ -10,7 +10,7 @@ import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from . import __version__, config, content, engines, feedback, memory, planner, postcall, storage, stt, telemetry, tts, usage
+from . import __version__, config, content, debrief_view, engines, feedback, memory, planner, postcall, storage, stt, telemetry, tts, usage
 from .engines.base import BACKGROUND, EngineError, LLMEngine
 from .engines.gemini_live import GeminiLiveDriver, basic_status
 from .priority import ModelGate
@@ -782,6 +782,7 @@ async def _save_and_debrief(session, history, records, backlog, llm, settings, e
             await asyncio.to_thread(storage.export_obsidian, session, settings["obsidian_dir"])
     except Exception as exc:
         log.warning("Saving the debrief failed: %s", type(exc).__name__)
-    emit("debrief", session_id=sid, debrief=result)
+    emit("debrief", session_id=sid, debrief=debrief_view.enrich_debrief(
+        result, session["feedback"], session["mode"]))
     telemetry.record("session_ended", settings, engine=session["engine"], mode=session["mode"],
                      answers=session["stats"]["answers"], duration_s=session["duration_s"])

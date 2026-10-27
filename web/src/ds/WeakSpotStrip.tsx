@@ -3,7 +3,7 @@
  *   badge · title · count. The first `visibleCount` rows show; "+ N more … Show all" reveals the rest with a short
  *   staggered rise (docs/motion.md §3.7 "Weak-spot Show all"). `footer` holds the Focus chips + Drill button.
  * - `debrief`: "What to work on" in Debrief. A `<ul>` grid of cards on the layer tint (--color-layer-*-tint, the
- *   only place tints appear), head = layer icon + name (never colour only, GR10), h3 title, evidence, fix, also.
+ *   only place tints appear), head = layer icon + name (never colour only, GR10), h3 title, evidence, said / lands (D98, optional), fix, also.
  *   3 equal columns when the strip is wide, 1 column in a narrow parent (container query on the strip).
  * Order is the caller's: pass items already in the configured layer order (GR8). */
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
@@ -26,10 +26,16 @@ export interface WeakSpot {
   count?: ReactNode;
   /** Debrief: evidence row ("Questions 1, 2, 4" as links). */
   evidence?: ReactNode;
-  /** Debrief: the fix line (caller renders the "Fix:" lead). */
+  /** Debrief (D98): "What you said": a quote or a number (caller renders the lead and the quote marks). Left out when absent. */
+  said?: ReactNode;
+  /** Debrief (D98): "How it lands": the interviewer's likely reading (caller renders the lead). Left out when absent. */
+  lands?: ReactNode;
+  /** Debrief: the fix line (caller renders the "How to fix" lead). */
   fix?: ReactNode;
   /** Debrief: secondary point under a hairline ("Also: “we” instead of “I” …"). */
   also?: ReactNode;
+  /** Debrief (D98 r2): one muted line at the end of the card (e.g. the "may have misheard" note on Language). */
+  note?: ReactNode;
 }
 
 export interface WeakSpotStripProps {
@@ -127,8 +133,11 @@ export function WeakSpotStrip({
             </span>
             <ItemH className={s.cardTitle}>{it.title}</ItemH>
             {it.evidence ? <div className={s.cardLine}>{it.evidence}</div> : null}
+            {it.said ? <div className={s.cardText}>{it.said}</div> : null}
+            {it.lands ? <div className={s.cardText}>{it.lands}</div> : null}
             {it.fix ? <div className={s.cardFix}>{it.fix}</div> : null}
             {it.also ? <div className={s.cardAlso}>{it.also}</div> : null}
+            {it.note ? <div className={s.cardNote}>{it.note}</div> : null}
           </li>
         ))}
       </ul>

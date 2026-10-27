@@ -6,6 +6,7 @@ Vukoli launcher for Windows: opens the app (starting the local server first if n
                         (Edge or Chrome app mode: no tabs, no address bar)
   Vukoli.cmd stop       stop the server
   Vukoli.cmd status     say whether it is running
+  Vukoli.cmd vukoli://start   what the "Start Vukoli" link of an installed, closed app runs: start the server, open nothing
   -NoBrowser            open nothing (or set VUKOLI_NO_BROWSER=1)
   -Browser              open a normal tab in the default browser instead of an app window (or set VUKOLI_APP_WINDOW=0)
 
@@ -43,6 +44,9 @@ $noBrowser = ($NoBrowser.IsPresent -or ($env:VUKOLI_NO_BROWSER -and $env:VUKOLI_
 $useTab = ($Browser.IsPresent -or ($env:VUKOLI_APP_WINDOW -and $env:VUKOLI_APP_WINDOW -match '^(0|false|no|off)$'))
 # A hidden shortcut has no console, so problems are shown in a message box (not in CI / scripted runs)
 $useDialog = (-not $noBrowser) -and (-not $env:CI)
+# vukoli://start (the "Start Vukoli" button of the page an installed, closed app shows): start the server and open
+# nothing, the window that asked is already there and reloads itself when the server answers
+if ($Command -match '^vukoli:') { $Command = 'open'; $noBrowser = $true; $useDialog = -not $env:CI }
 
 function Show-Problem([string]$Text) {
     Write-Host $Text
@@ -164,10 +168,37 @@ function Find-Chromium {
     return $null
 }
 
+# The shortcut Chrome / Edge made when Vukoli was installed as an app (own taskbar icon): a .lnk named Vukoli in the Start
+# menu that runs the browser with --app-id. Our own Vukoli.lnk has no --app-id. Returns the .lnk path, or $null.
+function Find-InstalledApp {
+    $roots = @()
+    foreach ($kind in 'Programs', 'CommonPrograms') {
+        try { $roots += [Environment]::GetFolderPath($kind) } catch { $null = $_ }
+    }
+    foreach ($root in $roots) {
+        if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $root -Filter 'Vukoli*.lnk' -Recurse -ErrorAction SilentlyContinue)) {
+            try {
+                $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut($f.FullName)
+                if ($lnk.Arguments -notmatch '--app-id=') { continue }
+                # Edge also records the address; skip an app installed from another port
+                if ($lnk.Arguments -match '--app-url=(\S+)' -and -not $Matches[1].Trim('"').StartsWith($url)) { continue }
+                return $f.FullName
+            } catch { $null = $_ }
+        }
+    }
+    return $null
+}
+
 function Open-Browser {
     if ($noBrowser) { Write-Host ('Vukoli is running: {0}' -f $url); return }
-    # Own window (Chromium app mode) in the normal browser profile, so the microphone permission is remembered
+    # Own window in the normal browser profile, so the microphone permission is remembered: the installed app first,
+    # else Chromium app mode
     if (-not $useTab) {
+        $installed = Find-InstalledApp
+        if ($installed) {
+            try { Start-Process -FilePath $installed; return } catch { $null = $_ }
+        }
         $exe = Find-Chromium
         if ($exe) {
             try {

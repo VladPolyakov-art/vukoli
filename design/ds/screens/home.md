@@ -209,6 +209,7 @@ Inside Mike's last message, full column width. Card `subtle`, `Padding: md`, `--
 | `Setup/Again` · `/Drill` · `/Example` | §4.5 · §4.6 · §4.7 |
 | `Setup/EnglishLevel` · `/EnglishPhrases` · `/EnglishPlan` | §4.8 |
 | `Setup/Starting` | §4.10 |
+| `Home/AfterEnd/Saving` · `/Saved` | D73 (2026-10-27): End (any mode) lands here at once, no full-screen «Saving…», no «Saving» toast. **Saving:** the session is the first row of the rail's Recents, its title shimmering (`NavRow loading`), «2 of 5» in the trailing slot once the server reports it, no «…» menu while it loads, still a link. **Saved:** the row is plain; one toast at the top «Your session is saved» + «Open debrief» → `/sessions/:id?view=debrief` (not shown on that session's page) |
 | `Setup/Overflow` (+30%) | job "Kestrel Payments International Holdings · Senior Staff Product Designer, Platform Experience and Growth" wraps in the plan; 300-character note wraps; 40-line pasted job clamped to 3 lines + Show all; 7 saved jobs in the Change picker (search on) |
 | `VacancyEditor/*` | §7 |
 

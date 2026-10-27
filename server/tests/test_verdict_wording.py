@@ -65,3 +65,18 @@ def test_a_rewritten_sentence_after_a_recheck_reads_naturally():
     assert out == ("Your answers were clear. The main thing to fix: finish with what happened, "
                    "one result, ideally a number.")
     assert out.count(":") == 1
+
+
+def _language_record(*tags: str) -> dict:
+    items = [{"tag": tag, "status": "active", "severity": 2} for tag in tags]
+    return {"id": "x", "layers": {"language": {"items": items}}}
+
+
+def test_the_template_debrief_gives_language_spots_a_real_fix_and_one_id_per_question():
+    tags = ("meaning_error", "tense", "article", "preposition", "collocation", "word_choice")
+    assert set(feedback.LANGUAGE_FIX) == set(tags)
+    for tag in tags:
+        out = feedback.fallback_debrief([_language_record(tag, tag), _language_record(tag)], "content-first")
+        spot_ = out["weak_spots"][0]
+        assert spot_["text"] == feedback.LANGUAGE_FIX[tag] and not spot_["text"].startswith("Work on")
+        assert spot_["evidence"] == ["q1", "q2"]

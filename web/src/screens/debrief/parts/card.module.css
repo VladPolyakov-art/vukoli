@@ -61,7 +61,7 @@
 .muted svg { flex: none; margin-top: calc(var(--space-1) / 2); }
 
 /* D71: the breakdown next to the chat. The Disclosure card's surface and paddings, without the header button. */
-.fixed { background: var(--color-surface-card); border-radius: var(--radius-md); color: var(--color-text-primary); min-width: 0; }
+.fixed { background: var(--color-surface-card); box-shadow: var(--shadow-raised); border-radius: var(--radius-md); color: var(--color-text-primary); min-width: 0; }
 .fixedHead { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
 .fixedText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .fixedTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-medium); line-height: var(--leading-normal); overflow-wrap: anywhere; }

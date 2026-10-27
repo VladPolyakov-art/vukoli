@@ -14,7 +14,9 @@
   width: var(--control-h-lg);
   height: var(--control-h-lg);
   border-radius: var(--radius-pill);
-  background: var(--color-subtle);
+  /* D101: a white disc with the raised shadow on the canvas; grey inside an island. */
+  background: var(--note-fill, var(--color-surface-note));
+  box-shadow: var(--note-shadow, var(--shadow-raised));
   color: var(--color-text-secondary);
 }
 .title { font-size: var(--text-lg); font-weight: var(--weight-semibold); color: var(--color-text-primary); }

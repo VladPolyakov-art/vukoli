@@ -66,7 +66,7 @@
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--color-text-secondary);
+  color: var(--color-fg-icon);
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
@@ -131,7 +131,7 @@
   justify-content: center;
   width: calc(var(--icon-lg) + var(--space-1));
   height: calc(var(--icon-lg) + var(--space-1));
-  color: var(--color-text-secondary);
+  color: var(--color-fg-icon);
 }
 .newLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .railBody[data-collapsed] .newRow { width: var(--rail-slot); }
@@ -187,6 +187,10 @@
   .chatItem .chat { padding-right: calc(var(--control-h-sm) + var(--space-1)); }
   .chatItem .track { display: none; }
 }
+
+/* A chat still being saved after End has no "…" menu: its row keeps its padding and its progress on hover and on touch. */
+.chatItem[data-pending] .chat { padding-right: var(--space-2); }
+.chatItem[data-pending] .track { display: inline; }
 
 /* ---- Bottom: engine warning (only when not ready) + account ---- */
 .foot { display: flex; flex: none; flex-direction: column; gap: var(--space-1); }

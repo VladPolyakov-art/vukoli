@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)" />
+    <title>Vukoli isn't running</title>
+    <style>
+      /* Shown by the service worker (sw.js) when a page load fails because the local server is not running.
+       * Self-contained on purpose: the app's hashed CSS is not available offline. The values mirror the design
+       * tokens (src/ds/tokens.css): canvas, text-primary / secondary, action, focus, radius-pill, space and text scales. */
+      :root {
+        --canvas: #FFFFFF; --text: #141414; --text-secondary: #4A4A4A;
+        --action: #141414; --action-hover: #2A2A2A; --on-action: #FFFFFF; --focus: #686868;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --canvas: #0A0A0A; --text: #EBEBEB; --text-secondary: #B4B4B4;
+          --action: #EBEBEB; --action-hover: #E2E2E2; --on-action: #141414; --focus: #949494;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 1rem;
+        background: var(--canvas); color: var(--text);
+        font-family: Manrope Variable, Manrope, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-size: 1rem; line-height: 1.5; -webkit-font-smoothing: antialiased;
+      }
+      main { width: min(100%, 26rem); display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; }
+      .mark { width: 3.25rem; height: auto; margin-bottom: 0.5rem; }
+      h1 { margin: 0; font-size: 1.75rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.02em; }
+      p { margin: 0; color: var(--text-secondary); font-size: 0.875rem; }
+      a.start {
+        display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem; margin-top: 0.5rem; padding: 0 1.5rem;
+        border-radius: 9999px; background: var(--action); color: var(--on-action);
+        font-size: 0.875rem; font-weight: 500; text-decoration: none;
+        transition: background-color 0.12s ease-out, transform 0.12s ease-out;
+      }
+      a.start:hover { background: var(--action-hover); }
+      a.start:active { transform: scale(0.97); }
+      a.start:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) { a.start { transition: none; } a.start:active { transform: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="8 15 104 90" aria-hidden="true">
+        <defs><linearGradient id="vg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#CFE2FB"/><stop offset="0.3" stop-color="#78B6F9"/><stop offset="0.6" stop-color="#0A6BDC"/><stop offset="0.84" stop-color="#0B3A6C"/><stop offset="1" stop-color="#0F1F3A"/></linearGradient></defs>
+        <path fill="url(#vg)" fill-rule="evenodd" d="M8,15 L112,15 L112,37 C112,79.16 88.60,105.00 60.0,105 C31.40,105.00 8,79.16 8,37Z M28,33 L92,33 L92,44 C92,69.42 77.60,85.00 60.0,85 C42.40,85.00 28,69.42 28,44Z"/>
+      </svg>
+      <h1>Vukoli isn't running</h1>
+      <p>Vukoli runs on your computer, and it is not started right now. Start it and this window opens the app by itself.</p>
+      <a class="start" href="vukoli://start">Start Vukoli</a>
+      <p>Or open Vukoli from Launchpad / the Start menu.</p>
+      <p id="status" role="status">Waiting for Vukoli to start…</p>
+    </main>
+    <script>
+      // Reload into the app as soon as the server answers (Start Vukoli above, or any other way of starting it).
+      var busy = false;
+      function check() {
+        if (busy) return;
+        busy = true;
+        fetch("/api/health", { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (h) { if (h && h.ok === true) location.replace("/"); })
+          .catch(function () {})
+          .then(function () { busy = false; });
+      }
+      setInterval(check, 1500);
+    </script>
+  </body>
+</html>

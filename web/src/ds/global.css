@@ -11,6 +11,12 @@
 html {
   -webkit-text-size-adjust: 100%;
   color-scheme: light dark;
+  /* Owner, 2026-10-27: a two-finger swipe over a menu moved the whole frame sideways. Nothing in the app is wider than
+   * the viewport (checked), so this was the page itself rubber-banding on the horizontal axis (macOS) and the swipe
+   * chaining out of a menu. The app is a fixed frame: the page never scrolls or bounces, only its inner scrollers do
+   * (vertically, each with overscroll-behavior: contain), and a stray wide element can never add a sideways scroll. */
+  overflow-x: clip;
+  overscroll-behavior: none;
 }
 
 /* D82: one quiet scrollbar everywhere — a thin thumb on a transparent track, so hovering it never paints the
@@ -42,6 +48,8 @@ html {
 
 body {
   margin: 0;
+  overflow-x: clip;
+  overscroll-behavior: none;
   min-height: 100dvh;
   background: var(--color-canvas);
   color: var(--color-text-primary);

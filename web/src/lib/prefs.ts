@@ -17,6 +17,7 @@ const KEYS = {
   roundType: "ic.roundType",
   vacancy: "ic.vacancyId",
   railCollapsed: "ic.railCollapsed",
+  installDismissed: "ic.installDismissed",
 } as const;
 
 function read(key: string): string | null {
@@ -36,6 +37,13 @@ function write(key: string, value: string | null) {
 }
 
 export const prefs = {
+  /** "Install Vukoli as an app" card on Home: the user said no thanks. */
+  installDismissed(): boolean {
+    return read(KEYS.installDismissed) === "1";
+  },
+  setInstallDismissed(v: boolean) {
+    write(KEYS.installDismissed, v ? "1" : null);
+  },
   /** D57: the sidebar is collapsed to the icon rail (≥ 1024). */
   railCollapsed(): boolean {
     return read(KEYS.railCollapsed) === "1";

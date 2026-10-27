@@ -24,6 +24,8 @@ export default defineConfig({
   outputDir: "test-results",
   use: {
     baseURL: BASE_URL,
+    // The service worker (public/sw.js) would handle page loads itself, out of reach of page.route; the suite tests the app, not the install.
+    serviceWorkers: "block",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     // A fake microphone: the page sees a working input device (permission is granted per test with `permissions`).

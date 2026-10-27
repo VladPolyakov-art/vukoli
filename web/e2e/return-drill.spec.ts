@@ -10,6 +10,9 @@ import {
   resetApp,
   seedReturningUser,
   sendAnswer,
+  showDebrief,
+  viewer,
+  questionTab,
   skipSetup,
 } from "./helpers";
 
@@ -99,12 +102,14 @@ test.describe("US-20 AC1 What next, in the debrief", () => {
     await openMenu(page);
     await page.getByRole("link", { name: "Kestrel Pay · Product Manager" }).click();
 
-    await page.getByRole("button", { name: /^Verdict/ }).click();
-    const work = page.getByRole("region", { name: "What to work on" });
-    await expect(work).toContainText("Finish with what happened: one result, ideally a number.");
+    await showDebrief(page);
+    const work = page.locator("[data-review-id='Debrief/Plan']");
+    await expect(work).toContainText("End with the result");
+    await expect(work).toContainText("Prepositions");
     await expect(work.getByRole("listitem")).toHaveCount(2); // one for content, one for language
     await work.getByRole("button", { name: "Go to question 3" }).click();
-    await expect(page.getByRole("article")).toContainText("Question 3");
+    await expect(viewer(page).getByRole("article")).toContainText("Question 3");
+    await expect(questionTab(page, 3)).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("button", { name: "Drill these weak spots" })).toBeVisible();
   });
 
@@ -113,7 +118,7 @@ test.describe("US-20 AC1 What next, in the debrief", () => {
     await page.goto("/");
     await openMenu(page);
     await page.getByRole("link", { name: "Kestrel Pay · Product Manager" }).click();
-    await page.getByRole("button", { name: /^Verdict/ }).click();
+    await showDebrief(page);
     await page.getByRole("button", { name: "Drill these weak spots" }).click();
 
     // F-13-14: Home opens the drill plan straight away, no "What should we drill?" question, and it keeps the job.
@@ -137,9 +142,9 @@ test.describe("US-22 AC3 Dismissed corrections are not counted", () => {
     // dismiss / restore / recheck (feedback.refresh_weak_spots), so Home's drill follows.
     const { sessions } = await seedReturningUser(request);
     for (const session of sessions) {
-      await page.goto(`/sessions/${session.id}`);
-      await page.getByRole("radio", { name: "2", exact: true }).click();
-      const card = page.getByRole("region", { name: "Breakdown" }).getByRole("article");
+      await page.goto(`/sessions/${session.id}?view=debrief`);
+      await questionTab(page, 2).click();
+      const card = viewer(page).getByRole("article");
       await expect(card).toContainText("since five years");
       await card.getByRole("button", { name: "Dismiss" }).click();
       // The correction is gone from the card (the answer itself is still there); it says why it is not counted.

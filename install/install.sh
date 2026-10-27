@@ -181,6 +181,7 @@ UV="$UVDIR/uv"
 DLDIR="$PREFIX/.download"
 BIN="$PREFIX/bin/vukoli"
 LAUNCH_APP="${VUKOLI_APP_DIR:-$HOME/Applications}/Vukoli.app"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 AGENT_PLIST="$HOME/Library/LaunchAgents/$AGENT_LABEL.plist"
 
 total_ram_mb() {
@@ -248,6 +249,7 @@ do_uninstall() {
     say "  Removed the login agent that started Ollama with your computer ($AGENT_LABEL). Ollama itself is still installed."
   fi
   if [ -d "$LAUNCH_APP" ] && grep -q "com.vukoli.launcher" "$LAUNCH_APP/Contents/Info.plist" 2>/dev/null; then
+    "$LSREGISTER" -u "$LAUNCH_APP" >/dev/null 2>&1 || true   # forget the vukoli:// link
     rm -rf "$LAUNCH_APP"; say "  Removed $LAUNCH_APP"
   fi
   rm -f "$HOME/.local/share/applications/vukoli.desktop" 2>/dev/null || true
@@ -684,6 +686,8 @@ if [ "$IS_MAC" = 1 ]; then
   printf '%s' "$PREFIX" >"$LAUNCH_APP/Contents/Resources/prefix"
   chmod +x "$LAUNCH_APP/Contents/MacOS/Vukoli"
   touch "$LAUNCH_APP"
+  # Register the app (and its vukoli:// link, used by "Start Vukoli" on the page an installed, closed app shows).
+  "$LSREGISTER" -f "$LAUNCH_APP" >/dev/null 2>&1 || true
   note "App icon: $LAUNCH_APP (Launchpad, Spotlight or the Applications folder in your home folder)."
 else
   mkdir -p "$HOME/.local/share/applications"
@@ -713,7 +717,7 @@ TOTAL=$((SECONDS - START_SECS))
 say ""
 say "Vukoli $VERSION_INSTALLED is installed."
 say "  Install folder : $PREFIX"
-say "  Window         : Vukoli opens in its own window (Chrome or Edge app mode); other browsers get a normal tab."
+say "  Window         : Vukoli opens in its own window (Chrome or Edge app mode; the app offers to install itself for its own Dock icon); other browsers get a normal tab."
 say "  Start later    : open Vukoli from Launchpad / Applications (in your home folder), or run: $BIN"
 say "  Stop           : $BIN stop"
 say "  Uninstall      : bash $APPDIR/install/install.sh --uninstall   (add --purge to delete your sessions too)"

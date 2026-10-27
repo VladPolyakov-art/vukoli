@@ -1,15 +1,16 @@
 /* Live data → Debrief view model. Pure (no I/O), unit-tested in mapRecord.test.ts.
- * What the saved session does not carry (verdict step, per-question start time, corrections count) is left out of the
+ * What the saved session does not carry (per-question start time, corrections count) is left out of the
  * model; the view shows only what is there (see "live data gaps" in docs/frontend.md). */
 import { percent, windowName } from "../../components/engine/PlanLimit";
 import { diffMarks, paceVerdict } from "../../components/Feedback";
 import { t, tMaybe, tp } from "../../i18n";
 import { formatClock, formatDateTime, formatDuration } from "../../lib/format";
-import type { FeedbackRecord, LanguageItem, LayerName, LowConfWord, SessionRecord } from "../../lib/types";
+import type { FeedbackRecord, LanguageItem, LayerName, LowConfWord, ScoreKey, SessionRecord } from "../../lib/types";
 import { languageCounts, type StrongerState, type Thread } from "../../session/reducer";
+import { verdictModel } from "./verdictStep";
 import type {
   ContentBlock, ConversationTurn, Correction, DebriefModel, DeliveryBlock, EnglishModel, LanguageBlock, MetaItem, QuestionModel, Segments,
-  StrongerModel, WeakSpotModel,
+  PlanStepModel, ScoreRowModel, StrongerModel, VerdictModel, WeakSpotModel,
 } from "./types";
 
 /** A verdict needs at least this many answered questions (US-17 AC1). */
@@ -145,25 +146,76 @@ function deliveryBlock(record: FeedbackRecord | undefined): DeliveryBlock | unde
   };
 }
 
+/** "q2" → 2: the same ids in weak-spot evidence and in scorecard `lost`. Anything else is dropped; a number listed
+ * twice (one id per item on the server) is shown once, in order. */
+export function questionRefs(ids?: string[]): number[] {
+  const refs = (ids ?? []).map((e) => /^q(\d+)$/i.exec(e)).filter((m): m is RegExpExecArray => Boolean(m)).map((m) => Number(m[1]));
+  return [...new Set(refs)];
+}
+
 function weakSpots(record: SessionRecord): WeakSpotModel[] {
   const out: WeakSpotModel[] = [];
-  const ref = (ids?: string[]) => (ids ?? []).map((e) => /^q(\d+)$/i.exec(e)).filter((m): m is RegExpExecArray => Boolean(m)).map((m) => Number(m[1]));
-  for (const w of record.debrief?.weak_spots ?? []) {
-    const title = w.text || tMaybe(`feedback.tag.${w.tag}`, w.tag.replace(/_/g, " "));
-    const ids = ref(w.evidence);
+  const list = record.debrief?.weak_spots ?? [];
+  // D98: with "What you said" / "How it lands" the card needs a short heading and the server's `text` becomes "How to fix";
+  // an older debrief keeps its sentence as the heading.
+  const rich = list.some((w) => w.said || w.lands_as);
+  for (const w of list) {
+    const label = tMaybe(`feedback.tag.${w.tag}`, w.tag.replace(/_/g, " "));
+    const title = rich ? label : w.text || label;
+    const ids = questionRefs(w.evidence);
     const first = out.find((o) => o.layer === w.layer);
     if (first) {
       if (w.layer === "content" && !first.also) first.also = { text: title, ids };
       continue;
     }
+    const said = w.said?.trim();
     out.push({
       id: `${w.layer}-${w.tag}`,
       layer: w.layer,
       title,
       evidence: ids.length ? { kind: "questions", ids } : undefined,
+      said: said ? { text: said, kind: w.said_kind ?? (w.layer === "delivery" ? "metric" : "quote") } : undefined,
+      lands: w.lands_as?.trim() || undefined,
+      fix: rich && w.text ? w.text : undefined,
     });
   }
   return out;
+}
+
+/** The scorecard rows in the fixed order of rubric §9.1; unknown keys are dropped, a score outside 1–5 counts as "not asked". */
+export const SCORE_ORDER: ScoreKey[] = ["structure", "own_part", "result", "relevance", "reflection", "language", "delivery"];
+
+function scorecard(record: SessionRecord): ScoreRowModel[] | undefined {
+  const rows = record.debrief?.scorecard?.rows;
+  if (!rows?.length) return undefined;
+  const out = SCORE_ORDER.flatMap((key) => {
+    const row = rows.find((r) => r.key === key);
+    if (!row) return [];
+    const score = typeof row.score === "number" && row.score >= 1 && row.score <= 5 ? Math.round(row.score) : null;
+    return [{ key, score, answers: row.answers ?? 0, lost: score === null ? [] : questionRefs(row.lost) }];
+  });
+  return out.length ? out : undefined;
+}
+
+/** D99: the verdict. With the server's step (computed from the scorecard) the headline is the step's name and the
+ * model's sentence is the line under it; without one (too short, no scored row, an older server) the sentence is the
+ * headline and there is no scale. */
+function verdict(record: SessionRecord): VerdictModel | undefined {
+  const d = record.debrief;
+  if (!d?.verdict) return undefined;
+  const strength = d.strength?.trim() || undefined;
+  const value = d.step?.value;
+  if (value !== 0 && value !== 1 && value !== 2) return { headline: d.verdict, strength };
+  const gap = (d.step?.gap ?? []).filter((k, i, all) => SCORE_ORDER.includes(k) && all.indexOf(k) === i);
+  const target = d.step?.target === 3 || d.step?.target === 4 ? d.step.target : undefined;
+  return verdictModel({ value, gap, target: target ?? null }, d.verdict, strength);
+}
+
+function plan(record: SessionRecord): PlanStepModel[] | undefined {
+  const steps = (record.debrief?.plan ?? []).filter((p) => p.text?.trim()).slice(0, 3);
+  if (!steps.length) return undefined;
+  // Only the first step carries the drill (US-20 AC8).
+  return steps.map((p, i) => ({ id: `${i}-${p.layer}-${p.tag}`, layer: p.layer, text: p.text.trim(), drill: i === 0 && p.drill }));
 }
 
 export interface MapOptions {
@@ -296,12 +348,18 @@ function asked(record: SessionRecord): number {
   return new Set(record.transcript.filter((x) => x.role === "model" && x.kind === "question").map((x) => x.question_id ?? x.text)).size;
 }
 
+/** Distinct questions that got at least one main (non-follow-up) answer. `stats.answers` counts raw replies (a long voice answer
+ * arrives as many fragments: 11 of them for one question read "answered 11 of 5"), so it is never used here. */
+function answeredQuestions(record: SessionRecord): number {
+  return new Set(record.feedback.filter((f) => f.answer_kind !== "follow_up").map((f) => f.question_id || f.question)).size;
+}
+
 /** Map a saved session to the view model. */
 export function mapRecord(record: SessionRecord, opts: MapOptions): DebriefModel {
   const threads = threadsFromRecord(record);
   const english = record.mode === "english";
-  const answered = record.stats?.answers ?? record.feedback.filter((f) => f.answer_kind !== "follow_up").length;
   const total = Math.max(record.questions.length, threads.length);
+  const answered = Math.min(answeredQuestions(record), total);
   const d = record.debrief;
   const partial = !english && (Boolean(d?.too_short) || (answered < MIN_ANSWERS && total > 0 && answered < total && !d?.verdict)) ? { answered, total } : undefined;
   const followUps = record.feedback.filter((f) => f.answer_kind === "follow_up").length;
@@ -312,21 +370,31 @@ export function mapRecord(record: SessionRecord, opts: MapOptions): DebriefModel
       : d.source === "template" ? "template" : undefined;
   const questionNumbers = threads.map((th) => th.number);
   const maxAsked = Math.max(0, ...questionNumbers);
+  const eng = english ? englishModel(threads) : undefined;
+  const questions = english ? [] : threads.map((th) => questionModel(record, th, opts));
+  const shownVerdict = !partial && !english ? verdict(record) : undefined;
+  // Nothing to show besides the chat: no verdict, no notice, no answer cards. An English talk always has its summary and
+  // corrections ("No corrections this time."), so it keeps the Debrief view.
+  const empty = !shownVerdict && !notice && !questions.length && !eng;
   return {
     id: record.id,
     title: record.title || t("debrief.title"),
     meta: metaFor(record, english ? 0 : asked(record) || threads.length, followUps, threads.length),
     obsidian: opts.obsidian,
     saved: true,
-    verdict: d?.verdict && !partial && !english ? { headline: d.verdict } : undefined,
+    verdict: shownVerdict,
     verdictNotice: notice,
     partial,
+    // D98: only an interview debrief that has a verdict gets the scorecard and the plan (US-20 AC4, AC6).
+    scorecard: !partial && !english && d?.verdict ? scorecard(record) : undefined,
     weakSpots: spots,
+    plan: !partial && !english && d?.verdict ? plan(record) : undefined,
     drill: !partial && !english && spots.length ? { points: spots.length } : undefined,
-    questions: english ? [] : threads.map((th) => questionModel(record, th, opts)),
+    questions,
     skipped: partial && maxAsked < total ? { from: maxAsked + 1, to: total } : undefined,
-    english: english ? englishModel(threads) : undefined,
+    english: eng,
     conversation: conversation(record),
+    empty,
   };
 }
 

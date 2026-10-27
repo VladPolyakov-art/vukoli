@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from . import (DATA_VERSION, __version__, config, content, engines, feedback, memory, planner, postcall, storage, stt,
+from . import (DATA_VERSION, __version__, config, content, debrief_view, engines, feedback, memory, planner, postcall, storage, stt,
                telemetry, tts, usage)
 from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
@@ -520,6 +520,12 @@ def _repair_if_orphaned(session: dict) -> dict:
     return session
 
 
+def _shown_debrief(session: dict) -> dict | None:
+    """The debrief as the page gets it: the saved one plus the scorecard, "what you said / how it lands" and the plan,
+    built now from the saved feedback (rubric §9). The saved session never holds these."""
+    return debrief_view.enrich_debrief(session.get("debrief"), session.get("feedback") or [], session.get("mode", ""))
+
+
 def _not_while_preparing(session_id: str) -> None:
     """The feedback of a session being prepared still changes: edits wait for it (409, the page tries again)."""
     if postcall.is_running(session_id):
@@ -579,7 +585,10 @@ async def purge_session(trash_id: str, request: Request) -> dict:
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str) -> dict:
     record = _repair_if_orphaned(_session_or_404(session_id))
-    return {**record, "title": storage.display_title(record.get("title", ""))}
+    shown = {**record, "title": storage.display_title(record.get("title", ""))}
+    if "debrief" in record:
+        shown["debrief"] = _shown_debrief(record)
+    return shown
 
 
 @router.get("/sessions/{session_id}/markdown")
@@ -639,7 +648,7 @@ async def rerun_debrief(session_id: str, request: Request) -> dict:
     session["debrief"] = await feedback.debrief(llm, session.get("feedback", []),
                                                 layer_order=settings["layer_order"], past=past)
     storage.save_session(session)
-    return session["debrief"]
+    return _shown_debrief(session)
 
 
 class FlagBody(BaseModel):
@@ -666,7 +675,7 @@ async def session_flag(session_id: str, flag_id: str, body: FlagBody, request: R
         session["debrief"] = feedback.refresh_weak_spots(
             session["debrief"], session.get("feedback", []), config.load_settings()["layer_order"])
     storage.save_session(session)
-    return {"flag": flag, "language": record["layers"]["language"], "debrief": session.get("debrief")}
+    return {"flag": flag, "language": record["layers"]["language"], "debrief": _shown_debrief(session)}
 
 
 class StrongerBody(BaseModel):
@@ -757,7 +766,7 @@ async def session_recheck(session_id: str, body: RecheckBody, request: Request) 
         session["debrief"] = feedback.refresh_weak_spots(
             session["debrief"], session.get("feedback", []), settings["layer_order"])
     storage.save_session(session)
-    return {"feedback": record, "transcript": session.get("transcript") or [], "debrief": session.get("debrief")}
+    return {"feedback": record, "transcript": session.get("transcript") or [], "debrief": _shown_debrief(session)}
 
 
 @router.get("/memory")

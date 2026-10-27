@@ -305,15 +305,29 @@ def render_session_markdown(session: dict) -> str:
              "tags: [interview-practice]", "---", "",
              f"# {display_title(session.get('title', '')) or 'Practice session'}", "",
              "Saved on this computer.", ""]
-    debrief = session.get("debrief") or {}
+    from .debrief_view import STEP_NAMES, enrich_debrief, markdown_sections   # built at read time, never saved (rubric §9)
+    debrief = enrich_debrief(session.get("debrief"), session.get("feedback") or [], session.get("mode", "")) or {}
     if debrief.get("verdict"):
-        lines += ["## Debrief", "", debrief["verdict"], ""]
-        for spot in debrief.get("weak_spots", []):
-            lines.append(f"- **{md_cell(spot.get('layer'))}**: {md_cell(spot.get('text'))}")
+        extra = markdown_sections(debrief) if "scorecard" in debrief else {}
+        lines += ["## Debrief", ""]
+        step = (debrief.get("step") or {}).get("value")
+        if step in (0, 1, 2):                              # D99: derived at read time, like the scorecard
+            lines += [f"Verdict: {STEP_NAMES[step]}", ""]
+        lines += [debrief["verdict"], ""]
+        # The order of the page (rubric §9): weak spots, plan, then the scorecard.
+        if extra.get("weak_spots"):
+            lines += ["### Weak spots", "", *extra["weak_spots"]]
+        else:
+            for spot in debrief.get("weak_spots", []):
+                lines.append(f"- **{md_cell(spot.get('layer'))}**: {md_cell(spot.get('text'))}")
         if debrief.get("strength"):
             lines += ["", f"Strength: {debrief['strength']}"]
         if debrief.get("next_step"):
             lines += ["", f"Next step: {debrief['next_step']}"]
+        if extra.get("plan"):
+            lines += ["", "### Plan for the next session", "", *extra["plan"]]
+        if extra.get("scorecard"):
+            lines += ["", "### Scorecard", "", *extra["scorecard"]]
         lines.append("")
     feedback = session.get("feedback") or []
     if feedback:
@@ -349,6 +363,11 @@ def render_session_markdown(session: dict) -> str:
 
 
 def save_session(session: dict) -> dict:
+    from .debrief_view import strip_enriched          # the scorecard, the step and the plan are built when read, not stored
+    if session.get("debrief"):
+        clean = strip_enriched(session["debrief"])
+        if clean is not session["debrief"]:
+            session = {**session, "debrief": clean}
     saved = save_record("sessions", session)
     md_path = record_path("sessions", session["id"]).with_suffix(".md")
     atomic_write(md_path, render_session_markdown(saved))

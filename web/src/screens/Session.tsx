@@ -1,7 +1,8 @@
 /* Session route: the live container. It owns the socket / audio (useSession) and maps the reducer to the pure
  * SessionView (screens/session/SessionView.tsx); the review page and Storybook render the same view from fixtures.
- * Terminal states (failed, saving, not started from Practice) stay here as centred messages. */
-import { useEffect, useMemo, useState } from "react";
+ * Terminal states (failed, not saved, not started from Practice) stay here as centred messages. After End there is no
+ * full-screen "Saving…": with an answer on record the user is sent Home at once and the session loads in Recents. */
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button, Callout, EmptyState, motionMemory } from "../ds";
 import { t, tMaybe } from "../i18n";
@@ -15,7 +16,6 @@ import type { EngineId } from "../lib/types";
 import { selectThreads, type SessionState } from "../session/reducer";
 import { editTargets, heardEdit, recheckEdits } from "../session/recheck";
 import { useSession, type SessionConfig } from "../session/useSession";
-import { endingLine } from "./session/ending";
 import { SessionView } from "./session/SessionView";
 import type { PanelMode, SessionData, SessionHandlers, SessionOverlay, SessionPhase, TranscriptTurn } from "./session/types";
 import s from "./Session.module.css";
@@ -82,11 +82,6 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   }, [live, startedAt]);
   const elapsed = useElapsed(startedAt, live || state.phase === "connecting");
 
-  /* Done and saved while still here (the server ended the session): go to the debrief. */
-  useEffect(() => {
-    if (state.phase === "done" && state.savedSessionId && !state.interrupted) navigate(`/sessions/${state.savedSessionId}`, { replace: true });
-  }, [state.phase, state.savedSessionId, state.interrupted, navigate]);
-
   const threads = useMemo(() => selectThreads(state), [state]);
   const userTurns = state.transcript.filter((x) => x.speaker === "user").length;
 
@@ -104,19 +99,38 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   }, [state.recheckError, recheckBusy, draft, editing]);
 
   /* D73: with an answer on record the server saves the session and writes the debrief by itself (the socket is not
-   * needed), so End goes Home at once and the shell's toast says when it is ready (lib/pendingSave). Without an
-   * answer nothing is saved: stay for that message. */
-  const end = () => {
+   * needed), so after End (the user's, or the server's own: the round is over, the connection backs up) the user goes
+   * Home at once, any mode; the session is a loading row at the top of Recents until its debrief is ready, then a toast
+   * opens it (lib/pendingSave, AppShell). Without an answer nothing is saved: stay for that message. */
+  const handedOff = useRef(false);
+  const handOff = () => {
     const id = state.sessionId;
-    const leave = !!id && userTurns > 0 && storageOk && (state.phase === "live" || state.phase === "connecting" || !!state.interrupted);
-    actions.end();
-    if (!leave) return;
-    pendingSave.start(id);
+    if (handedOff.current || !id || userTurns === 0 || !storageOk) return false;
+    handedOff.current = true;
+    pendingSave.start(id, { title, track: english ? "english" : "interview" });
     navigate("/", { replace: true });
+    return true;
   };
+  const end = () => {
+    const leave = state.phase === "live" || state.phase === "connecting" || !!state.interrupted;
+    actions.end();
+    if (leave) handOff();
+  };
+  const afterEnd = !state.interrupted && (state.phase === "ending" || state.phase === "saving" || state.phase === "debrief_pending");
+  const savedHere = !state.interrupted && state.phase === "done" && !!state.savedSessionId;
+  useEffect(() => {
+    if (!afterEnd && !savedHere) return;
+    // The server ended the session itself (round over, connection backing up) or it is already saved: same way out.
+    // Not possible (no answer, folder not writable) while a saved id exists: go to its page.
+    if (!handOff() && savedHere && !handedOff.current) navigate(`/sessions/${state.savedSessionId}`, { replace: true });
+    // handOff reads the latest render's values; it runs once per session (handedOff).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [afterEnd, savedHere, state.sessionId, state.savedSessionId, userTurns, storageOk]);
   const questionIndex = state.threadOrder.indexOf(state.currentThreadId);
   const total = state.questions.length;
-  const phase: SessionPhase = state.interrupted ? "interrupted" : phaseOf(state, playing);
+  /* Between End and the end of the session with nothing to save (no answer, or the folder is not writable): the same
+   * screen with a quiet "Saving…" state, not a full-screen message. */
+  const phase: SessionPhase = state.interrupted ? "interrupted" : afterEnd ? "saving" : phaseOf(state, playing);
 
   /* US-13 AC5 (D94): Resume on the interrupted card turns on once the engine answers again (checked every few seconds
    * while the card shows); a dropped connection can always be tried again. Gemini Live cannot pick a session up again. */
@@ -207,17 +221,6 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
       </main>
     );
   }
-  if (!state.interrupted && (state.phase === "ending" || state.phase === "saving" || state.phase === "debrief_pending" || state.phase === "done")) {
-    return (
-      <main className={s.center} id="main">
-        <p className="shimmer-text" role="status" aria-busy="true">
-          {endingLine(state)}
-        </p>
-        {state.saveError ? <Callout tone="error">{t("session.errors.saveFailed")} {state.saveError}</Callout> : null}
-      </main>
-    );
-  }
-
   /* ---------- live: reducer -> view props ---------- */
   const start = config.start;
   const current = threads.at(-1) ?? null;

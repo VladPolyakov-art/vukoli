@@ -64,6 +64,9 @@ Vukoli opens as its own window when Chrome, Edge, Chromium or Brave is installed
 in your normal browser profile, so the microphone permission is remembered. Without them it opens a tab in your
 default browser. To always get a browser tab, set `VUKOLI_APP_WINDOW=0` (or start the launcher with `--browser` / `-Browser`).
 
+Chrome and Edge also offer to install Vukoli as an app (a card on Home, or Settings > General > Install Vukoli as an app),
+which gives it its own Dock / taskbar icon. If the app is closed, clicking that icon shows "Start Vukoli".
+
 ## What's free
 
 Everything you need to practise is free forever, with no account and no key. The free core is never a demo.

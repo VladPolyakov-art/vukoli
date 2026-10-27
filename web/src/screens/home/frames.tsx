@@ -2,7 +2,7 @@
  * playable (send, pick a reply, change a plan row, start); pending reads resolve after a pause. No network. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { AppShellView, savedToast, savingToast } from "../../components/AppShell";
+import { AppShellView, savedToast } from "../../components/AppShell";
 import { ToastProvider, useToast } from "../../ds";
 import { VacancyEditorView, type FileState, type LinkState, type VacancySource } from "../../components/VacancyEditor";
 import { OverlayRoot } from "../../ds/OverlayRoot";
@@ -213,13 +213,14 @@ export function HomeHarness({ scene }: { scene: HomeScene }) {
 }
 
 /** The screen inside the shell, no frame around it (the review page brings its own). */
-/** D73: the toast the shell shows after End, as in the app (the same options, the real region). */
-function SceneToast({ kind }: { kind: "saving" | "saved" }) {
+/** D73: the toast the shell shows when the debrief is ready, as in the app (the same options, the real region).
+ * While the session is being saved there is no toast: the scene's Recents has a loading row instead. */
+function SceneToast() {
   const toast = useToast();
   useEffect(() => {
-    const id = toast.show(kind === "saving" ? savingToast() : { ...savedToast(() => {}), duration: null });
+    const id = toast.show({ ...savedToast(() => {}), duration: null });
     return () => toast.dismiss(id);
-  }, [toast, kind]);
+  }, [toast]);
   return null;
 }
 
@@ -231,7 +232,7 @@ export function HomeScene({ id }: { id: HomeSceneId }) {
         <AppShellView current="practice" recent={scene.recent} engine={scene.engine}>
           <HomeHarness scene={scene} />
         </AppShellView>
-        {scene.toast ? <SceneToast kind={scene.toast} /> : null}
+        {scene.toast ? <SceneToast /> : null}
       </ToastProvider>
     </MemoryRouter>
   );

@@ -3,8 +3,12 @@
   flex-direction: column;
   min-height: 0;
   background: var(--color-surface-card);
+  box-shadow: var(--shadow-raised);
   border: 0;
   border-radius: var(--radius-lg);
+  /* D101: an info Callout / EmptyState disc inside an island falls back to the sunken grey, no shadow. */
+  --note-fill: var(--color-subtle);
+  --note-shadow: none;
 }
 .header {
   display: flex;
@@ -15,5 +19,5 @@
   border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 .title { font-size: var(--text-md); font-weight: var(--weight-semibold); margin: 0; }
-.body { padding: var(--space-4) var(--space-5); overflow: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: var(--space-4); }
+.body { padding: var(--space-4) var(--space-5); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: var(--space-4); }
 .footer { padding: var(--space-3) var(--space-5); border-top: var(--border-width) solid var(--color-border-subtle); }

@@ -46,6 +46,13 @@ async def lifespan(app: FastAPI):
     await antigravity_cli.close_spares()                 # D87: no `agy` left waiting after Vukoli quits
 
 
+# Install-as-app files (web/public): Python's mimetypes may not know .webmanifest, and the service worker, the manifest and
+# the offline page must be revalidated on every load, so an updated UI or worker is picked up at once (never served stale).
+_MEDIA_TYPES = {".webmanifest": "application/manifest+json"}
+_REVALIDATE_FILES = {"sw.js", "manifest.webmanifest", "offline.html"}
+_REVALIDATE = {"Cache-Control": "no-cache"}
+
+
 def create_app() -> FastAPI:
     config.ensure_meta()
     app = FastAPI(title="Vukoli", version=__version__, docs_url="/api/docs", redoc_url=None,
@@ -76,7 +83,8 @@ def create_app() -> FastAPI:
                 return JSONResponse({"detail": {"code": "not_found", "message": "Not found."}}, status_code=404)
             target = (dist / path).resolve()
             if path and target.is_file() and dist.resolve() in target.parents and target.name != "index.html":
-                return FileResponse(target)
+                return FileResponse(target, media_type=_MEDIA_TYPES.get(target.suffix),
+                                    headers=_REVALIDATE if path in _REVALIDATE_FILES else None)
             # Revalidate the shell on every load, so a rebuilt UI shows up without a hard reload.
             return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
     else:

@@ -2,10 +2,14 @@
 /* Card surface: card tokens (radius-md, DS-1); the header button is the card's top, full bleed. */
 .card {
   background: var(--color-surface-card);
+  box-shadow: var(--shadow-raised);
   border: 0;
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
   list-style: none;
+  /* D101: an info Callout / EmptyState disc inside an island falls back to the sunken grey, no shadow. */
+  --note-fill: var(--color-subtle);
+  --note-shadow: none;
 }
 .heading { margin: 0; font: inherit; }
 .header {

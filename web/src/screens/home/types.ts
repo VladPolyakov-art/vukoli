@@ -143,6 +143,8 @@ export interface HomeViewProps {
   textMode?: boolean;
   /** US-23: saved sessions can't be read. */
   storageError?: boolean;
+  /** The browser can install Vukoli as an app and the user has not said no: a quiet card on the start screen. */
+  installCard?: boolean;
   suggestions: Suggestion[];
   /** Quick start (D51 item 1): what the round mic at the composer's end starts (its tooltip). None: not offered (English). */
   quickStart?: { detail: string; answer?: "voice" | "text"; /** The remembered job's questions are still being written (QA-02): the button waits. */ wait?: boolean } | null;
@@ -185,4 +187,6 @@ export interface HomeViewProps {
   onRetryEngine?: () => void;
   onUseTextMode?: () => void;
   onDismissBrowser?: () => void;
+  onInstall?: () => void;
+  onDismissInstall?: () => void;
 }

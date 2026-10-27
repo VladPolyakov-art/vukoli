@@ -6,9 +6,41 @@ const meta: Meta<typeof Card> = { title: "DS/Card", component: Card, tags: ["aut
 export default meta;
 type Story = StoryObj<typeof Card>;
 
-export const Raised: Story = { args: { children: "Kestrel Pay · Senior Product Designer" } };
-export const Subtle: Story = { args: { tone: "subtle", children: "Feedback appears here after each question." } };
-export const Flat: Story = { args: { tone: "flat", children: "Saved on this computer" } };
+/** The sample answer in a session (`padding="sm"`); the "server isn't answering" screen uses `padding="lg"`. */
+export const Raised: Story = {
+  args: {
+    padding: "sm",
+    children: (
+      <div style={{ display: "grid", gap: "var(--space-1)", maxWidth: "28rem" }}>
+        <strong>Sample answer</strong>
+        <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>Practice only. Say it in your own words.</span>
+      </div>
+    ),
+  },
+};
+/** First-time tips in a session (`padding="sm"`), the Home example and the plan card (`padding="md"`). */
+export const Subtle: Story = {
+  args: {
+    tone: "subtle",
+    padding: "sm",
+    children: (
+      <div style={{ display: "grid", gap: "var(--space-1)", maxWidth: "28rem" }}>
+        <strong>First time here</strong>
+        <span style={{ fontSize: "var(--text-sm)" }}>Answer aloud when Mike stops. Pause to think: he waits up to 3 s.</span>
+      </div>
+    ),
+  },
+};
+/** The three paddings (`--space-3` / `--space-5` / `--space-6`): sm in the session, md on Home, lg for a screen-level card. */
+export const Padding: Story = {
+  render: () => (
+    <div style={{ display: "grid", gap: "var(--space-3)", maxWidth: "28rem" }}>
+      {(["sm", "md", "lg"] as const).map((p) => (
+        <Card key={p} tone="subtle" padding={p}>{`padding="${p}"`}</Card>
+      ))}
+    </div>
+  ),
+};
 /** Toggle cards (`aria-pressed`): selected = 2px border + check icon, never an action colour. */
 export const Selectable: Story = {
   render: () => (

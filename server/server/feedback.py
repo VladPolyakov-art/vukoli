@@ -246,12 +246,31 @@ CONTENT_FIX = {
     "no_reflection": "End with one thing you would do differently.",
 }
 
+# Short fixes for the language tags, in the voice of CONTENT_FIX (used by the template debrief).
+LANGUAGE_FIX = {
+    "meaning_error": "Rephrase the sentence so it can only mean one thing.",
+    "tense": "Use the past tense for finished projects: 'I led', not 'I lead'.",
+    "article": "Check 'the' before nouns you've already mentioned or that are specific.",
+    "preposition": "Learn the preposition with the verb as one phrase: 'responsible for'.",
+    "collocation": "Use the usual verb pairing: 'make a decision', 'run a study'.",
+    "word_choice": "Pick the exact word: a concrete noun instead of 'things' or 'stuff'.",
+}
+
 
 def content_from_model(data: dict, *, question: str, competency: str, transcript: str, n_i: int, n_we: int) -> dict:
+    """The content layer of one answer. `checks` keeps the raw yes/no answers of the model (voice already corrected by
+    the counters) so the debrief scorecard (rubric §9.1) can be built in code later. Records saved before 2026-10-24
+    have no `checks`."""
     hypothetical = competency == "H"
     voice = data.get("voice", "none")
     if voice == "i" and n_i == 0 and n_we > 0:
         voice = "we"                                   # trust the counters over the model
+    invites_reflection = competency == "F" or "differently" in question.lower()
+    checks = {"situation": bool(data.get("situation")), "task": bool(data.get("task")),
+              "action": bool(data.get("action")), "result": bool(data.get("result")), "voice": voice,
+              "result_type": str(data.get("result_type") or ""), "relevant": data.get("relevant") is not False,
+              "reflection": bool(data.get("reflection")), "invites_reflection": invites_reflection,
+              "hypothetical": hypothetical}
     issues: list[tuple[int, str]] = []                 # (severity, tag) in check order
     if data.get("relevant") is False:
         issues.append((3, "off_topic"))
@@ -266,7 +285,7 @@ def content_from_model(data: dict, *, question: str, competency: str, transcript
             issues.append((1, "we_mixed"))
         if data.get("result_type") == "vague" and data.get("result"):
             issues.append((2, "vague_result"))
-    if not data.get("reflection") and (competency == "F" or "differently" in question.lower()):
+    if not data.get("reflection") and invites_reflection:
         issues.append((2, "no_reflection"))
     evidence = str(data.get("evidence") or "")
     praise = str(data.get("praise") or "")
@@ -279,10 +298,11 @@ def content_from_model(data: dict, *, question: str, competency: str, transcript
         return {"layer": "content", "status": "fix", "severity": top[0], "tag": tag, "fix": fix,
                 "evidence": evidence, "praise": praise,
                 "tips": [CONTENT_FIX[t] for s, t in issues if s == 1],
-                "missing": [t for s, t in issues if s >= 2]}
+                "missing": [t for s, t in issues if s >= 2], "checks": checks}
     fix = "Nothing to fix here." + (f" Strong: \"{praise}\"" if praise else "")
     return {"layer": "content", "status": "ok", "severity": 0, "tag": "", "fix": fix, "evidence": "",
-            "praise": praise, "tips": [CONTENT_FIX[t] for s, t in issues if s == 1], "missing": []}
+            "praise": praise, "tips": [CONTENT_FIX[t] for s, t in issues if s == 1], "missing": [],
+            "checks": checks}
 
 
 async def analyze_content(llm: LLMEngine, *, question: str, competency: str, transcript: str,
@@ -455,14 +475,16 @@ def fallback_debrief(feedback: list[dict], layer_order: str) -> dict:
     counts: dict[tuple[str, str], list[str]] = {}
     for i, record in enumerate(feedback, 1):
         for layer, tag, _sev in counted_tags(record):
-            counts.setdefault((layer, tag), []).append(f"q{i}")
+            ids = counts.setdefault((layer, tag), [])
+            if f"q{i}" not in ids:                  # several items of one tag in one answer: one id
+                ids.append(f"q{i}")
     ranked = sorted(counts.items(), key=lambda kv: -len(kv[1]))
     spots, used = [], set()
     for (layer, tag), evidence in ranked:
         if layer in used:
             continue
         used.add(layer)
-        text = CONTENT_FIX.get(tag) or DELIVERY_TIP.get(tag) or f"Work on {tag.replace('_', ' ')}."
+        text = CONTENT_FIX.get(tag) or DELIVERY_TIP.get(tag) or LANGUAGE_FIX.get(tag) or f"Work on {tag.replace('_', ' ')}."
         spots.append({"layer": layer, "tag": tag, "text": text, "evidence": evidence})
     order = ["content", "language", "delivery"] if layer_order == "content-first" else ["delivery", "content", "language"]
     spots.sort(key=lambda s: order.index(s["layer"]))

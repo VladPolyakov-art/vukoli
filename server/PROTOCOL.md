@@ -289,6 +289,24 @@ asked the next question (see Turns). Times are measured from the moment the serv
 {"type": "save_error", "code": "save_failed", "message": "Could not save the session. Copy the transcript before leaving this page."}
 ```
 - With fewer than 3 answers the debrief has `"too_short": true` and a fixed verdict.
+- In interview mode (not too short) every debrief sent to a client (this message, `GET /api/sessions/{id}`,
+  `POST .../debrief`, `.../flags/{flag_id}`, `.../recheck`, and the Markdown export) also carries, built in code at
+  read time from the saved feedback layers and never saved (feedback_rubric.md section 9, US-20 AC6-AC9):
+  - `scorecard`: `{"rows": [{"key", "score", "answers", "lost"}]}`, always 7 rows in this order: `structure`,
+    `own_part`, `result`, `relevance`, `reflection`, `language`, `delivery`. `score` is 1-5, or `null` ("Not asked
+    this time") when `answers` is 0; `lost` lists the `q<n>` ids (the same numbering as `evidence`) of answers that
+    got less than full points, and is empty for a score of 5.
+  - `step` (D99, feedback_rubric.md 9.4): `{"value": 0 | 1 | 2, "gap": ["structure", ...], "target": 3 | 4 | null}`, the step
+    of the verdict scale (0 `Not ready yet`, 1 `Getting there`, 2 `Ready`), computed from `scorecard`; a row is "shown"
+    when its score is not `null`. 0: a content row (`structure`, `own_part`, `result`, `relevance`) scores 1 or 2.
+    2: every shown row scores 4 or more. 1: everything else. `gap` = the rows that stand between the user and the next
+    step, lowest score first and ties in scorecard order: for 0 the content rows at 1-2 (`target` 3), for 1 every shown
+    row at 1-3 (`target` 4), for 2 empty (`target` `null`). No `step` field when no row has a score (and the debrief is
+    `too_short` or English mode: none of these fields).
+  - on each weak spot: `said` + `said_kind` (`quote` | `metric`) + `said_from` (the `q<n>` it comes from) when a
+    fragment or a metric could be verified, and `lands_as` for a known tag.
+  - `plan`: up to 3 `{"layer", "tag", "text", "drill"}`, one per weak spot in order; `drill` is true on the first.
+  The existing fields are unchanged. English mode debriefs do not have these fields.
 - `source`: `model` or `template` (fallback built in code when the model is unavailable).
 
 ### Errors

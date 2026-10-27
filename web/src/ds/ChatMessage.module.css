@@ -21,7 +21,9 @@
   max-width: 75%;
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
-  background: var(--color-subtle);
+  /* D101: a white bubble on the grey canvas (dark: the old subtle fill, same value). */
+  background: var(--color-surface-bubble);
+  box-shadow: var(--shadow-raised);
   color: var(--color-text-primary);
   font-size: var(--text-md);
   line-height: var(--leading-normal);
@@ -50,7 +52,7 @@
 
 /* Interim (the user's words still being recognised): no stroke. The bubble's fill is 65% strength, the words stay
  * --color-text-secondary (set in the Transcript); the fill and the words firm up once the answer is final. */
-.interim .bubble { background: color-mix(in srgb, var(--color-subtle) 65%, transparent); }
+.interim .bubble { background: color-mix(in srgb, var(--color-surface-bubble) 65%, transparent); }
 
 /* Session transcript size (D49). */
 .lg .text, .lg .bubble { font-size: var(--text-lg); }

@@ -3,8 +3,9 @@
  * Numbers must agree everywhere: fillers 8 · 11 · 6 · 12 · 8 = 45 → 9 per answer; lengths 1:50 · 2:20 · 1:35 · 3:40 · 2:05. */
 import { t, tp } from "../../i18n";
 import type {
-  Correction, DebriefModel, DeliveryBlock, EnglishModel, MetaItem, QuestionModel, Segments, WeakSpotModel,
+  Correction, DebriefModel, DeliveryBlock, EnglishModel, MetaItem, PlanStepModel, QuestionModel, ScoreRowModel, Segments, WeakSpotModel,
 } from "./types";
+import { verdictFromRows } from "./verdictStep";
 
 const saved: MetaItem = { icon: "check", text: t("debrief.savedHere"), href: "/settings/storage" };
 const counts = (questions: number, followUps: number) =>
@@ -15,6 +16,25 @@ const NOTHING_CONTENT = t("debrief.sum.contentNothing");
 const NOTHING_LANGUAGE = t("debrief.sum.languageNothing");
 const NO_RESULT = "No result";
 const noResultBlock = { text: "End with what changed: a number or a decision. The result is missing." };
+
+/* D98 (rubric §9.1–9.3): the scorecard, "How it lands" and the plan. The server builds them from the saved layers; the
+ * fixtures hold the same shapes. Scores follow the rubric: score = round(1 + 4 × points / (2 × answers)). */
+const LANDS = {
+  no_result: "The interviewer can't tell if your work changed anything, so the story ends without a point.",
+  we_not_i: "All “we” makes it hard to see your part; the interviewer may credit the team, not you.",
+  tense: "Tense slips make it unclear whether this happened before or is still true.",
+  collocation: "The meaning is clear, but the wording sounds unusual and pulls attention from the content.",
+  filler_high: "Many “um”s read as unsure, even when the content is strong.",
+  too_long: "Long answers make the interviewer cut in or lose the main point.",
+} as const;
+const PLAN = {
+  number: "Before your next session, write one number for each of your 3 main stories.",
+  mine: "For each story, name the one decision that was yours.",
+  phrases: "Drill the phrases from this session's corrections out loud, three times each.",
+  record: "Record one answer and replay it, listening only for this habit.",
+  time: "Time one answer: aim for one to two minutes.",
+} as const;
+const step = (id: string, layer: PlanStepModel["layer"], text: string): PlanStepModel => ({ id, layer, text, drill: id === "p1" });
 
 const delivery = (fillers: number, length: string, wpm: number, mostFillers?: string, extra: Partial<DeliveryBlock> = {}): DeliveryBlock => {
   const [m, s] = length.split(":").map(Number) as [number, number];
@@ -62,7 +82,7 @@ const q1: QuestionModel = {
 const q2: QuestionModel = {
   n: 2,
   question: "Tell me about a time you had to change a design late in a project.",
-  summary: { content: `${NO_RESULT} · “we” → “I” ×2`, language: tp("debrief.sum.phrasings", 2), delivery: fillersLabel(11) },
+  summary: { content: `${NO_RESULT} · “we” → “I” ×2 · no lesson`, language: tp("debrief.sum.phrasings", 2), delivery: fillersLabel(11) },
   duration: "2:20", startsAt: "03:35", followUps: 1, misheard: 1,
   followUp: "What was the result for the merchants?",
   answer: [
@@ -75,6 +95,7 @@ const q2: QuestionModel = {
       items: [
         { text: "End with what changed: a number or a decision. The result is missing." },
         { lead: "“we” → “I” ×2:", text: "“we redesigned it”, “we tested it” — say “I” for what you did." },
+        { lead: "No lesson:", text: "Add one last sentence on what you would do differently next time." },
       ],
     },
     language: {
@@ -162,19 +183,41 @@ const interviewWeakSpots: WeakSpotModel[] = [
   {
     id: "ws-content", layer: "content", title: "No measurable result in 3 of 5 answers",
     evidence: { kind: "questions", ids: [1, 2, 4] },
+    said: { kind: "quote", text: "Last year I, like, rebuilt the onboarding and we got a lot of positive feedback." },
+    lands: LANDS.no_result,
     fix: "End every story with a number or a decision: “conversion stayed at 4.1%”, “we dropped the second screen”.",
     also: { text: "“we” instead of “I”", ids: [2, 4], fix: "say “I” for what you did." },
   },
   {
     id: "ws-language", layer: "language", title: "“I have led” for finished projects — 2 times",
     evidence: { kind: "questions", ids: [2, 5] },
-    fix: "say “I led” when you name a finished time (“last spring”, “in 2023”).",
+    said: { kind: "quote", text: "I have led the redesign last spring" },
+    lands: LANDS.tense,
+    fix: "Say “I led” when you name a finished time (“last spring”, “in 2023”).",
   },
   {
     id: "ws-delivery", layer: "delivery", title: "9 fillers per answer on average",
     evidence: { kind: "most", ids: [4], trail: "(12)" },
-    fix: "pause silently instead of “uh” and “like”.",
+    said: { kind: "metric", text: "12 fillers in 3:40" },
+    lands: LANDS.filler_high,
+    fix: "Pause silently instead of “uh” and “like”.",
   },
+];
+
+const row = (key: ScoreRowModel["key"], score: number | null, answers: number, lost: number[] = []): ScoreRowModel => ({ key, score, answers, lost });
+const interviewScorecard: ScoreRowModel[] = [
+  row("structure", 3, 5, [1, 2, 4]),
+  row("own_part", 4, 5, [2, 4]),
+  row("result", 3, 5, [1, 2, 4]),
+  row("relevance", 5, 5),
+  row("reflection", 1, 1, [2]),
+  row("language", 4, 5, [2, 5]),
+  row("delivery", 3, 5, [1, 2, 4, 5]),
+];
+const interviewPlan: PlanStepModel[] = [
+  step("p1", "content", PLAN.number),
+  step("p2", "language", PLAN.phrases),
+  step("p3", "delivery", PLAN.record),
 ];
 
 export const interviewS2: DebriefModel = {
@@ -190,8 +233,11 @@ export const interviewS2: DebriefModel = {
   ],
   obsidian: true,
   saved: true,
-  verdict: { step: 1, headline: "Getting there", line: "Clear stories, but 3 of 5 answers end before the result." },
+  // The step follows the scorecard by the one rule (D99, verdictStep.ts): here "Getting there", gap Lessons learned, Structure, Result, Delivery.
+  verdict: verdictFromRows(interviewScorecard, "Clear stories, but 3 of 5 answers end before the result."),
+  scorecard: interviewScorecard,
   weakSpots: interviewWeakSpots,
+  plan: interviewPlan,
   drill: { questions: 3, points: 4, minutes: 12 },
   questions: [q1, q2, q3, q4, q5],
 };
@@ -205,23 +251,23 @@ export const interviewLong: DebriefModel = {
   ...interviewS2,
   id: "s-long",
   title: LONG_TITLE,
-  verdict: {
-    step: 1, headline: "Getting there",
-    line: "Clear, well-structured stories, but 3 of 5 answers end before the result, and two of them skip the part you personally did.",
-  },
+  verdict: verdictFromRows(interviewScorecard,
+    "Clear, well-structured stories, but 3 of 5 answers end before the result, and two of them skip the part you personally did."),
   weakSpots: [
     {
       ...interviewWeakSpots[0]!, title: "No measurable result in 3 of 5 answers, and in two of them no decision either",
       fix: "End every story with a number or a decision: “conversion stayed at 4.1%”, “we dropped the second screen”, “support tickets did not rise”.",
       also: { text: "“we” instead of “I” when you describe your own part", ids: [2, 4], fix: "say “I” for what you did and “we” for what the team shipped." },
+      said: { kind: "quote", text: "Last year I, like, rebuilt the onboarding and we got a lot of positive feedback, and the leadership team was really happy with how it came out in the end." },
+      lands: "The interviewer can't tell if your work changed anything, so the story ends without a point, and they may ask for a number that you do not have.",
     },
     {
       ...interviewWeakSpots[1]!, title: "“I have led” for finished projects — 2 times, once next to a date",
-      fix: "say “I led” when you name a finished time (“last spring”, “in 2023”, “two quarters ago”). Keep “I have led” for things you still do.",
+      fix: "Say “I led” when you name a finished time (“last spring”, “in 2023”, “two quarters ago”). Keep “I have led” for things you still do.",
     },
     {
       ...interviewWeakSpots[2]!, title: "9 fillers per answer on average, most of them “uh” before a number",
-      fix: "pause silently instead of “uh” and “like”; a short pause reads as confidence, not as a gap.",
+      fix: "Pause silently instead of “uh” and “like”; a short pause reads as confidence, not as a gap.",
     },
   ],
   questions: [
@@ -329,7 +375,7 @@ const sq = (n: number, question: string, summary: QuestionModel["summary"], dura
 });
 
 const q3Sam: QuestionModel = sq(
-  3, "Tell me about a feature that failed. What did you learn?",
+  3, "Tell me about a feature that failed and how you dealt with it.",
   { content: "Your own decision is missing", language: "1 phrasing", delivery: "Answers run long" },
   "4:05", "09:10", 1,
   {
@@ -357,6 +403,16 @@ const q3Sam: QuestionModel = sq(
   },
 );
 
+const exampleScorecard: ScoreRowModel[] = [
+  row("structure", 4, 5, [3, 4]),
+  row("own_part", 3, 5, [1, 3, 4]),
+  row("result", 4, 5, [1, 4]),
+  row("relevance", 5, 5),
+  row("reflection", null, 0),
+  row("language", 4, 5, [3, 4, 5]),
+  row("delivery", 4, 5, [3, 4]),
+];
+
 export const exampleSam: DebriefModel = {
   id: "example",
   title: "Brightline · Product Manager, Growth",
@@ -365,26 +421,42 @@ export const exampleSam: DebriefModel = {
     { icon: "clock", text: "Oct 14, 7:30 PM · 22 min" },
     { icon: "chat", text: counts(5, 3) },
   ],
-  verdict: { step: 1, headline: "Getting there", line: "Strong on the why, but 3 answers skip the decision you made yourself." },
+  verdict: verdictFromRows(exampleScorecard, "Strong on the why, but 3 answers skip the decision you made yourself."),
+  // Lessons learned: no question here invites a lesson, so the row says "Not asked this time". Step: Getting there, gap Your part.
+  scorecard: exampleScorecard,
   weakSpots: [
     {
       id: "ws-content", layer: "content", title: "Your own decision is missing in 3 of 5 answers",
       evidence: { kind: "questions", ids: [1, 3, 4] },
+      said: { kind: "quote", text: "We looked at the data we had and picked the option with the lowest risk." },
+      lands: LANDS.we_not_i,
       fix: "Name the call you made and why: “I chose to cut the referral flow because…”.",
     },
     {
       id: "ws-language", layer: "language", title: "“make a research” instead of “do research” — 2 times",
       evidence: { kind: "questions", ids: [3, 4] },
-      fix: "“research” takes “do” and has no plural.",
+      said: { kind: "quote", text: "didn't make a research" },
+      lands: LANDS.collocation,
+      fix: "“Research” takes “do” and has no plural.",
     },
     {
       id: "ws-delivery", layer: "delivery", title: "Answers run long: 3:10 on average",
       evidence: { kind: "most", ids: [3], trail: "(4:05)" },
-      fix: "one sentence of context, then what you did.",
+      said: { kind: "metric", text: "4:05 for one answer" },
+      lands: LANDS.too_long,
+      fix: "One sentence of context, then what you did.",
     },
   ],
+  plan: [
+    step("p1", "content", PLAN.mine),
+    step("p2", "language", PLAN.phrases),
+    step("p3", "delivery", PLAN.time),
+  ],
   questions: [
-    sq(1, "Tell me about a product decision you made with incomplete data.", { content: "Your own decision is missing", language: NOTHING_LANGUAGE, delivery: fillersLabel(5) }, "2:50", "00:30", 1, { followUp: "What would you have wanted to know?" }),
+    sq(1, "Tell me about a product decision you made with incomplete data.", { content: "Your own decision is missing", language: NOTHING_LANGUAGE, delivery: fillersLabel(5) }, "2:50", "00:30", 1, {
+      followUp: "What would you have wanted to know?",
+      answer: ["We looked at the data we had and picked the option with the lowest risk. The team agreed, and we moved on."],
+    }),
     sq(2, "Describe a time you had to say no to a senior stakeholder.", { content: NOTHING_CONTENT, language: NOTHING_LANGUAGE, delivery: fillersLabel(4) }, "2:40", "04:20", 0),
     q3Sam,
     sq(4, "How do you prioritise when everything is urgent?", { content: "Your own decision is missing", language: tp("debrief.sum.phrasings", 1), delivery: fillersLabel(6) }, "3:20", "13:25", 1, { followUp: "What do you drop first?" }),

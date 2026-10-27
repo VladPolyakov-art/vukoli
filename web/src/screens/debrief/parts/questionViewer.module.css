@@ -1,0 +1,12 @@
+/* The question viewer (layout D): the section, one question, Previous / Next. The tab bar has its own module. */
+.viewer { display: flex; flex-direction: column; min-width: 0; scroll-margin-top: 0; }
+
+/* One question. A floor on its height so switching to a short answer does not pull the page up under the reader. */
+.panel { display: flex; flex-direction: column; gap: var(--space-6); padding-top: var(--space-6); min-height: calc(var(--space-16) * 7); }
+.panel:focus-visible { outline: none; }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-width) solid var(--color-border-subtle); }
+
+
+@container page (width < 560px) {
+  .nav > button { flex: 1 1 0; }
+}

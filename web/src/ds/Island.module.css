@@ -10,6 +10,8 @@
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--color-surface-card);
+  /* D101: white on the grey canvas, lifted by the raised shadow (dark: no shadow, the fill separates). */
+  box-shadow: var(--shadow-raised);
   color: var(--color-text-primary);
 }
 .box { width: 100%; padding: var(--space-3); border-radius: var(--radius-lg); }

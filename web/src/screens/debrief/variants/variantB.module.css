@@ -1,0 +1,74 @@
+/* Variant B · skills, weakest first. One list replaces the three layer columns and the scorecard. Monochrome rows; the
+ * only tint is the layer tag inside an opened row (CONTRACT §2.6). Widths answer to the `page` container. */
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  align-items: start;
+  gap: var(--space-8);
+}
+.label { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.verdict { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.headline {
+  margin: 0;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+.line { margin: 0; max-width: 56ch; color: var(--color-text-secondary); font-size: var(--text-md); line-height: var(--leading-relaxed); }
+.next { margin: 0; max-width: 56ch; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+/* The plan: a small card with three short steps and the one primary. */
+.plan { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.steps { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding-inline-start: var(--space-5); }
+.step { padding-inline-start: var(--space-1); }
+.step::marker { color: var(--color-text-secondary); font-weight: var(--weight-semibold); }
+.stepText { display: block; font-size: var(--text-sm); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.stepLayer { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.drill { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); }
+.hint { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+/* The skills list. */
+.skills { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 13rem) auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-6);
+  padding-block: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border-subtle);
+  min-width: 0;
+}
+.row:last-child { border-bottom: var(--border-width) solid var(--color-border-subtle); }
+.name { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.rowLabel { font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.layer { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.meter { padding-top: calc(var(--space-1) / 2); }
+.main { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; }
+.holds { padding-top: var(--space-1); }
+.spotTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.fix { margin: 0; max-width: 64ch; font-size: var(--text-md); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.hasSpot .fix { color: var(--color-text-secondary); }
+.muted { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.lost { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+.more { align-self: stretch; }
+.detail { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); padding-bottom: var(--space-2); }
+.lines { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-5); margin: 0; }
+.lines > div { display: contents; }
+.lines dt { color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); padding-top: calc(var(--space-1) / 2); }
+.lines dd { margin: 0; font-size: var(--text-md); line-height: var(--leading-normal); max-width: 60ch; overflow-wrap: anywhere; }
+
+@container page (width < 840px) {
+  .top { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+}
+@container page (width < 640px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .main { grid-column: 1 / -1; }
+}
+@container page (width < 560px) {
+  .headline { font-size: var(--text-2xl); }
+  .lines { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .lines dd { margin-bottom: var(--space-3); }
+}

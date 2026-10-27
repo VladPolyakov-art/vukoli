@@ -19,6 +19,7 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { browserSttSupported } from "../audio/browserStt";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
+import { iconPlace, useInstallOffer } from "../lib/installApp";
 import { prefs, type PausePref } from "../lib/prefs";
 import { errorMessage, useApp } from "../lib/store";
 import { useTheme } from "../lib/theme";
@@ -321,7 +322,22 @@ function GeneralSection() {
           />
         </SettingRow>
       </SettingGroup>
+      <InstallGroup />
     </>
+  );
+}
+
+/** The browser offers to install Vukoli as an app (src/lib/installApp.ts): the group is there only while it can. */
+function InstallGroup() {
+  const { canInstall, install } = useInstallOffer();
+  if (!canInstall) return null;
+  const where = t(iconPlace(navigator.userAgent) === "dock" ? "install.dock" : "install.taskbar");
+  return (
+    <SettingGroup title={t("install.settingsTitle")} id="install-title">
+      <SettingRow id="general-install" label={t("install.settingsLabel")} description={t("install.settingsHint", { where })}>
+        <Button variant="secondary" size="sm" icon="download" data-track="settings-install" onClick={() => { void install(); }}>{t("install.action")}</Button>
+      </SettingRow>
+    </SettingGroup>
   );
 }
 

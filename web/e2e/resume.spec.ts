@@ -7,6 +7,8 @@ import {
   resetApp,
   savedSessionId,
   sendAnswer,
+  showDebrief,
+  viewer,
   skipSetup,
   startTextInterview,
   JOB_TEXT,
@@ -61,8 +63,9 @@ test.describe("US-13 AC5 A dropped connection", () => {
 
     await page.getByRole("button", { name: "End", exact: true }).click();
     await page.getByRole("button", { name: "Open debrief" }).click();
-    await expect(page).toHaveURL(new RegExp(`/sessions/${id}$`));
-    await expect(page.getByRole("region", { name: "Breakdown" }).getByRole("article")).toContainText(ANSWER_WITH_RESULT);
+    await expect(page).toHaveURL(new RegExp(`/sessions/${id}(\\?view=debrief)?$`));
+    await showDebrief(page);
+    await expect(viewer(page).getByRole("article")).toContainText(ANSWER_WITH_RESULT);
   });
 
   test("negative: the server cannot continue the session, the card says why and Resume can be tried again", async ({

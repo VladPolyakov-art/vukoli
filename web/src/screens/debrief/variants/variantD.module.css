@@ -1,0 +1,349 @@
+/* Variant D · question switcher. Monochrome (P1); the layer tint only on the small note tags (CONTRACT §2.6, Q2-b).
+ * Widths answer to the `page` container (840 / 640 / 560), not the viewport. */
+
+/* v2: the body spans the header's width (title row, meta, the edit / … icons), one right edge for the whole page.
+ * Doubled class: wins over DebriefView's reading column whatever order the two modules load in. */
+.wide.wide { max-width: none; }
+
+.stack { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.label { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.lead { font-weight: var(--weight-semibold); }
+.muted { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+/* Summary: verdict on the left, one final score on the right. */
+.summary { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-4) var(--space-8); }
+.verdict { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1 1 28rem; }
+.headline {
+  margin: 0;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+.line { margin: 0; max-width: 60ch; color: var(--color-text-secondary); font-size: var(--text-md); line-height: var(--leading-relaxed); }
+.next { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+/* "Your level" (v3, owner: "a proper progress bar"): progress toward Ready that still names the three steps and marks
+ * where the user is. Three looks for the owner (A track · B journey · C blocks). Monochrome (P1): the fill is the text
+ * colour, the rest `--color-subtle`; no red / green. The fill grows once on load (`--duration-slower` `--ease-enter`,
+ * clip-path so the round ends keep their shape); global.css sets every duration to 0 under reduced motion. */
+.level { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: 36rem; padding-top: var(--space-3); }
+.levelHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
+.levelLabel { color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.levelCaption { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); font-variant-numeric: tabular-nums; }
+.captionStrong { color: var(--color-text-primary); font-weight: var(--weight-medium); }
+
+.rail { position: relative; height: var(--space-2); margin-block: var(--space-2) var(--space-1); border-radius: var(--radius-pill); background: var(--color-subtle); }
+.railFill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: inherit;
+  background: var(--color-text-primary);
+  animation: level-fill var(--duration-slower) var(--ease-enter) backwards;
+}
+@keyframes level-fill { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+/* A · track: the "Getting there" stop as a notch in the rail, a ring marker at the user's place. */
+.tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--border-width-strong);
+  height: calc(100% + var(--space-2));
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+}
+.marker {
+  position: absolute;
+  top: 50%;
+  width: var(--space-5);
+  height: var(--space-5);
+  transform: translate(-50%, -50%);
+  border: calc(var(--border-width-strong) * 2) solid var(--color-text-primary);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised);
+  animation: level-marker var(--duration-slower) var(--ease-enter) backwards;
+}
+@keyframes level-marker { from { left: 0; } }
+
+/* B · journey: a thin line, three stops as discs (passed = filled with a check, current = ring with a dot). */
+.levelJourney .rail { height: var(--border-width-strong); margin-block: var(--space-4) var(--space-3); }
+.node {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  transform: translate(-50%, -50%);
+  border: var(--border-width-strong) solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-canvas);
+}
+.node[data-at="0"] { left: 0; transform: translate(0, -50%); }
+.node[data-at="1"] { left: 50%; }
+.node[data-at="2"] { left: 100%; transform: translate(-100%, -50%); }
+.nodeDone { border-color: var(--color-text-primary); background: var(--color-text-primary); }
+.nodeHere { border-color: var(--color-text-primary); }
+.nodeHere::after { content: ""; width: var(--space-2); height: var(--space-2); border-radius: var(--radius-pill); background: var(--color-text-primary); }
+
+/* Step names under the rail: start, centre, end (A and B). */
+.stops { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.stops > :nth-child(2) { text-align: center; }
+.stops > :nth-child(3) { text-align: end; }
+.stopName { color: var(--color-text-tertiary); font-size: var(--text-sm); line-height: var(--leading-tight); }
+.passed { color: var(--color-text-secondary); }
+.here { color: var(--color-text-primary); font-weight: var(--weight-semibold); }
+
+/* C · blocks: the steps as a line of names, then one cell per skill that counts for the next step. */
+.crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); margin: 0; padding: 0; list-style: none; }
+.crumbs > li + li::before { content: "›"; margin-inline-end: var(--space-2); color: var(--color-text-tertiary); font-weight: var(--weight-regular); }
+.cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1); margin-block: var(--space-1); }
+.cell { height: var(--space-3); border-radius: var(--radius-sm); background: var(--color-subtle); }
+.cellOn { background: var(--color-text-primary); animation: level-cell var(--duration-base) var(--ease-enter) backwards; }
+@keyframes level-cell { from { opacity: 0; transform: scaleY(0.4); } }
+
+/* The score shows the scorecard on hover (v3): the number, then "Average of 7 skills" with a dotted underline and an
+ * info icon: the usual "hover for more" cue, nothing that reads as "press". */
+.score { display: flex; flex-direction: column; align-items: flex-end; }
+.scoreBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: end;
+  cursor: help;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.scoreBtn:hover, .scoreBtn[aria-expanded="true"] { background: var(--color-hover); }
+.scoreBtn:focus-visible { outline: var(--border-width-strong) solid var(--color-focus); outline-offset: 0; }
+.scoreValue {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+}
+.scoreOf { color: var(--color-text-tertiary); font-size: var(--text-xl); font-weight: var(--weight-medium); }
+.scoreMore { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.scoreBtn:hover .scoreMore, .scoreBtn[aria-expanded="true"] .scoreMore { color: var(--color-text-primary); }
+.scoreMoreText { text-decoration: underline dotted; text-decoration-thickness: var(--border-width); text-underline-offset: var(--space-1); }
+
+/* The scorecard popover (local; a DS Popover candidate): the Menu's surface, a vertical scroll inside, never sideways. */
+.pop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: var(--layout-panel);
+  max-width: calc(100% - 2 * var(--layout-gutter));
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-raised);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-overlay);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container: skills / inline-size;
+  position: fixed;
+  z-index: var(--z-dialog);
+  pointer-events: auto;
+  animation: global(fade-in) var(--duration-fast) var(--ease-enter) backwards;
+}
+:global([data-overlay-root]) > .pop { position: absolute; }
+.popBottom { margin-top: var(--space-2); }
+.popLeft { margin: 0; }
+.popTop { margin-top: calc(-1 * var(--space-2)); }
+.popHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0 0; }
+.popTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); }
+.popTitle:focus { outline: none; }
+.skills { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.skill {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--space-3);
+  padding-block: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border-subtle);
+}
+.skillLabel { font-size: var(--text-md); font-weight: var(--weight-semibold); }
+/* Just the number, in one right-aligned column (owner, 2026-10-27: no small dash meters in the panel). */
+.skillScore { min-width: 3ch; font-size: var(--text-md); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; text-align: end; }
+.skillLost { grid-column: 1 / -1; color: var(--color-text-secondary); font-size: var(--text-sm); }
+/* Wide (to the side of the score at ≥ 1024): two columns of skills, so the panel stays short. */
+@container skills (width >= 30rem) {
+  .skills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-6); }
+}
+
+/* Plan + the one primary: a heading row and up to three one-line steps. */
+.plan { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.planHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.drill { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2) var(--space-4); }
+.hint { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.steps { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.step { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); }
+.stepText { margin: 0; font-size: var(--text-md); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.stepTitle { font-weight: var(--weight-semibold); }
+.stepDo { color: var(--color-text-secondary); }
+.stepLinks { color: var(--color-text-secondary); font-size: var(--text-sm); white-space: nowrap; }
+
+/* The viewer: a switcher that stays at the top of <main> while a long answer scrolls, then one question. */
+.viewer { display: flex; flex-direction: column; min-width: 0; scroll-margin-top: 0; }
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding-block: var(--space-2) 0;
+  background: var(--color-canvas);
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+/* --tab-min: the least width a labelled tab gets before the switcher drops to numbers only (VariantD useSwitcherLayout). */
+.bar { --tab-min: 8rem; }
+.barCompact { display: flex; align-items: center; gap: var(--space-1); padding-block: var(--space-1) 0; }
+.barStep { flex: none; margin-bottom: var(--space-1); }
+.tabs { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1); min-width: 0; }
+/* Numbers only: tabs share the row, never narrower than a touch target; past that the strip scrolls sideways. */
+.tabsCompact {
+  flex: 1 1 auto;
+  grid-auto-columns: minmax(var(--control-h-touch), 1fr);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.tabsCompact::-webkit-scrollbar { display: none; }
+.tabsCompact .tab { grid-template-columns: minmax(0, 1fr); justify-items: center; padding: var(--space-2) 0 var(--space-3); }
+.tabsCompact .tabText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Edge fade on the side that has more tabs (alpha mask; any opaque colour works). */
+.fadeStart { mask-image: linear-gradient(to right, transparent, var(--color-canvas) var(--space-10)); }
+.fadeEnd { mask-image: linear-gradient(to left, transparent, var(--color-canvas) var(--space-10)); }
+.fadeBoth {
+  mask-image: linear-gradient(to right, transparent, var(--color-canvas) var(--space-10), var(--color-canvas) calc(100% - var(--space-10)), transparent);
+}
+.tab {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  margin-bottom: calc(-1 * var(--border-width));
+  border: 0;
+  border-bottom: var(--border-width-strong) solid transparent;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.tab:hover { color: var(--color-text-primary); background: var(--color-hover); }
+.tab[aria-selected="true"] { color: var(--color-text-primary); border-bottom-color: var(--color-border-selected); }
+.tab:focus-visible { outline: var(--border-width-strong) solid var(--color-focus); outline-offset: calc(-1 * var(--border-width-strong)); }
+.tabNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.tab[aria-selected="true"] .tabNum { background: var(--color-action); color: var(--color-text-on-action); }
+.tabText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding-top: calc(var(--space-1) / 2);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+/* One question. A floor on its height so switching to a short answer does not pull the page up under the reader. */
+.panel { display: flex; flex-direction: column; gap: var(--space-6); padding-top: var(--space-6); min-height: calc(var(--space-16) * 7); }
+.panel:focus-visible { outline: none; }
+.q { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.qHead { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.qOf { color: var(--color-text-secondary); font-weight: var(--weight-semibold); }
+.fact { display: inline-flex; align-items: center; gap: var(--space-1); }
+.qTitle { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-semibold); line-height: var(--leading-tight); overflow-wrap: anywhere; }
+.qTitle:focus { outline: none; }
+.lostLine { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: var(--space-8); }
+.answerCol, .notesCol { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.part { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.partLabel { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.answer { margin: 0; font-size: var(--text-md); line-height: var(--leading-relaxed); overflow-wrap: anywhere; }
+.ghostRow { margin-inline-start: calc(-1 * var(--space-3)); }
+.stronger { padding: var(--space-2) 0 var(--space-1) var(--space-4); border-left: var(--border-width-strong) solid var(--color-text-primary); }
+
+/* Notes: one list, a small layer tag on each, no layer columns. */
+.notes { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border-subtle);
+}
+.note:first-child { border-top: 0; padding-top: 0; }
+.noteText { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; min-width: 0; font-size: var(--text-md); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.noteLine { margin: 0; font-size: var(--text-md); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.spotTitle { margin: 0; font-weight: var(--weight-semibold); }
+.lines { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-4); margin: 0; }
+.lines > div { display: contents; }
+.lines dt { color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); padding-top: calc(var(--space-1) / 2); }
+.lines dd { margin: 0; }
+.fixLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin: 0; }
+.heard { color: var(--color-text-secondary); }
+.fixArrow { color: var(--color-text-tertiary); flex: none; }
+.why { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+.fixActions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-inline-start: calc(-1 * var(--space-3)); }
+.metrics { margin: 0; font-variant-numeric: tabular-nums; }
+.removed { display: flex; flex-direction: column; gap: var(--space-1); }
+
+.nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-width) solid var(--color-border-subtle); }
+
+@container page (width < 840px) {
+  .cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+}
+@container page (width < 640px) {
+  .step { grid-template-columns: auto minmax(0, 1fr); }
+  .stepLinks { grid-column: 2; white-space: normal; }
+}
+@container page (width < 560px) {
+  .headline, .scoreValue { font-size: var(--text-2xl); }
+  .score { align-items: flex-start; }
+  .scoreBtn { align-items: flex-start; text-align: start; }
+  .drill { justify-content: stretch; width: 100%; }
+  .drill > button { width: 100%; }
+  .lines { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .lines dd { margin-bottom: var(--space-2); }
+  .nav > button { flex: 1 1 0; }
+}

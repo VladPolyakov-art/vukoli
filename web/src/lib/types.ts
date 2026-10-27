@@ -307,10 +307,45 @@ export interface FeedbackRecord {
   layers: { delivery?: DeliveryLayer; language?: LanguageLayer; content?: ContentLayer };
 }
 
-export interface WeakSpot { layer: LayerName; tag: string; text: string; evidence?: string[] }
+/** D98 (rubric §9.2): `said` is an exact fragment of the answer (`quote`) or a delivery number (`metric`); `lands_as`
+ * is the interviewer's likely reading. Old servers and sessions saved before D98 send none of the three. */
+export interface WeakSpot {
+  layer: LayerName;
+  tag: string;
+  text: string;
+  evidence?: string[];
+  said?: string;
+  said_kind?: "quote" | "metric";
+  lands_as?: string;
+}
+/** D98 (rubric §9.1): the seven scorecard rows, in this order. */
+export type ScoreKey = "structure" | "own_part" | "result" | "relevance" | "reflection" | "language" | "delivery";
+export interface ScoreRow {
+  key: ScoreKey;
+  /** 1–5; null = nothing to judge ("Not asked this time"). */
+  score: number | null;
+  answers: number;
+  /** Question ids that lost points ("q2", the same ids as `WeakSpot.evidence`). */
+  lost: string[];
+}
+/** D98 (rubric §9.3): one step per weak spot, up to three; the first has the drill. */
+export interface PlanStep { layer: LayerName; tag: string; text: string; drill: boolean }
+/** D99 (rubric §9.4): the step of the verdict scale, computed by the server from the scorecard at read time. */
+export interface VerdictStepData {
+  value: 0 | 1 | 2;
+  /** Scorecard rows between the user and the next step, lowest score first. */
+  gap: ScoreKey[];
+  /** The score those rows need: 3 (from step 0), 4 (from step 1); null at step 2. */
+  target: 3 | 4 | null;
+}
 export interface Debrief {
   verdict: string;
   weak_spots: WeakSpot[];
+  /** Interview debriefs only; all three D98 parts are built by the server in code at read time. */
+  scorecard?: { rows: ScoreRow[] };
+  /** Absent: too short, English mode, or no row has a score. */
+  step?: VerdictStepData;
+  plan?: PlanStep[];
   strength: string;
   next_step: string;
   source: "model" | "template" | string;

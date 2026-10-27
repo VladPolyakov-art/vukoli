@@ -1,0 +1,13 @@
+/* Shared layout of the debrief variants. Frame = the same look as the review frames (ScaledStage), but grown to the
+ * page's height. Tokens only (CONTRACT §1). */
+.stageOuter {
+  width: 100%;
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+.stageInner { overflow: hidden; transform-origin: top left; }
+
+.scale { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.meterCompact { gap: calc(var(--space-1) / 2); }
+.meterCompact > span { inline-size: var(--space-4); }

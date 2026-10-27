@@ -12,7 +12,8 @@
 .body { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
 .title { font-weight: var(--weight-semibold); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
-.info { background: var(--color-subtle); }
+/* D101: white island on the canvas (fill + raised shadow); inside an island / dialog the island sets --note-* back to the sunken grey. */
+.info { background: var(--note-fill, var(--color-surface-note)); box-shadow: var(--note-shadow, var(--shadow-raised)); }
 .info .icon { color: var(--color-text-secondary); }
 .success { background: var(--color-success-tint); }
 .success .icon { color: var(--color-text-success); }

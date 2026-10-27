@@ -7,8 +7,8 @@ export default meta;
 type Story = StoryObj<typeof TextShimmer>;
 
 export const Active: Story = { args: { children: "Preparing questions…", status: true } };
-export const Still: Story = { args: { children: "12 questions from this job", active: false } };
-export const Medium: Story = { args: { children: "Writing your feedback…", size: "md", as: "p", status: true } };
+/** `size="md"` on its own line: the debrief while it is written. */
+export const Medium: Story = { args: { children: "Preparing feedback · 2 of 5 answers", size: "md", as: "p", status: true } };
 export const Overflow: Story = {
   args: { children: "Reading the Kestrel Pay job description and matching it with your CV and the question bank…", as: "p" },
   render: (args) => <div style={{ width: "17.5rem" }}><TextShimmer {...args} /></div>,

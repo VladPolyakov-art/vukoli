@@ -52,6 +52,16 @@ jobs:
           test -f "$RUNNER_TEMP/vukoli/install-state"
           echo "--- install-state ---"; cat "$RUNNER_TEMP/vukoli/install-state"
 
+      # The vukoli:// link ("Start Vukoli" on the page an installed, closed app shows) opens this app
+      - name: The app icon claims the vukoli:// link
+        run: |
+          set -euo pipefail
+          APP="$HOME/Applications/Vukoli.app"
+          scheme="$(/usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes:0:CFBundleURLSchemes:0" "$APP/Contents/Info.plist")"
+          [ "$scheme" = vukoli ] || { echo "::error::Info.plist has no vukoli URL type (got '$scheme')"; exit 1; }
+          LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          "$LSREGISTER" -dump | grep -q "claimed schemes:.*vukoli:" || { echo "::error::LaunchServices does not know the vukoli:// scheme"; exit 1; }
+
       - name: Install again (resume / update path)
         run: |
           set -euo pipefail
@@ -74,6 +84,18 @@ jobs:
           echo "health: $(cat health.json)"
           curl -fsS "http://127.0.0.1:${IC_PORT}/" -o index.html
           grep -q '<div id="root"' index.html || { echo "::error::/ does not serve the web app (no <div id=\"root\")"; head -c 600 index.html; exit 1; }
+          # the install-as-app files: right type, never cached
+          mtype="$(curl -fsS -o /dev/null -D - "http://127.0.0.1:${IC_PORT}/manifest.webmanifest" | tr -d '\r' | awk -F': ' 'tolower($1)=="content-type" {print $2}')"
+          [ "$mtype" = "application/manifest+json" ] || { echo "::error::manifest served as '$mtype'"; exit 1; }
+          curl -fsS "http://127.0.0.1:${IC_PORT}/sw.js" -o /dev/null
+          curl -fsS "http://127.0.0.1:${IC_PORT}/offline.html" | grep -q "Start Vukoli" || { echo "::error::offline.html is not served"; exit 1; }
+          # with an app that Chrome / Edge installed for Vukoli, the launcher opens that app (open is stubbed: nothing really opens)
+          STUB="$RUNNER_TEMP/stub"; FAKEHOME="$RUNNER_TEMP/fakehome"; SHIM="$FAKEHOME/Applications/Chrome Apps.localized/Vukoli.app"
+          mkdir -p "$STUB" "$SHIM/Contents"
+          printf '#!/bin/bash\necho "$*" >> "%s/open.log"\n' "$RUNNER_TEMP" > "$STUB/open"; chmod +x "$STUB/open"
+          /usr/libexec/PlistBuddy -c "Add :CrAppModeShortcutURL string http://127.0.0.1:${IC_PORT}/" "$SHIM/Contents/Info.plist"
+          HOME="$FAKEHOME" PATH="$STUB:$PATH" VUKOLI_NO_BROWSER=0 "$PREFIX/bin/vukoli" start
+          grep -qF -- "-a $SHIM" "$RUNNER_TEMP/open.log" || { echo "::error::launcher did not open the installed app"; cat "$RUNNER_TEMP/open.log" || true; exit 1; }
           "$PREFIX/bin/vukoli" stop
           sleep 2
           if curl -fsS "http://127.0.0.1:${IC_PORT}/api/health" >/dev/null 2>&1; then echo "::error::server still answers after stop"; exit 1; fi
@@ -138,6 +160,10 @@ jobs:
           foreach ($p in 'app\server\requirements.txt', 'venv\Scripts\python.exe', 'uv\uv.exe', 'install-state', 'bin\Vukoli.cmd') {
             if (-not (Test-Path (Join-Path $prefix $p))) { throw "missing after install: $p" }
           }
+          # the vukoli:// link ("Start Vukoli" on the page an installed, closed app shows) runs the launcher
+          $linkCmd = (Get-ItemProperty 'HKCU:\Software\Classes\vukoli\shell\open\command' -ErrorAction Stop).'(default)'
+          if ($linkCmd -notlike "*$prefix*" -or $linkCmd -notlike '*"%1"*') { throw "vukoli:// handler looks wrong: $linkCmd" }
+          if ($null -eq (Get-ItemProperty 'HKCU:\Software\Classes\vukoli').'URL Protocol') { throw "vukoli:// is not marked as a URL protocol" }
           "--- install-state ---"; Get-Content (Join-Path $prefix 'install-state')
 
       # Resume: pretend the run stopped after step 3, then run again under PowerShell 7 (also covers pwsh)
@@ -189,6 +215,27 @@ jobs:
           if ($still) { throw "server still answers after Vukoli.cmd stop" }
           Write-Host "launcher start/stop OK"
 
+      - name: The vukoli:// link starts the server
+        shell: powershell
+        env:
+          IC_DATA_DIR: ${{ runner.temp }}\vukoli-data
+          VUKOLI_NO_BROWSER: "1"
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP 'vukoli'
+          $port = $env:IC_PORT
+          # the command Windows runs for vukoli://start, with %1 filled in the way Windows does
+          $linkCmd = (Get-ItemProperty 'HKCU:\Software\Classes\vukoli\shell\open\command').'(default)'
+          Invoke-Expression ('& ' + ($linkCmd -replace '%1', 'vukoli://start'))
+          if ($LASTEXITCODE -ne 0) { throw "the vukoli:// command exited with $LASTEXITCODE" }
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            try { Invoke-WebRequest "http://127.0.0.1:$port/api/health" -UseBasicParsing -TimeoutSec 3 | Out-Null; $ok = $true; break } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $ok) { throw "the vukoli:// link did not start the server within 60 s" }
+          & "$prefix\app\install\windows\Vukoli.cmd" stop
+          if ($LASTEXITCODE -ne 0) { throw "Vukoli.cmd stop exited with $LASTEXITCODE" }
+          Write-Host "vukoli:// start OK"
+
       - name: Uninstall with purge
         shell: powershell
         env:
@@ -203,6 +250,7 @@ jobs:
             if (Test-Path (Join-Path $f 'Vukoli.lnk')) { throw "shortcut left behind in $f" }
           }
           if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Vukoli') { throw "uninstall registry entry left behind" }
+          if (Test-Path 'HKCU:\Software\Classes\vukoli') { throw "vukoli:// registry key left behind" }
 
       # The documented one-liner: `irm <url> | iex` with options in environment variables. The script text is piped
       # from the checked-out file, so this proves the iex mode (no param binding, no exit, no profile) on this commit.

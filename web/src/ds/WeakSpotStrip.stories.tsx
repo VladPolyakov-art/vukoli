@@ -1,82 +1,78 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "./Button";
-import { Chip, ChipGroup } from "./Badge";
 import { Icon } from "./icons";
 import { WeakSpotStrip, type WeakSpot } from "./WeakSpotStrip";
 
-/** Weak-spot strip (G18). `home` = monochrome rows in a subtle card + Show all + Focus chips; `debrief` = cards on
- * the layer tint (the only place tints appear). Items come in the configured layer order (GR8). */
+/** Weak-spot strip (G18). The app uses only `context="debrief"` (screens/debrief/parts/Sections.tsx): cards on the layer
+ * tint with the layer name, a title, the evidence question links and, since D98, the `said` ("What you said" / "Measured")
+ * and `lands` ("How it lands") lines, then the fix, an optional `also` and an optional muted `note`. Any line left out
+ * is not drawn. Items come in the configured layer order (GR8). The Home variant (`context="home"`, D47/Q2: no strip on
+ * Home) has no stories; the prop stays in the component. */
 const meta: Meta<typeof WeakSpotStrip> = { title: "DS/WeakSpotStrip", component: WeakSpotStrip, tags: ["autodocs"] };
 export default meta;
 type Story = StoryObj<typeof WeakSpotStrip>;
 
-const HOME_ITEMS: WeakSpot[] = [
-  { id: "w1", layer: "content", layerLabel: "Content", title: "No result in your answers", count: "4 answers in 2 sessions" },
-  { id: "w2", layer: "content", layerLabel: "Content", title: "“we” instead of “I”", count: "3 answers" },
-  { id: "w3", layer: "language", layerLabel: "Language", title: "“I have led” for finished projects", count: "2 answers" },
-  { id: "w4", layer: "delivery", layerLabel: "Delivery", title: "Fillers: 9 per answer on average", count: "5 answers" },
-];
-
-function Footer() {
-  const [focus, setFocus] = useState("All");
-  const items: [string, number][] = [["All", 4], ["Content", 2], ["Language", 1], ["Delivery", 1]];
-  return (
-    <>
-      <ChipGroup label="Focus" role="radio">
-        {items.map(([n, c]) => <Chip key={n} role="radio" count={c} selected={focus === n} onClick={() => setFocus(n)}>{n}</Chip>)}
-      </ChipGroup>
-      <Button variant="secondary" icon="practice">Drill my weak spots</Button>
-      <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-tertiary)" }}>3 questions aimed at all 4 · ~12 min · Kestrel Pay job</span>
-    </>
-  );
-}
-
-const HOME_ARGS = {
-  context: "home" as const,
-  items: HOME_ITEMS,
-  title: "What to work on",
-  sub: "From your last 2 interviews",
-  headerAction: <Button variant="link" size="sm" iconRight="arrowRight">Last session: Kestrel Pay · Oct 19</Button>,
-  moreText: "+ 2 more: Language “I have led” · Delivery fillers",
-  showAllLabel: "Show all",
-  showLessLabel: "Show less",
-  footer: <Footer />,
-};
-
-export const Home: Story = { args: HOME_ARGS };
-export const HomeExpanded: Story = { args: { ...HOME_ARGS, defaultExpanded: true } };
-export const HomeLoading: Story = { args: { ...HOME_ARGS, loading: true, loadingLabel: "Loading your weak spots…" } };
-export const HomeEmpty: Story = { args: { ...HOME_ARGS, items: [], footer: undefined, empty: "Weak spots and “Drill my weak spots” appear after your first interview." } };
-/** Narrow parent (343px): rows wrap, the count drops under the title. */
-export const HomeNarrow: Story = { args: HOME_ARGS, render: (args) => <div style={{ width: "21.4375rem" }}><WeakSpotStrip {...args} /></div> };
-
-const q = (ns: number[]) => (
+/** A labelled line inside a card: the label on its own line, the text under it (debrief `Line`). */
+const Line = ({ label, children }: { label: string; children: ReactNode }) => (
   <>
-    <span>Questions</span>
-    {ns.map((n) => <Button key={n} variant="link" size="sm" aria-label={`Question ${n}`}>{n}</Button>)}
+    <span style={{ display: "block", color: "var(--color-text-secondary)", fontWeight: "var(--weight-semibold)" }}>{label}</span>
+    {children}
   </>
 );
+const Quote = ({ children }: { children: string }) => <q style={{ quotes: '"\u201C" "\u201D"', color: "var(--color-text-primary)" }}>{children}</q>;
+const Metric = ({ children }: { children: string }) => <span style={{ color: "var(--color-text-primary)", fontVariantNumeric: "tabular-nums" }}>{children}</span>;
+const Q = ({ n }: { n: number }) => <Button variant="link" size="sm" aria-label={`Go to question ${n}`}>{n}</Button>;
+
 const CONTENT: WeakSpot = {
-  id: "d1", layer: "content", layerLabel: "Content", title: "No measurable result in 3 of 5 answers", evidence: q([1, 2, 4]),
-  fix: <><strong>Fix:</strong> End every story with a number or a decision: “conversion stayed at 4.1%”, “we dropped the second screen”.</>,
-  also: <><strong>Also:</strong> “we” instead of “I” in questions 2, 4 — say “I” for what you did.</>,
+  id: "ws-content", layer: "content", layerLabel: "Content", title: "No measurable result in 3 of 5 answers",
+  evidence: <>Questions <Q n={1} />, <Q n={2} />, <Q n={4} /></>,
+  said: <Line label="What you said"><Quote>Last year I, like, rebuilt the onboarding and we got a lot of positive feedback.</Quote></Line>,
+  lands: <Line label="How it lands">The interviewer can't tell if your work changed anything, so the story ends without a point.</Line>,
+  fix: <Line label="How to fix">End every story with a number or a decision: “conversion stayed at 4.1%”, “we dropped the second screen”.</Line>,
+  also: <><strong>Also:</strong> “we” instead of “I” in questions <Q n={2} />, <Q n={4} /> — say “I” for what you did.</>,
 };
+/** D98 r2 (GR9): the language spot says that words the app may have misheard are not counted. */
 const LANGUAGE: WeakSpot = {
-  id: "d2", layer: "language", layerLabel: "Language", title: "“I have led” for finished projects — 2 times", evidence: q([2, 5]),
-  fix: <><strong>Fix:</strong> say “I led” when you name a finished time (“last spring”, “in 2023”).</>,
+  id: "ws-language", layer: "language", layerLabel: "Language", title: "“I have led” for finished projects — 2 times",
+  evidence: <>Questions <Q n={2} />, <Q n={5} /></>,
+  said: <Line label="What you said"><Quote>I have led the redesign last spring</Quote></Line>,
+  lands: <Line label="How it lands">Tense slips make it unclear whether this happened before or is still true.</Line>,
+  fix: <Line label="How to fix">Say “I led” when you name a finished time (“last spring”, “in 2023”).</Line>,
+  note: <>Words the app may have misheard are not counted. You can check them in <Button variant="link" size="sm">each question</Button>.</>,
 };
+/** A delivery number is measured, not said: the lead is "Measured" and there are no quotation marks. */
 const DELIVERY: WeakSpot = {
-  id: "d3", layer: "delivery", layerLabel: "Delivery", title: "9 fillers per answer on average", evidence: <><span>Most in question</span><Button variant="link" size="sm">4</Button><span>(12)</span></>,
-  fix: <><strong>Fix:</strong> pause silently instead of “uh” and “like”.</>,
+  id: "ws-delivery", layer: "delivery", layerLabel: "Delivery", title: "9 fillers per answer on average",
+  evidence: <>Most in question <Q n={4} /> <span>(12)</span></>,
+  said: <Line label="Measured"><Metric>12 fillers in 3:40</Metric></Line>,
+  lands: <Line label="How it lands">Many “um”s read as unsure, even when the content is strong.</Line>,
+  fix: <Line label="How to fix">Pause silently instead of “uh” and “like”.</Line>,
 };
 const DEBRIEF_ARGS = { context: "debrief" as const, title: "What to work on", sub: "One per layer, from this session.", items: [CONTENT, LANGUAGE, DELIVERY] };
 
+/** The debrief block with every D98 line: evidence, said / measured, lands, fix, also, and the language note. */
 export const DebriefContentFirst: Story = { args: DEBRIEF_ARGS };
 export const DebriefDeliveryFirst: Story = { args: { ...DEBRIEF_ARGS, items: [DELIVERY, LANGUAGE, CONTENT] } };
+/** `said` as a quote and `lands` on one card only: the lines the card does not have are simply not drawn. */
+export const DebriefSaidLands: Story = { args: { ...DEBRIEF_ARGS, sub: undefined, items: [CONTENT] } };
+/** `note` (D98 r2): one muted line at the end of a card, here the Language "may have misheard" note. */
+export const DebriefNote: Story = { args: { ...DEBRIEF_ARGS, sub: undefined, items: [LANGUAGE] } };
+/** A session saved before D98 has no said / lands lines: evidence and fix only. */
+export const DebriefNoDetail: Story = {
+  args: {
+    ...DEBRIEF_ARGS,
+    items: [
+      { ...CONTENT, said: undefined, lands: undefined, also: undefined },
+      { ...LANGUAGE, said: undefined, lands: undefined, note: undefined },
+      { ...DELIVERY, said: undefined, lands: undefined },
+    ],
+  },
+};
+/** Component states (the app hides the block while it loads or when it is empty). */
 export const DebriefLoading: Story = { args: { ...DEBRIEF_ARGS, loading: true, loadingLabel: "Writing your feedback…" } };
 export const DebriefEmpty: Story = {
-  args: { ...DEBRIEF_ARGS, items: [], empty: <span style={{ display: "inline-flex", gap: "var(--space-2)", alignItems: "center" }}><Icon name="check" size="sm" />Nothing major to fix in this session.</span> },
+  args: { ...DEBRIEF_ARGS, items: [], empty: <span style={{ display: "inline-flex", gap: "var(--space-2)", alignItems: "center" }}><Icon name="check" size="sm" />Nothing major to fix</span> },
 };
 /** Narrow parent (343px): one column. Long titles wrap. */
 export const DebriefNarrow: Story = {

@@ -1,6 +1,11 @@
-/* Debrief chat (D71): the Session transcript's quiet labels at the setup chat's size. */
+/* Debrief chat: the Session transcript's quiet labels at the setup chat's size. The log spans the page; each message
+ * box is capped (Mike --layout-narrow, the user's box --layout-content, whose bubble is 75% of it) for a readable line. */
 .log { gap: var(--space-6); }
+.msgMike { max-width: var(--layout-narrow); }
+.msgUser { align-self: flex-end; width: 100%; max-width: var(--layout-content); }
 .turn { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+/* A jump lands the question under the sticky jump bar. */
+.turn[data-question] { scroll-margin-top: var(--space-16); }
 .question {
   margin: 0;
   padding-top: var(--space-4);

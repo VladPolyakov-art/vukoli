@@ -305,6 +305,7 @@ $null = & {
         $S.Launcher = Join-Path (Join-Path (Join-Path (Join-Path $p 'app') 'install') 'windows') 'vukoli.ps1'
         $S.Icon = Join-Path $p 'Vukoli.ico'
         $S.UninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Vukoli'
+        $S.UrlKey = 'HKCU:\Software\Classes\vukoli'
     }
     function Get-ShortcutPaths {
         $list = @()
@@ -777,6 +778,18 @@ $null = & {
         [System.IO.File]::WriteAllText((Join-Path $S.Bin 'Vukoli.cmd'), $cmdBody, [System.Text.Encoding]::ASCII)
         Note ('Command: {0}\Vukoli.cmd   (Vukoli.cmd stop  stops the app)' -f $S.Bin)
 
+        # vukoli://start: the "Start Vukoli" button on the page an installed, closed app shows. Starts the server and opens
+        # nothing (the window that asked is already open). Current user only, no admin.
+        try {
+            $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            $cmdKey = $S.UrlKey + '\shell\open\command'
+            $null = New-Item -Path $cmdKey -Force
+            Set-ItemProperty -Path $S.UrlKey -Name '(default)' -Value 'URL:Vukoli'
+            Set-ItemProperty -Path $S.UrlKey -Name 'URL Protocol' -Value ''
+            Set-ItemProperty -Path $cmdKey -Name '(default)' -Value ('"' + $ps + '" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $S.Launcher + '" "%1"')
+            Note 'Link vukoli://start registered (lets a closed Vukoli window start the app).'
+        } catch { Warn ('Could not register the vukoli:// link: {0}' -f $_.Exception.Message) }
+
         # Apps & features entry (current user only, no admin)
         try {
             $installScript = Join-Path (Join-Path $S.App 'install') 'install.ps1'
@@ -844,6 +857,10 @@ $null = & {
                 } catch { $mine = $true }
                 if ($mine) { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; Note ('Removed shortcut {0}' -f $lnk) }
             }
+        }
+        if (Test-Path -LiteralPath $S.UrlKey) {
+            $cmd = (Get-ItemProperty -Path ($S.UrlKey + '\shell\open\command') -ErrorAction SilentlyContinue).'(default)'
+            if (-not $cmd -or $cmd -like ('*' + $S.Prefix + '*')) { Remove-Item -Path $S.UrlKey -Recurse -Force -ErrorAction SilentlyContinue }
         }
         if (Test-Path -LiteralPath $S.UninstallKey) {
             $loc = (Get-ItemProperty -Path $S.UninstallKey -ErrorAction SilentlyContinue).InstallLocation

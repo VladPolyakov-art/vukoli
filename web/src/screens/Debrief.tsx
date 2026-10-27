@@ -1,7 +1,7 @@
 /* Debrief of a saved session (live container). The screen itself is the pure `DebriefView` (screens/debrief/);
  * this file loads the session, polls while the debrief is being written, and wires the actions to the REST API. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useFreshOnce, useToast } from "../ds";
 import { t } from "../i18n";
 import { api, ApiError } from "../lib/api";
@@ -12,6 +12,7 @@ import { errorMessage, useApp } from "../lib/store";
 import type { SessionRecord } from "../lib/types";
 import type { StrongerState } from "../session/reducer";
 import { DebriefView } from "./debrief/DebriefView";
+import type { DebriefViewMode } from "./debrief/types";
 import { DEFAULT_OPEN, exampleSam } from "./debrief/fixtures";
 import { feedbackOfFlag, mapRecord, threadsFromRecord } from "./debrief/mapRecord";
 import { renameSession, SESSIONS_CHANGED } from "./debrief/rename";
@@ -21,15 +22,58 @@ export { threadsFromRecord };
 /** The build-up plays on the first open of each session in this visit (Debrief build-up, motion.md). */
 const seen = new Set<string>();
 
+/** The view lives in the URL (D101): a saved session opens on the debrief, so no param is the debrief and `?view=conversation`
+ * is the chat; `?view=debrief` (old links, the "debrief ready" toast) is still the debrief. Switching replaces the entry, so
+ * Back leaves the page instead of flipping between the views. A session with nothing to show but its chat has no debrief
+ * view: the view itself falls back to the conversation. */
+function useViewParam(initial: DebriefViewMode = "debrief"): [DebriefViewMode, (next: DebriefViewMode) => void] {
+  const [params, setParams] = useSearchParams();
+  const param = params.get("view");
+  const view: DebriefViewMode = param === "debrief" || param === "conversation" ? param : initial;
+  const setView = (next: DebriefViewMode) => {
+    setParams((prev) => {
+      const n = new URLSearchParams(prev);
+      if (next === initial) n.delete("view");
+      else n.set("view", next);
+      // `?q=n` belongs to the debrief view only.
+      if (next === "conversation") n.delete("q");
+      return n;
+    }, { replace: true });
+  };
+  return [view, setView];
+}
+
+/** The question the debrief shows lives in the URL too: `?q=4` opens question 4 and a reload keeps it. It is written only when
+ * the user picks a question (the first one stays a clean URL); a number the session does not have is ignored by the view. */
+function useQuestionParam(): [number | undefined, (n: number) => void] {
+  const [params, setParams] = useSearchParams();
+  const raw = Number(params.get("q"));
+  const question = Number.isInteger(raw) && raw > 0 ? raw : undefined;
+  const setQuestion = (n: number) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("q", String(n));
+      return next;
+    }, { replace: true });
+  };
+  return [question, setQuestion];
+}
+
 /** `/sessions/example`: the built-in sample debrief (History empty state link); never reads the saved sessions. */
 function ExampleDebrief() {
   const navigate = useNavigate();
   const { settings } = useApp();
+  const [view, setView] = useViewParam();
+  const [question, setQuestion] = useQuestionParam();
   useDocumentTitle(exampleSam.title);
   return (
     <DebriefView
       variant="example"
       state="ready"
+      view={view}
+      onViewChange={setView}
+      question={question}
+      onQuestionChange={setQuestion}
       model={exampleSam}
       layerOrder={settings?.layer_order ?? "content-first"}
       ui={{ open: DEFAULT_OPEN.example }}
@@ -48,6 +92,8 @@ function LiveDebrief() {
   const navigate = useNavigate();
   const toast = useToast();
   const { settings } = useApp();
+  const [view, setView] = useViewParam();
+  const [question, setQuestion] = useQuestionParam();
   const storageWritable = useStorageWritable();
   const session = useLoad(() => api.session(id), [id]);
   const [stronger, setStronger] = useState<Record<string, StrongerState>>({});
@@ -206,6 +252,10 @@ function LiveDebrief() {
       key={epoch}
       variant={record.mode === "english" ? "english" : "interview"}
       state="ready"
+      view={view}
+      onViewChange={setView}
+      question={question}
+      onQuestionChange={setQuestion}
       storageError={!storageWritable}
       model={model}
       layerOrder={settings?.layer_order ?? "content-first"}

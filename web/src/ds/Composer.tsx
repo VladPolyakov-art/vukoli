@@ -2,8 +2,8 @@
  * Slots, top to bottom: `attachment` (a ComposerAttachment card or a Skeleton row while loading) · the field
  * (a borderless textarea that grows 2 → `maxRows`) · toolbar (`toolbarStart` / `toolbarEnd`: outlined sm buttons)
  * + the round send button. Without a toolbar the send button sits inline, bottom-right of the field (chat row, R6).
- * Focus: the whole composer is the input: keyboard focus draws the ring on the box, never on the inner textarea
- * (review v1, D47a: an inner ring made the button look outside the input).
+ * Focus (owner, 2026-10-27): focusing the input (click or keyboard) changes nothing visible on the box or the field: no
+ * ring, no fill step, no shadow; the blinking caret alone is the focus mark. The buttons inside keep their own focus ring.
  * `surface: none` (v2): no border / shadow / radius / fill of its own: the composer sits inside the Session island.
  * `send.variant`: `action` = black / white (Session), `quiet` = outlined (Home, so Start stays the only primary: DS-6).
  * The send button appears with a short rise when it becomes visible (D6); a new `send.icon` fades in (D52: the Home

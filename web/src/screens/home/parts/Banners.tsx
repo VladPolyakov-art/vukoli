@@ -3,6 +3,7 @@ import { useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Callout, CopyField, IconButton, usePresence } from "../../../ds";
 import { t } from "../../../i18n";
+import { iconPlace } from "../../../lib/installApp";
 import type { EngineBannerModel } from "../types";
 import { TextLink } from "./TextLink";
 import s from "./parts.module.css";
@@ -20,12 +21,15 @@ export interface BannersProps {
   engine?: EngineBannerModel | null;
   browser?: boolean;
   storage?: boolean;
+  install?: boolean;
   onRetryEngine?: () => void;
   onUseTextMode?: () => void;
   onDismissBrowser?: () => void;
+  onInstall?: () => void;
+  onDismissInstall?: () => void;
 }
 
-export function Banners({ engine, browser, storage, onRetryEngine, onUseTextMode, onDismissBrowser }: BannersProps) {
+export function Banners({ engine, browser, storage, install, onRetryEngine, onUseTextMode, onDismissBrowser, onInstall, onDismissInstall }: BannersProps) {
   const navigate = useNavigate();
   return (
     <div className={s.banners} data-review-id="Home/Banners">
@@ -74,6 +78,21 @@ export function Banners({ engine, browser, storage, onRetryEngine, onUseTextMode
             actions={<Button variant="secondary" size="sm" data-track="banner-storage-open" onClick={() => navigate("/settings/storage")}>{t("home.storage.open")}</Button>}
           >
             {t("home.storage.body")}
+          </Callout>
+        </div>
+      </Presence>
+      <Presence show={Boolean(install)}>
+        <div data-review-id="Home/InstallCard" data-review-section="Home · Install card" data-comment-target>
+          <Callout
+            icon="monitor"
+            actions={(
+              <span className={s.bannerActions}>
+                <Button variant="secondary" size="sm" icon="download" data-track="banner-install" onClick={onInstall}>{t("install.action")}</Button>
+                <IconButton icon="x" size="sm" label={t("install.dismiss")} data-track="banner-install-dismiss" onClick={onDismissInstall} />
+              </span>
+            )}
+          >
+            {t("install.body", { where: t(iconPlace(navigator.userAgent) === "dock" ? "install.dock" : "install.taskbar") })}
           </Callout>
         </div>
       </Presence>

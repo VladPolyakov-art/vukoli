@@ -12,7 +12,9 @@
   background: var(--color-raised);
   color: var(--color-text-primary);
   box-shadow: var(--shadow-overlay);
-  overflow: auto;
+  /* Never scrolls sideways (owner, 2026-10-27: a two-finger swipe moved the menu); a vertical scroll stays inside the panel. */
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 /* App: fixed to the viewport; review frame: absolute in the OverlayRoot layer. Position comes from inline style. */
@@ -29,7 +31,7 @@
 .floating.right.alignEnd { transform-origin: bottom left; }
 .inline { position: relative; }
 
-.picker { padding: 0; min-width: var(--layout-panel); max-width: none; overflow: hidden; }
+.picker { padding: 0; min-width: var(--layout-panel); max-width: none; overflow: hidden; overscroll-behavior: contain; }
 .inline.picker { min-width: min(var(--layout-panel), 100%); }
 
 /* Items (menu) and options (listbox) share one row. */
@@ -99,7 +101,7 @@
 
 .search { padding: var(--space-2) var(--space-2) 0; }
 .searchIcon { display: inline-flex; padding-right: var(--space-2); color: var(--color-text-secondary); }
-.list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-1); }
+.list { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-1); }
 /* The listbox keeps focus (options are marked with aria-activedescendant); its ring sits inside the popover edge. */
 .list { outline-offset: calc(-1 * var(--focus-ring-width)); }
 .list:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); }

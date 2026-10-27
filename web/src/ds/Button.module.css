@@ -111,7 +111,8 @@
   /* Owner (D76): every icon button is round — its hover and pressed fills too. */
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--color-text-secondary);
+  /* D101: icon buttons are black in light (--color-fg-icon); dark keeps the secondary grey. */
+  color: var(--color-fg-icon);
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard);

@@ -84,15 +84,16 @@ Prefix: `patterns-appshell--`. Review: `#sidebar-<state>`.
 | Rename | optimistic | list reloads, toast "Couldn't rename the chat." |
 | Download | `GET` the session Markdown (browser download) | browser's own error |
 
-**After End (D73).** Session's End goes to `/` and the shell watches the save: it polls every 2 s for up to 3 min.
+**After End (D73, reworked 2026-10-27).** Session's End (any mode: interview, English; also an end the server starts itself) goes to `/` at once: no full-screen "Saving your session…" and no "Saving" toast. The session is the top row of Recents from that moment; the shell polls it every 2 s for up to 3 min.
 
-| Phase | Toast |
+| Phase | What shows |
 |---|---|
-| Saving | shimmer "Saving your session… It'll be ready in a moment" (stays until done) |
-| Saved | "Your session is saved" + action "Open debrief" (12 s) |
-| Not found in 3 min | error toast "Couldn't find the saved session yet. Check History in a minute." (stays until dismissed) |
+| Saving / preparing | Recents: the new session is the first row (title = the session's title, newest first), its title in the shimmer text treatment (`NavRow` `loading`, global `.shimmer-text`; plain secondary text under reduced motion; paused while the user speaks). Once the server reports progress the trailing slot says "2 of 5" (the debrief stage: just the shimmer). English keeps its quiet "EN" until there are numbers. No "…" menu while it loads; the row is a link (the session page shows its own pending state). A screen reader hears "Saving your session…" / "Preparing feedback" / "Writing your debrief…" after the title. |
+| Ready | The row stops shimmering. Toast at the top: "Your session is saved" + action "Open debrief" (5 s, hover holds) → `/sessions/:id?view=debrief`. Not shown, and dismissed on arrival, when the user is on that session's page (pathname only; UT-4) |
+| Not found in 3 min | error toast "Couldn't find the saved session yet. Check Recents in a minute." (stays until dismissed) |
+| Several at once | Each session has its own row and its own numbers; a new practice started meanwhile inherits nothing (no toast, no line); the older row keeps loading until it is ready. State: `lib/pendingSave` (a list, kept in `sessionStorage` so a reload keeps watching) |
 
-Home stories for these: `screens-home--after-end-saving`, `screens-home--after-end-saved`. Review: `#home-after-end-saving`, `#home-after-end-saved`.
+Stories: `screens-home--after-end-saving` (the loading Recents row), `screens-home--after-end-saved` (the ready toast), `patterns-appshell--recents-saving`, `--recents-preparing`, `--recents-saving-drawer`, `ds-navrow--loading`. Review: `#home-after-end-saving`, `#home-after-end-saved`.
 
 The Drawer closes by itself when the shell grows to ≥1024.
 
@@ -562,7 +563,7 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 
 | Situation | Result |
 |---|---|
-| End, ≥1 answer, live or connecting | `pendingSave.start(id)` → `/` (replace) → shell toasts (§1.2) (D73) |
+| End, ≥1 answer, live or connecting (or the server ends the session itself) | `pendingSave.start(id, {title, track})` → `/` (replace) → a loading row in Recents, then one toast (§1.2) (D73) |
 | End, 0 answers | stays: EmptyState "Session ended" / "Nothing was saved: you didn't answer any questions." + "Back to Practice" |
 | Socket closes with a saved id | `/sessions/:id` |
 | Socket closes without a saved id | failed `connection_lost`: "The session stopped" / "The connection to Mike was lost. Any answers you gave are saved." |
@@ -570,7 +571,7 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 | `bad_start` | "The session couldn't start: {message}" |
 | `session_failed` / unknown code | "Something went wrong and the session stopped. Your answers so far are saved." (or the server message) |
 | Audio backlog | "The connection can't keep up with the audio. Ending the session and saving it." then end |
-| Ending / saving / debrief pending | shimmer "Saving your session…" / "Writing your debrief…" |
+| Ending / saving with nothing to save (0 answers, or the folder is not writable) | the same screen with the quiet state pill "Saving your session…"; then the "Session ended" screen above. Never a full-screen "Saving…" |
 | Done, save failed | "Session ended" + "Couldn't save the session." |
 
 ### 4.4 Keyboard (V2.8)
@@ -626,23 +627,55 @@ Notices are withheld while recording.
 - Map: `ds/screens/debrief.md`: §3.0 frame, §3.1 header, §3.2 verdict, §3.3 weak spots, §3.4 actions, §3.5 question by question, §3.6 english, §3.7 example, §5 states, §7 motion.
 - PRD: US-17, US-18, US-20, US-22, US-23, US-29.
 
-**Decision on this screen:** what to fix next. The verdict and weak spots are folded into a bar (D80); the conversation and the picked answer's breakdown are open.
+**Decision on this screen:** what to fix next. The page opens on the **Debrief** (owner request 2026-10-27, D101: «сначала дебриф, а потом историю нашего диалога»); the conversation, full width, is the other view of the same page, one switch away. *Update 2026-10-27 (D101): the order of the switch is Debrief | Conversation and a finished session opens on the Debrief; before, the page was chat-first.* The Debrief view is **layout D** (owner's pick, 2026-10-27; choice record `ds/screens/debrief-variants.md`): summary → plan with the one Drill → one question at a time.
 
 ### 5.1 Layout
 
 | Part | Contents |
 |---|---|
-| Header | H1 title + "Rename session" (pencil) + "More actions for this session" menu: "Export to Obsidian" (only with a folder set), "Download as Markdown", "Archive", "Delete" (confirm Dialog, same copy as §1.2). Meta list "Session details": questions, follow-ups, "Saved on this computer" |
-| VerdictBar (interview, ≥3 answers) | folded; opens to: Verdict (scale "Not ready yet / Getting there / Ready", sr "Verdict: {step}, step {n} of 3") · "What to fix first" (weak spots, evidence "Go to question {n}") · "What next" ("Drill these weak spots" / "Practise again") |
-| Conversation | "Conversation" / "Pick an answer to see its breakdown" |
+| Header | H1 title + "Rename session" (pencil) + "More actions for this session" menu: "Export to Obsidian" (only with a folder set), "Download as Markdown", "Archive", "Delete" (confirm Dialog, same copy as §1.2). Meta list "Session details": questions, follow-ups, "Saved on this computer". **Toolbar under the meta:** the view switch + the one "Practise again" |
+| View switch | DS `Segmented` "View" (label hidden): "Debrief" · "Conversation" (Debrief first; arrow keys and Tab follow this order). Only when the session has a debrief to show (`!model.empty`); without one the page is the conversation alone and has no switch. The view lives in the URL: no param (or any other value) is the debrief, `?view=conversation` is the chat, `?view=debrief` (old links, the toast) is still the debrief. Switching replaces the history entry, scrolls `<main>` to the top and drops `?q`. The example (`/sessions/example`) works the same way |
+| Practise again | One button next to the switch, in both views (`data-track="practise-again"`). Label: "Practise again" (interview) or "Practise these phrases" (English with phrases to review). Primary only for English / partial without a storage error, else secondary. The hint "Same job and round, new questions" is a Tooltip and the button's `aria-description`. The example has none |
+| Conversation view (second) | Full main-area width. Mike's messages cap at `--layout-narrow`, the user's at `--layout-content`, right-aligned. With 2+ asked questions a sticky bar "Question" (Segmented "Jump to question") scrolls the chat to that question. Then the "Questions {from}–{to} weren't asked" line |
+| Debrief view, interview and example (layout D) | **One content width** (the same right edge as the header row), top to bottom: notice / partial banner · **Summary** (region "Verdict": the step's name or the model's sentence, the model's line, "Your level" blocks, "To reach “Ready”: …"; on the right the one score "3.3/5 · Average of 7 skills") · **"Your plan for the next session"** (up to 3 one-line steps with their weak spot and question links, and the page's only primary button "Drill these weak spots") · example's "Start your first interview" link · **"Question by question"**: a sticky switcher (one tab per question), exactly one question, "Previous" / "Next: question n" |
+| Debrief view, English | The reading column (max `--layout-content`): Summary, Corrections, Phrases to review, as before |
+| Skills card | Behind the score: opens to the left on mouse hover or keyboard focus, as a full-width sheet on tap under 640px. The seven skills weakest first with "3/5" and links to the questions that lost points; "Not asked this time"; the misheard note. No Scorecard block on the page |
+| Question switcher | `?q=n` in the URL (a reload or a shared link keeps the question; a number the session does not have is ignored). Tabs show the number and the question's text (2 lines) while each gets 8rem; otherwise numbers only with ‹ ›; then horizontal scroll with an edge fade; the selected tab stays in view; always one row. ←/→/Home/End move between tabs |
+| Question | Meta line ("Question 2 of 5 · 2:20 · at 03:35 · 1 follow-up"), the question as heading, "Lost points on: …"; left: your answer, "Edit what I said", the follow-up answer, "Show a stronger answer" fold; right: one "Feedback" list with small layer tags (the weak spot with "What you said / How it lands / How to fix" on its first evidence question, content notes, language corrections inline with "Not what you said?" and "Dismiss", delivery numbers and tip, misheard notes) |
 
-**Conversation, wide** (`page` ≥840): two columns.
-- Left: the chat ("Conversation with Mike").
-- Right: the breakdown, sticky, height capped to `<main>`, with a Segmented question picker and a QuestionCard.
+**No nested scrollers.** The old sticky, height-capped breakdown panel (own `overflow-y`) is gone, and so is the folded verdict bar. The only scroller is `<main>`; the page root clips sideways overflow (`overflow-x: clip`), so a trackpad swipe moves nothing.
 
-**Conversation, narrow** (`page` <840): stacked. Picking an answer scrolls to its breakdown.
+**Narrow** (`page` <560): the same, with tighter gaps; the toolbar wraps.
 
 **Build-up.** On the first open of each session in this visit, sections stagger in (`motion-stagger`).
+
+### 5.1a Scorecard, "How it lands", plan (D98, US-20 AC6–AC9)
+
+> **Layout D (2026-10-27) changes where these live, not what they say.** The scorecard is no longer a block: its rows are the skills card behind the one score (weakest first, "3/5", no meter; "Not asked this time" and the misheard note stay). The weak-spot lines ("What you said" / "Measured", "How it lands", "How to fix") sit on the weak spot's first evidence question, in that question's Feedback list; there is no "What to work on" section (an older debrief with no plan lists its weak spots under that heading inside the plan card). The plan is one compact card with the Drill button. "Also:" is dropped. "Average of N skills" is the mean of the scored rows (🟡 not in the rubric). The step falls back to the scorecard rule when the server sends none. The text below describes the data and the wording; read "Scorecard section" as "skills card" and "weak spot card" as "weak-spot block in the question".
+
+All three are built by the server in code from the saved layers (rubric §9) and arrive in `record.debrief` as optional `scorecard`, `plan` and, per weak spot, `said` / `said_kind` / `lands_as`. Interview debriefs with a verdict only; the English debrief and a short session (no verdict) show none of it. No grade (Intern → Senior+) anywhere. Code (layout D): `parts/Summary.tsx`, `LevelProgress.tsx`, `SkillsHoverCard.tsx`, `Plan.tsx`, `QuestionViewer.tsx`, `QuestionTabs.tsx`, `QuestionView.tsx`, `debriefShared.tsx`, `Sections.tsx` (`Actions`, `PractiseAgain`), `mapRecord.ts`.
+
+**Scorecard** (section "Scorecard", caption "Practice scores from this app's rubric, not a hiring prediction.", and under the caption a footnote: "Words the app may have misheard are not counted. You can check them in each question.")
+- Up to seven rows in a fixed order, not the layer order: "Structure (STAR)", "Your part", "Result", "On the question", "Lessons learned", "English", "Delivery". Only rows with a score are rows.
+- Row, wide: label · meter (five segments, `--color-text-primary` on `--color-border-subtle`, decoration) · `n/5` · "Lost points in question(s)" + question numbers as link buttons (same control and jump as weak-spot evidence). Row, narrow (`page` <640): label and score on one line, the lost-points line under it.
+- A row reads as "Result, 3 out of 5" (visible `3/5` and the meter are `aria-hidden`; the spoken text is visually hidden).
+- A row scored 5 lists no questions. A row with no score (`null`) is not shown; one line at the end of the scorecard (`--text-sm`, tertiary) names them: "Not asked this time: Lessons learned" (several labels joined by commas). No scored row at all → the whole scorecard is hidden.
+- Monochrome: a score is never a status colour (CONTRACT §2.4).
+
+**Weak spot card** (G18 debrief), lines in this order, each with its label on its own line; a missing field leaves out its line and label:
+1. "What you said": a verified fragment in quotation marks (`<q>`). For `said_kind: "metric"` the label is **"Measured"** and the text is plain, such as "12 fillers in 3:40" (no quote marks).
+2. "How it lands": the interviewer's likely reading (`lands_as`).
+3. "How to fix": the server's `text` (old name "Fix:").
+On the Language card, after its lines, one muted line: "Words the app may have misheard are not counted. You can check them in each question." ("each question" is a link button to the first evidence question, same jump as the evidence numbers; aria "each question, starting with question {n}"). Without evidence it is plain text. The `WeakSpotStrip` slot is `note`.
+When the debrief has `said` / `lands_as`, the card heading is the short tag name ("End with the result"); an older debrief keeps its sentence as the heading and shows no new lines.
+
+**What moves the verdict** (rubric §9.4, D99): the step and one muted line (`--text-sm`, secondary, max 60ch) under the scale, in the verdict block. The step is **computed in code from the scorecard the user sees** (server `debrief_view.verdict_step`, read time, never stored; the example uses the same rule on the web, `verdictStep.ts`): "Not ready yet" when any content row (Structure (STAR), Your part, Result, On the question) scores 1 or 2; "Ready" when every shown row scores 4 or more; otherwise "Getting there" (Lessons learned, English and Delivery can never cause "Not ready yet", but below 4 they hold "Getting there"). Too short or no scored row: no scale, no line, and the headline stays the model's sentence. With a step, the h2 headline is the step's name and the model's sentence is the line under it (the same in the live page and the example). The line states the rule: "Not ready yet": "To reach “Getting there”: get <rows> to 3 of 5 or more." · "Getting there": "To reach “Ready”: get <rows> to 4 of 5 or more." · "Ready": "Keep it: <strength>" or no line. `<rows>` = the scorecard's own labels of the rows in the gap, lowest score first (ties in scorecard order): one; "A and B"; "A, B and C"; with more than three the first two and "and N more" (e.g. “get Lessons learned, Structure (STAR) and 2 more to 4 of 5 or more.”). Built in code (`parts/verdictLine.ts`), no model. 
+
+**Plan for the next session** (after the weak spots): numbered list, up to 3 steps, one per weak spot in the same order; each step is the exercise sentence plus its layer (icon and name). The first step has "Drill these weak spots" (primary, `data-track="drill-start"`, same handler as before) with its hint ("3 questions on these 4 points · about 12 min"). The Actions block then shows nothing ("Practise again" is in the header toolbar). No plan (older session, server without D98) → section hidden and the drill stays in the Actions block as before. In the example the drill button is disabled and the hint "In your own debrief, you can drill these weak spots in a short session." sits under it (it leaves the Actions block).
+
+**After a flag is dismissed, a word marked misheard or an answer edited** the server rebuilds all three at read time; the page shows them with no extra state (AC9).
+
+**Build-up.** Verdict → weak spots → plan → scorecard → actions → question by question, same `rise-in` stagger as the other blocks. Reduced motion: none.
 
 ### 5.2 States
 
@@ -650,8 +683,17 @@ Notices are withheld while recording.
 |---|---|---|---|---|---|
 | Loading | fetching | skeletons | — | `loading`, `-mobile` | `loading` |
 | Preparing | debrief being written right after a session (polls every 3 s, up to 20 times) | Verdict section with shimmer "Writing your debrief. This takes a few seconds…" | wait | `preparing` | `preparing` |
-| Interview, full | ≥3 answers, debrief ready | folded verdict bar + conversation | open the bar, pick answers | `interview-full`, `-mobile` | `interview-full` |
-| Verdict open | bar opened | verdict, weak spots, actions | Drill / Practise | `interview-verdict-open` | `verdict-open` |
+| Interview, conversation | debrief ready, default view | full-width conversation, switch + Practise again under the meta, jump bar | switch to Debrief, jump to a question | `interview-conversation`, `-mobile` | `interview-conversation` |
+| Interview, full | `?view=debrief` | summary (verdict, level, one score), plan with Drill, switcher, one question | switch questions (tabs, ←/→, Previous / Next), open the skills card | `interview-full`, `-mobile` | `interview-full` |
+| Opened on a question | `?view=debrief&q=4` | the viewer on question 4 | — | `interview-opened-on-question4`, `-mobile` | `question-4` |
+| Many questions | 10 / 12 questions | switcher: numbers only with ‹ ›, scrolls with a fade past the fit | — | `ten-questions`, `twelve-questions`, `-mobile` | `ten-questions`, `twelve-questions` |
+| Skills card | hover / focus on the score | the seven skills to the left of the score (a sheet on a phone) | question links | `skills-card-open` | — |
+| Verdict without a step | debrief written before the steps | the level is derived from the scorecard; the headline is the model's sentence | — | `verdict-without-step` | `no-step` |
+| Verdict open | Debrief view | verdict, level + "what moves it" line, the one score, plan, switcher | Drill (in the plan) / Practise | `interview-verdict-open`, `-mobile` | `verdict-open` |
+| Skills, rows not asked | a row has `score: null` | no row for it in the skills card; the line "Not asked this time: …" at the end; all null → no score, no level | — | `scorecard-null-rows` | `scorecard-null` |
+| Weak spot without a quote | no verified fragment | "What you said" left out | — | `weak-spot-without-quote` | — |
+| No plan | older session / server without D98 | no score, no "Lost points on"; the weak spots under "What to work on" in the plan card, Drill in it | Drill / Practise | `no-plan` | `no-plan` |
+| One plan step | one weak spot | one step with the drill | Drill | `one-plan-step` | — |
 | Delivery first | `layer_order` = delivery-first | layers reordered | — | `interview-delivery-first` | `interview-delivery-first` |
 | Template verdict | engine was unavailable | "The AI model wasn't available, so this debrief was built from your feedback without it." + "Write the debrief again" ("Writing…") | rerun | — | — |
 | Missing verdict | no debrief, polling over, has feedback | "Write the debrief again"; without feedback: "No feedback was recorded for this session." | rerun | — | — |
@@ -666,6 +708,7 @@ Notices are withheld while recording.
 | Error | other load error | "We couldn't open this debrief." / "The session file may be damaged." + "Try again" + "Open Archive" | retry | `error` | `error` |
 | Action error | dismiss / restore / archive / delete / rerun fails | error Callout with the API message; the view resets to saved data | — | — | — |
 | Long text | long answers | "Show full answer" / "Show less" | — | `long-text`, `-mobile` | `overflow` |
+| Long text, conversation | long unbroken text in the chat | bubbles wrap; no sideways scroll | — | `long-text-conversation`, `-mobile` | `overflow-chat` |
 
 **Corrections (US-17, US-18).**
 - "Dismiss" leaves with an exit animation → "Dismissed — not counted." Restore is possible.

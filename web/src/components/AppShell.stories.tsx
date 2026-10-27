@@ -84,6 +84,21 @@ export const AccountMenuOpenCollapsed: StoryObj = { render: () => <Shell width={
 /** The "…" menu of a chat row (shown on hover or focus): Open, Move to Trash. */
 export const RowMenuOpen: StoryObj = { render: () => <Shell width={1440} height={900} initialMenu="row" actions={NOOP_ACTIONS} /> };
 
+const SAVING = (progress?: { done: number; total: number; stage: "feedback" | "debrief" }): RecentState => ({
+  status: "ready",
+  items: [{ id: "s4", title: "Kestrel Pay · Senior Product Designer", track: "interview", pending: true, progress }, ...(READY.status === "ready" ? READY.items : [])],
+});
+
+/** After End (D73): the session is the top row of Recents at once, its title shimmering (no "Saving…" toast, no
+ * full-screen state); the row is still a link. Plain secondary text under reduced motion. */
+export const RecentsSaving: StoryObj = { render: () => <Shell width={1440} height={900} path="/" start recent={SAVING()} /> };
+/** The server has said how far it is: "2 of 5" sits in the trailing slot. */
+export const RecentsPreparing: StoryObj = { render: () => <Shell width={1440} height={900} path="/" start recent={SAVING({ done: 2, total: 5, stage: "feedback" })} /> };
+/** The same in the drawer below 1024. */
+export const RecentsSavingDrawer: StoryObj = {
+  render: () => <Shell width={375} height={812} drawerOpen onDrawerOpenChange={() => {}} recent={SAVING({ done: 2, total: 5, stage: "feedback" })} />,
+};
+
 /** Home start layout (Page layout="start"). */
 export const DesktopStart: StoryObj = { render: () => <Shell width={1440} height={900} path="/" start /> };
 

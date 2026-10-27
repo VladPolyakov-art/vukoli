@@ -1,15 +1,21 @@
 /* Cards and rows: --radius-md (10px, DS-1, CONTRACT 2.7). Composer and panels keep --radius-lg. */
 .card {
   background: var(--color-surface-card);
+  /* D101: white on the grey canvas, lifted by the raised shadow (dark: no shadow, the fill separates). */
+  box-shadow: var(--shadow-raised);
   border: 0;
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
+  /* D101: an info Callout / EmptyState disc inside an island falls back to the sunken grey, no shadow. */
+  --note-fill: var(--color-subtle);
+  --note-shadow: none;
 }
 .pad-sm { padding: var(--space-3); }
 .pad-md { padding: var(--space-5); }
 .pad-lg { padding: var(--space-6); }
 .flat { box-shadow: none; }
-.subtle { background: var(--color-surface-chip); }
+/* D101: the plaque is a white island like the card (fill + raised shadow). Inside a Dialog it falls back to the chip grey. */
+.subtle { background: var(--plaque-fill, var(--color-surface-plaque)); box-shadow: var(--plaque-shadow, var(--shadow-raised)); }
 .interactive {
   position: relative;
   cursor: pointer;

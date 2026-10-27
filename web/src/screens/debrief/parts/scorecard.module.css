@@ -1,0 +1,27 @@
+/* Scorecard (D98, rubric §9.1): seven rows, label · meter and score · lost points. Monochrome: scores are not a status
+ * (CONTRACT §2.4). The layout answers to the width of the page (container query), not the viewport. */
+.block { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1) var(--space-6);
+  min-width: 0;
+  padding-block: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border-subtle);
+}
+.row:last-child { border-bottom: var(--border-width) solid var(--color-border-subtle); }
+.label { color: var(--color-text-primary); font-size: var(--text-md); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.score { display: inline-flex; align-items: center; gap: var(--space-3); }
+.meter { display: inline-flex; gap: var(--space-1); }
+.seg { inline-size: var(--space-6); block-size: var(--space-1); border-radius: var(--radius-pill); background: var(--color-border-subtle); }
+.seg.on { background: var(--color-text-primary); }
+.num { min-inline-size: var(--space-8); color: var(--color-text-primary); font-size: var(--text-md); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.notAsked { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.lost { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+@container page (width < 640px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); }
+  .lost { grid-column: 1 / -1; }
+}

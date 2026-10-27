@@ -15,6 +15,7 @@ import {
   resetApp,
   seedReturningUser,
   sendAnswer,
+  showDebrief,
   skipSetup,
   startTextInterview,
   steerEngine,
@@ -133,7 +134,7 @@ test.describe("F-13-8 / F-13-14 A drill from a debrief keeps its job", () => {
     await page.goto("/");
     await openMenu(page);
     await page.getByRole("link", { name: "Kestrel Pay · Product Manager" }).click();
-    await page.getByRole("button", { name: /^Verdict/ }).click();
+    await showDebrief(page);
     await page.getByRole("button", { name: "Drill these weak spots" }).click();
 
     const plan = page.getByRole("region", { name: "Here's the plan" });

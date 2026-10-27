@@ -51,6 +51,7 @@
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-surface-card);
+  box-shadow: var(--shadow-raised);
   min-width: 0;
 }
 .turn { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
@@ -72,6 +73,7 @@
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-surface-card);
+  box-shadow: var(--shadow-raised);
 }
 
 @container page (width < 560px) {

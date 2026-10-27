@@ -1,7 +1,8 @@
 #!/bin/bash
 # Vukoli launcher (macOS). Installed as <prefix>/bin/vukoli.
 #   vukoli            start the app if it is not running, then open it in its own window
-#                     (Chrome / Edge / Chromium / Brave app mode: no tabs, no address bar)
+#                     (Chrome / Edge / Chromium / Brave app mode: no tabs, no address bar), or in the app
+#                     Chrome / Edge installed for Vukoli ("Install" offer in the app: own Dock icon)
 #   vukoli --browser  same, but open a normal tab in the default browser (or set VUKOLI_APP_WINDOW=0)
 #   vukoli stop       stop the app
 #   vukoli status     say whether the app is running
@@ -84,18 +85,36 @@ find_chromium() {
   return 1
 }
 
+# The app that Chrome / Edge / Chromium / Brave installed for Vukoli ("Install as an app": its own Dock icon). It is found
+# by the address it opens, not by its name or folder. Prints its path, or nothing.
+find_installed_app() {
+  local dir app url
+  for dir in "$HOME/Applications" /Applications; do
+    for app in "$dir"/*Apps.localized/*.app; do
+      [ -d "$app" ] || continue
+      url="$(defaults read "$app/Contents/Info" CrAppModeShortcutURL 2>/dev/null)" || continue
+      case "${url%/}" in "$URL"|"http://localhost:$PORT") echo "$app"; return 0 ;; esac
+    done
+  done
+  return 1
+}
+
 open_default_browser() {
   if command -v open >/dev/null 2>&1; then open "$URL"
   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
   fi
 }
 
-# Own window (Chromium app mode) in the user's normal profile, so the microphone permission is remembered.
+# Own window in the user's normal profile, so the microphone permission is remembered. First choice is the installed app
+# (open -a brings its window forward, or opens one: a second window is never added). Otherwise Chromium app mode;
 # open -n starts a new process that hands the window to the running browser, if there is one.
 open_browser() {
   if [ "${VUKOLI_NO_BROWSER:-}" = 1 ]; then return 0; fi
   if [ "${VUKOLI_APP_WINDOW:-1}" != 0 ] && [ "$USE_TAB" != 1 ] && command -v open >/dev/null 2>&1; then
     local app
+    if app="$(find_installed_app)" && open -a "$app" >/dev/null 2>&1; then
+      return 0
+    fi
     if app="$(find_chromium)" && open -na "$app" --args "--app=$URL" --window-size=1280,860 >/dev/null 2>&1; then
       return 0
     fi

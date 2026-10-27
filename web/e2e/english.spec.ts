@@ -10,6 +10,7 @@ import {
   openMenu,
   resetApp,
   sendAnswer,
+  showDebrief,
   showFeedbackLater,
   skipSetup,
 } from "./helpers";
@@ -79,6 +80,7 @@ test.describe("US-24 English practice", () => {
     await (await endSession(page, "End practice")).click();
     await expect(page).toHaveURL(/\/sessions\/s-/);
     await expect(page.getByRole("heading", { name: "English practice", level: 1 })).toBeVisible();
+    await showDebrief(page);
     await expect(page.getByRole("region", { name: "Summary" })).toContainText("2 corrections.");
     const corrections = page.getByRole("region", { name: "Corrections" });
     await expect(corrections).toContainText("since five years");
@@ -111,6 +113,7 @@ test.describe("US-24 English practice", () => {
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
 
     await (await endSession(page, "End practice")).click();
+    await showDebrief(page);
     const corrections = page.getByRole("region", { name: "Corrections" });
     await expect(corrections).toContainText("since five years");
     await corrections.getByRole("button", { name: "Dismiss" }).first().click();
@@ -123,6 +126,7 @@ test.describe("US-24 English practice", () => {
     await sendAnswer(page, "I run the checkout team and I like the work. We shipped on time.");
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
     await (await endSession(page, "End practice")).click();
+    await showDebrief(page);
     await expect(page.getByRole("region", { name: "Corrections" })).toContainText("No corrections this time.");
   });
 
@@ -131,11 +135,12 @@ test.describe("US-24 English practice", () => {
     await sendAnswer(page, "I run the checkout team and I like the work. We shipped on time.");
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
     await (await endSession(page, "End practice")).click();
+    await showDebrief(page);
     await expect(page.getByRole("region", { name: "Corrections" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Corrections" })).toContainText("No corrections this time.");
-    const actions = page.getByRole("region", { name: "What next" });
-    await expect(actions).toBeVisible();
-    await expect(actions.getByRole("button", { name: "Practise again" })).toBeVisible();
+    // One "Practise again", near the top (next to the view switch), a plain label with no phrases to review; none further down.
+    await expect(page.getByRole("button", { name: "Practise again" })).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "What next" })).toHaveCount(0);
     await expect(page.getByText(/uses (these )?0 phrases/)).toHaveCount(0);
     await expect(page.getByText(/0 phrases/)).toHaveCount(0);
   });

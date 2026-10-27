@@ -1,37 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Badge } from "./Badge";
+import { useState } from "react";
 import { Disclosure } from "./Disclosure";
 import { Icon } from "./icons";
 
 /** Disclosure (G19): a header button (aria-expanded / aria-controls) that opens a region with a short rise and closes
- * with a soft fade. `card` = Debrief question cards; `plain` = a text toggle inside other content. */
+ * with a soft fade. The app uses two shapes (code is the source, 2026-10-25): `plain`, a text toggle inside other
+ * content (Earlier questions, "Show a stronger answer" with a leading icon, the engine / CV / terminal toggles), and
+ * the `card` verdict bar of the debrief (title only, controlled `open`, `headingLevel` 2). The numbered question card
+ * (leading number, meta line, list, no chevron, disabled) is gone: the debrief question card is always open and fixed
+ * (D71), so the `leading` / `meta` / `chevron="none"` slots have no card story any more. */
 const meta: Meta<typeof Disclosure> = { title: "DS/Disclosure", component: Disclosure, tags: ["autodocs"] };
 export default meta;
 type Story = StoryObj<typeof Disclosure>;
 
-const Q2 = "Tell me about a time you had to change a design late in a project.";
+const STRONGER =
+  "Kestrel is moving into small-business payments, where checkout is the whole experience. I led the design system rollout last year, and I'd like to apply that here, starting with consent and error states.";
 
-const num = (n: number) => (
-  <span
-    style={{
-      display: "inline-grid", placeItems: "center", width: "var(--control-h-sm)", height: "var(--control-h-sm)", flex: "none",
-      borderRadius: "var(--radius-pill)", background: "var(--color-subtle)", fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)",
-    }}
-  >
-    {n}
-  </span>
-);
-const meta2 = (
-  <>
-    <Badge tone="content" icon="content" tinted>No result · “we” → “I” ×2</Badge>
-    <Badge tone="language" icon="language" tinted>2 phrasings</Badge>
-    <Badge tone="delivery" icon="delivery" tinted>11 fillers</Badge>
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--color-text-tertiary)" }}>
-      <Icon name="clock" size="sm" /> 2:20 · at 03:35 · 1 follow-up
-    </span>
-  </>
-);
-const body = (
+const earlier = (
   <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", fontSize: "var(--text-md)", lineHeight: "var(--leading-relaxed)" }}>
     <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>Follow-up: What was the result for the merchants?</p>
     <p style={{ margin: 0 }}>
@@ -41,28 +26,68 @@ const body = (
   </div>
 );
 
-export const CardClosed: Story = {
-  args: { leading: num(2), title: "Tell me about a time you had to change a design late in a project.", meta: meta2, headingLevel: 3, children: body },
-};
-export const CardOpen: Story = { args: { ...CardClosed.args, defaultOpen: true } };
-export const Plain: Story = { args: { surface: "plain", title: "Show full answer", children: body } };
-export const PlainOpen: Story = { args: { surface: "plain", title: "Show full answer", defaultOpen: true, children: body } };
-export const NoChevron: Story = { args: { ...CardClosed.args, chevron: "none" } };
-export const Disabled: Story = { args: { leading: num(5), title: "Why do you want to join Kestrel Pay?", meta: "Not answered", disabled: true, children: body } };
-/** Overflow: a long question wraps; the chevron keeps its place. Narrow parent 343px. */
+/** Plain toggle in the Session feedback panel: "Earlier questions (2)". */
+export const Plain: Story = { args: { surface: "plain", title: "Earlier questions (2)", children: earlier } };
+export const PlainOpen: Story = { args: { surface: "plain", title: "Earlier questions (2)", defaultOpen: true, children: earlier } };
+
+/** Plain with a leading icon (debrief question card): the title flips with the state. */
+function Stronger({ initial = false }: { initial?: boolean }) {
+  const [open, setOpen] = useState(initial);
+  return (
+    <Disclosure
+      surface="plain"
+      open={open}
+      onOpenChange={setOpen}
+      leading={<Icon name="sparkle" size="sm" />}
+      title={open ? "Hide the stronger answer" : "Show a stronger answer"}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", fontSize: "var(--text-md)", lineHeight: "var(--leading-relaxed)" }}>
+        <p style={{ margin: 0, fontWeight: "var(--weight-semibold)" }}>A stronger answer</p>
+        <p style={{ margin: 0 }}>{STRONGER}</p>
+      </div>
+    </Disclosure>
+  );
+}
+export const PlainLeadingIcon: Story = { render: () => <Stronger /> };
+export const PlainLeadingIconOpen: Story = { render: () => <Stronger initial /> };
+
+/** The verdict bar of the debrief (D98): a `card` surface whose header is the whole verdict line — label, headline, a
+ * 3-step mini scale — inside an h2. Title only; the open state is controlled by the screen. */
+function VerdictBar({ headline = "Clear stories, but 3 of 5 answers end before the result.", initial = false, narrow }: { headline?: string; initial?: boolean; narrow?: boolean }) {
+  const [open, setOpen] = useState(initial);
+  const step = 1;
+  return (
+    <div style={{ width: narrow ? "21.4375rem" : undefined, maxWidth: "100%" }}>
+      <Disclosure
+        id="verdict"
+        headingLevel={2}
+        open={open}
+        onOpenChange={setOpen}
+        title={(
+          <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-1) var(--space-3)", minWidth: 0 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)" }}>Verdict</span>
+            <span style={{ color: "var(--color-text-primary)", fontSize: "var(--text-md)", fontWeight: "var(--weight-semibold)" }}>
+              {headline}<span className="visually-hidden">, step {step + 1} of 3</span>
+            </span>
+            <span aria-hidden="true" style={{ display: "inline-flex", gap: "var(--space-1)" }}>
+              {[0, 1, 2].map((n) => (
+                <span key={n} style={{ inlineSize: "var(--space-5)", blockSize: "var(--space-1)", borderRadius: "var(--radius-pill)", background: n <= step ? "var(--color-text-primary)" : "var(--color-border-subtle)" }} />
+              ))}
+            </span>
+          </span>
+        )}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", fontSize: "var(--text-md)", lineHeight: "var(--leading-relaxed)" }}>
+          <p style={{ margin: 0, fontWeight: "var(--weight-semibold)" }}>Getting there</p>
+          <p style={{ margin: 0, color: "var(--color-text-secondary)" }}>To reach “Ready”: get Structure and Result to 4 of 5 or more.</p>
+        </div>
+      </Disclosure>
+    </div>
+  );
+}
+export const VerdictBarClosed: Story = { render: () => <VerdictBar /> };
+export const VerdictBarOpen: Story = { render: () => <VerdictBar initial /> };
+/** Overflow: a long headline wraps in a narrow parent (343px); the chevron keeps its place. */
 export const Overflow: Story = {
-  args: {
-    ...CardClosed.args,
-    title: "Describe a disagreement with a product manager about scope late in a release, how you resolved it, and what you would do differently next time.",
-  },
-  render: (args) => <div style={{ width: "21.4375rem" }}><Disclosure {...args} /></div>,
-};
-export const List: Story = {
-  render: () => (
-    <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-      <Disclosure as="li" leading={num(1)} title="Tell me about yourself and your current role." meta="1:50 · 1 follow-up" headingLevel={3}>{body}</Disclosure>
-      <Disclosure as="li" leading={num(2)} title={Q2} meta={meta2} headingLevel={3} defaultOpen>{body}</Disclosure>
-      <Disclosure as="li" leading={num(3)} title="How do you work with engineers during handoff?" meta="1:35 · no follow-up" headingLevel={3}>{body}</Disclosure>
-    </ol>
-  ),
+  render: () => <VerdictBar narrow headline="Clear stories, but 3 of 5 answers end before the result and the numbers behind them are missing." />,
 };

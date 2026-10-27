@@ -8,6 +8,7 @@
   align-items: center;
   padding: var(--space-4) var(--space-5);
   background: var(--color-surface-card);
+  box-shadow: var(--shadow-raised);
   border-radius: var(--radius-lg);
 }
 .main { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }

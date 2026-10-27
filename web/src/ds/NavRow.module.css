@@ -6,7 +6,8 @@
   min-height: calc(var(--control-h-md) - var(--space-1));
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
+  /* D101: black at rest in light (--color-text-nav); dark keeps the secondary grey. */
+  color: var(--color-text-nav);
   text-decoration: none;
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);

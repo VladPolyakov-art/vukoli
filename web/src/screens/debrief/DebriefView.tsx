@@ -1,27 +1,28 @@
-/* Debrief (ds/screens/debrief.md; variants interview · english · example). Pure: every state comes from props, so
- * stories and the review page render it without a server; `screens/Debrief.tsx` is the live container.
- * Structure after Otter's summary (R5): Verdict (overview) → What to work on (key points + actions) → Question by
- * question (outline with quotes). Layer tints live only here (CONTRACT §2.6); fixes are marked inside the user's own
- * sentence, never red / green (P8). Container queries on `page`, no viewport media queries.
- * D80: a saved interview opens on the conversation; the verdict is a folded bar above it (VerdictBar).
- * D71: "Question by question" is two columns: the whole conversation as a chat on the left, the breakdown of the picked
- * answer on the right (sticky). A narrow page stacks them, and picking an answer scrolls to its breakdown. */
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+/* Debrief of a saved session (ds/screens/debrief.md; variants interview · english · example). Pure: every state comes
+ * from props, so stories and the review page render it without a server; `screens/Debrief.tsx` is the live container.
+ * The page opens on the debrief (D101, 2026-10-27); a Segmented switch under the title ("Debrief | Conversation",
+ * `?view=conversation` in the URL) shows the conversation across the whole main area, with the jump between questions.
+ * The debrief (layout D, 2026-10-27: the verdict with the level and the one score → plan + Drill → sticky question switcher → one
+ * question at a time, after Otter's summary, R5; the seven skills open from the score). One
+ * "Practise again" sits next to the switch in both views. A session with nothing to show (`model.empty`) has the
+ * conversation only, and no switch. Layer tints live only in the debrief (CONTRACT §2.6); fixes are marked inside the
+ * user's own sentence, never red / green (P8). Container queries on `page`, no viewport media queries. */
+import { useEffect, useId, useRef, useState } from "react";
 import { Callout, Segmented, durationMs, scrollBehavior } from "../../ds";
 import { t } from "../../i18n";
 import { pageStyles } from "../../components/Page";
-import { layerSequence, type DebriefViewProps } from "./types";
+import { layerSequence, type DebriefViewMode, type DebriefViewProps } from "./types";
 import { Header } from "./parts/Header";
 import { Conversation, conversationFromQuestions } from "./parts/Conversation";
 import { EnglishBody } from "./parts/English";
 import type { RowContext } from "./parts/Layers";
-import { QuestionCard } from "./parts/QuestionCard";
-import { Actions, SectionHead, TemplateNote, Verdict, VerdictBar, VerdictNotice, WeakSpots } from "./parts/Sections";
+import { orderedPlan, orderedSpots, questionHeadingId } from "./parts/debriefShared";
+import { Plan } from "./parts/Plan";
+import { QuestionViewer } from "./parts/QuestionViewer";
+import { Actions, PractiseAgain, TemplateNote, VerdictNotice } from "./parts/Sections";
+import { Summary } from "./parts/Summary";
 import { ErrorBody, ExampleBanner, LoadingBody, NotFoundBody, PartialBanner, StorageBanner } from "./parts/States";
 import s from "./DebriefView.module.css";
-
-/** `n` rem in px (the sticky offset is --space-6 = 1.5rem). */
-const remPx = (el: Element, n: number) => n * parseFloat(getComputedStyle(el.ownerDocument.documentElement).fontSize || "16");
 
 export function DebriefView(props: DebriefViewProps) {
   const { variant, state, model, layerOrder, ui, buildUp, storageError, className } = props;
@@ -29,10 +30,14 @@ export function DebriefView(props: DebriefViewProps) {
   const root = `${pageStyles.page} ${s.page} ${buildUp && state === "ready" ? "motion-stagger" : ""} ${className ?? ""}`;
   const heading = <h1 className="visually-hidden">{t("debrief.title")}</h1>;
 
-  const [picked, setPicked] = useState<number | undefined>(ui?.selected ?? ui?.open?.[0]);
-  const detail = useRef<HTMLDivElement>(null);
-  /** The breakdown's height cap: the visible height of <main> minus the sticky offset (D71). */
-  const [detailMax, setDetailMax] = useState<number | undefined>(undefined);
+  const [pickedOwn, setPicked] = useState<number | undefined>(ui?.selected ?? ui?.open?.[0]);
+  const picked = props.question ?? pickedOwn;
+  const detail = useRef<HTMLElement>(null);
+  const chat = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  /** The question picked in the conversation's jump bar (it scrolls the chat to that question). */
+  const [chatQ, setChatQ] = useState<number | undefined>(undefined);
+  const [viewOwn, setViewOwn] = useState<DebriefViewMode>(ui?.view ?? "debrief");
   const [strongerOpen, setStrongerOpen] = useState<ReadonlySet<number>>(() => new Set(ui?.strongerOpen ?? []));
   const [renaming, setRenaming] = useState(ui?.renaming ?? false);
   const [titleOverride, setTitleOverride] = useState<string | null>(null);
@@ -41,26 +46,12 @@ export function DebriefView(props: DebriefViewProps) {
   );
   const [recheckingOwn, setRechecking] = useState<number | null>(ui?.rechecking ?? null);
   const rechecking = props.rechecking !== undefined ? props.rechecking : recheckingOwn;
-  const [verdictOpen, setVerdictOpen] = useState(ui?.verdictOpen ?? false);
   const [dismissed, setDismissed] = useState<Readonly<Record<string, boolean>>>({});
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(() => new Set());
   /** Focus moves into a field only after the user opened it, never when a review state starts open. */
   const [userOpened, setUserOpened] = useState(false);
   const timers = useRef<number[]>([]);
   useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
-
-  const hasDetail = state === "ready" && Boolean(model?.questions.length);
-  useLayoutEffect(() => {
-    const panel = detail.current;
-    const main = panel?.closest("main");
-    if (!hasDetail || !panel || !main) return;
-    // Stacked (narrow) the panel is not sticky and takes its full height.
-    const measure = () => setDetailMax(getComputedStyle(panel).position === "sticky" ? Math.max(0, main.clientHeight - 2 * remPx(main, 1.5)) : undefined);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(main);
-    return () => ro.disconnect();
-  }, [hasDetail]);
 
   if (state === "loading" || state === "preparing") {
     return (
@@ -76,29 +67,42 @@ export function DebriefView(props: DebriefViewProps) {
   const canEdit = Boolean(props.onRecheck);
   const title = titleOverride ?? model.title;
   const seq = layerSequence(layerOrder);
-  const headerId = (n: number) => `${uid}q${n}`;
   const key = (q: number, id: string) => `${q}:${id}`;
 
   const selected = model.questions.some((q) => q.n === picked) ? picked : model.questions[0]?.n;
   const current = model.questions.find((q) => q.n === selected);
 
-  /** Show question `n` in the breakdown. Scroll to it only when it is out of view (the narrow, stacked layout, or a
-   * weak-spot link above); `focus` moves focus to its heading (evidence links), a chat bubble keeps it. */
-  const pick = (n: number, focus = false) => {
+  const turns = model.conversation?.length ? model.conversation : conversationFromQuestions(model.questions);
+  const hasDebrief = !model.empty;
+  const view: DebriefViewMode = hasDebrief ? props.view ?? viewOwn : "conversation";
+  const setView = (next: DebriefViewMode) => {
+    setViewOwn(next);
+    props.onViewChange?.(next);
+    // The new view starts at its top, not where the other one was scrolled to.
+    window.requestAnimationFrame(() => rootRef.current?.closest("main")?.scrollTo({ top: 0 }));
+  };
+
+  /** Switch the viewer to question `n` (the tabs, ←/→, Previous / Next); the URL follows (`?q=n`). */
+  const select = (n: number) => {
     setPicked(n);
+    props.onQuestionChange?.(n);
+  };
+  /** The links from the plan, the skills card and the chat: show question `n`, bring the viewer into view and move
+   * focus to the question's heading. */
+  const jump = (n: number) => {
+    select(n);
     window.requestAnimationFrame(() => {
-      const panel = detail.current;
-      if (!panel) return;
-      panel.scrollTop = 0;
-      const top = panel.getBoundingClientRect().top;
-      const viewport = panel.closest("main")?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
-      if (top < viewport.top || top > viewport.top + (viewport.bottom - viewport.top) * 0.6) {
-        panel.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
-      }
-      if (focus) document.getElementById(headerId(n))?.focus({ preventScroll: true });
+      detail.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+      document.getElementById(questionHeadingId(uid, n))?.focus({ preventScroll: true });
     });
   };
-  const jump = (n: number) => pick(n, true);
+
+  /** The questions Mike asked, for the jump in the conversation. */
+  const asked = Array.from(new Set(turns.flatMap((x) => (x.opens && x.q !== undefined ? [x.q] : []))));
+  const jumpChat = (n: number) => {
+    setChatQ(n);
+    chat.current?.querySelector<HTMLElement>(`[data-question="${n}"]`)?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+  };
 
   const dismiss = (q: number, id: string) => {
     const k = key(q, id);
@@ -133,32 +137,42 @@ export function DebriefView(props: DebriefViewProps) {
   });
 
   const english = variant === "english" ? model.english : undefined;
-  const turns = model.conversation?.length ? model.conversation : conversationFromQuestions(model.questions);
   const partial = Boolean(model.partial);
-  const ids = { verdict: `${uid}-verdict`, spots: `${uid}-spots`, actions: `${uid}-actions`, questions: `${uid}-questions` };
+  const ids = { verdict: `${uid}-verdict`, plan: `${uid}-plan`, actions: `${uid}-actions`, questions: `${uid}-questions` };
 
-  // D80: a saved interview opens on the conversation; the verdict, what to fix first and the next step fold into a bar.
-  const folded = variant === "interview" && Boolean(model.verdict) && !partial;
-  const verdictBlock = model.verdict && !partial ? (
-    <Verdict verdict={model.verdict} id={folded ? `${ids.verdict}-body` : ids.verdict} bare={folded} note={model.verdictNotice === "template" ? <TemplateNote rerunning={props.rerunning} onRerun={props.onRerun} /> : undefined} />
+  /* Interview and example with a verdict: the summary (verdict, level, the one score with the skills card), the plan with
+   * the page's only primary button, then the questions. A partial session has no verdict block, no plan. */
+  const summaryBlock = model.verdict && !partial ? (
+    <Summary
+      verdict={model.verdict}
+      rows={model.scorecard}
+      id={ids.verdict}
+      uid={uid}
+      note={model.verdictNotice === "template" ? <TemplateNote rerunning={props.rerunning} onRerun={props.onRerun} /> : undefined}
+      onJump={jump}
+    />
   ) : null;
-  const spotsBlock = !partial && !english && model.weakSpots.length ? <WeakSpots model={model} order={layerOrder} onJump={jump} id={ids.spots} /> : null;
+  const showDrill = variant !== "english" && !partial && Boolean(model.drill || model.plan?.some((p) => p.drill));
+  const planWanted = !partial && !english;
+  const planSteps = planWanted && model.verdict ? orderedPlan(model.plan, seq) : [];
+  const planSpots = planWanted && model.verdict ? orderedSpots(model.weakSpots, seq) : [];
+  const planBlock = planWanted && (planSteps.length || planSpots.length || showDrill) ? (
+    <Plan steps={planSteps} spots={planSpots} id={ids.plan} drill={model.drill} showDrill={showDrill} example={variant === "example"} storageError={storageError} onDrill={props.onDrill} onJump={jump} />
+  ) : null;
   const actionsBlock = (
     <Actions
       variant={variant}
       model={model}
-      english={english}
       partial={partial}
       storageError={storageError}
+      drillInPlan
       onDrill={props.onDrill}
-      onPractise={props.onPractise}
-      onStartFirst={props.onStartFirst}
       id={ids.actions}
     />
   );
 
   return (
-    <div className={root} data-review-id="Debrief/Page" data-variant={variant}>
+    <div ref={rootRef} className={`${root} ${s.fluid}`} data-review-id="Debrief/Page" data-variant={variant}>
       {storageError ? <StorageBanner onDownload={props.onDownload} /> : null}
       {variant === "example" ? <ExampleBanner onStart={props.onStartFirst} /> : null}
 
@@ -181,80 +195,94 @@ export function DebriefView(props: DebriefViewProps) {
         onDownload={props.onDownload}
         onArchive={props.onArchive}
         onTrash={props.onTrash}
+        toolbar={(
+          <>
+            {hasDebrief ? (
+              <Segmented
+                label={t("debrief.view.label")}
+                hideLabel
+                options={[
+                  { value: "debrief", label: t("debrief.view.debrief") },
+                  { value: "conversation", label: t("debrief.view.conversation") },
+                ] satisfies { value: DebriefViewMode; label: string }[]}
+                value={view}
+                onChange={setView}
+                track="debrief-view"
+              />
+            ) : null}
+            <PractiseAgain variant={variant} english={english} partial={partial} storageError={storageError} onPractise={props.onPractise} />
+          </>
+        )}
       />
 
       {props.notice ? <Callout tone="error" live="alert">{props.notice}</Callout> : null}
       {partial ? <PartialBanner answered={model.partial!.answered} total={model.partial!.total} /> : null}
-      {model.verdictNotice && model.verdictNotice !== "template" && !partial ? <VerdictNotice kind={model.verdictNotice} id={ids.verdict} rerunning={props.rerunning} onRerun={props.onRerun} /> : null}
-      {folded ? (
-        <VerdictBar verdict={model.verdict!} id={ids.verdict} open={verdictOpen} onOpenChange={setVerdictOpen}>
-          {verdictBlock}
-          {spotsBlock}
-          {actionsBlock}
-        </VerdictBar>
-      ) : (
-        <>
-          {verdictBlock}
-          {spotsBlock}
+
+      {view === "debrief" ? (
+        <div className={`${s.debrief} ${english ? "" : s.wide}`} data-review-id="Debrief/DebriefView">
+          {model.verdictNotice && model.verdictNotice !== "template" && !partial ? <VerdictNotice kind={model.verdictNotice} id={ids.verdict} rerunning={props.rerunning} onRerun={props.onRerun} /> : null}
+          {english ? null : summaryBlock}
+          {planBlock}
           {english ? (
             <EnglishBody english={english} ctx={rowsFor(0)} ids={{ summary: `${uid}-sum`, corrections: `${uid}-cor`, phrases: `${uid}-phr` }} />
           ) : null}
           {actionsBlock}
-        </>
-      )}
-
-      {turns.length ? (
-        <section className={s.questions} aria-labelledby={ids.questions} data-review-id="Debrief/Questions" data-review-section="Debrief · Conversation" data-comment-target="">
-          <SectionHead id={ids.questions} title={t("debrief.convo.title")} sub={current ? t("debrief.convo.sub") : undefined} />
-          <div className={`${s.split} ${current ? "" : s.single}`}>
-            <div className={s.chat}>
-              <Conversation turns={turns} questions={new Set(model.questions.map((q) => q.n))} selected={selected} onSelect={(n) => pick(n)} />
-              {model.skipped ? (
-                <p className={s.skipped}>
-                  {model.skipped.from === model.skipped.to
-                    ? t("debrief.partial.skippedOne", { n: model.skipped.from })
-                    : t("debrief.partial.skipped", { from: model.skipped.from, to: model.skipped.to })}
-                </p>
-              ) : null}
+          {current ? (
+            <QuestionViewer
+              questions={model.questions}
+              current={current.n}
+              onSelect={select}
+              uid={uid}
+              id={ids.questions}
+              sectionRef={detail}
+              view={{
+                seq,
+                spots: orderedSpots(model.weakSpots, seq),
+                scorecard: model.verdict && !partial ? model.scorecard : undefined,
+                rows: rowsFor(current.n),
+                rechecking: rechecking === current.n,
+                answerEditing: editing?.q === current.n && editing.target === "answer",
+                answerDraft: editing?.q === current.n ? editing.draft : undefined,
+                onEditAnswer: canEdit ? () => { setUserOpened(true); setEditing({ q: current.n, target: "answer" }); } : undefined,
+                onSaveAnswer: (text) => save(current.n, "answer", text),
+                onCancelAnswer: () => setEditing(null),
+                focusEditor: userOpened,
+                strongerOpen: strongerOpen.has(current.n),
+                onStrongerOpenChange: (v) => {
+                  setStrongerOpen((prev) => { const n = new Set(prev); if (v) n.add(current.n); else n.delete(current.n); return n; });
+                  if (v && current.stronger?.status === "idle") props.onStronger?.(current.n);
+                },
+              }}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <section className={s.chat} aria-labelledby={ids.questions} data-review-id="Debrief/Conversation" data-review-section="Debrief · Conversation" data-comment-target="">
+          <h2 id={ids.questions} className="visually-hidden">{t("debrief.convo.title")}</h2>
+          {asked.length > 1 ? (
+            <div className={s.jump}>
+              <span className={s.jumpLabel} aria-hidden="true">{t("debrief.convo.pick")}</span>
+              <Segmented
+                label={t("debrief.convo.jump")}
+                hideLabel
+                options={asked.map((n) => ({ value: String(n), label: String(n), title: t("debrief.q.number", { n }), track: "debrief-question-jump" }))}
+                value={String(chatQ ?? asked[0])}
+                onChange={(v) => jumpChat(Number(v))}
+              />
             </div>
-            {current ? (
-              <div ref={detail} className={s.detail} style={detailMax ? { maxHeight: detailMax } : undefined} aria-label={t("debrief.convo.breakdown")} role="region">
-                {model.questions.length > 1 ? (
-                  <Segmented
-                    label={t("debrief.convo.pick")}
-                    hideLabel
-                    options={model.questions.map((q) => ({ value: String(q.n), label: String(q.n), title: q.question, track: "debrief-question-pick" }))}
-                    value={String(current.n)}
-                    onChange={(v) => pick(Number(v))}
-                  />
-                ) : null}
-                <QuestionCard
-                  key={current.n}
-                  fixed
-                  q={current}
-                  order={seq}
-                  headerId={headerId(current.n)}
-                  open
-                  onOpenChange={() => {}}
-                  strongerOpen={strongerOpen.has(current.n)}
-                  onStrongerOpenChange={(v) => {
-                    setStrongerOpen((prev) => { const n = new Set(prev); if (v) n.add(current.n); else n.delete(current.n); return n; });
-                    if (v && current.stronger?.status === "idle") props.onStronger?.(current.n);
-                  }}
-                  rows={rowsFor(current.n)}
-                  rechecking={rechecking === current.n}
-                  answerEditing={editing?.q === current.n && editing.target === "answer"}
-                  answerDraft={editing?.q === current.n ? editing.draft : undefined}
-                  onEditAnswer={canEdit ? () => { setUserOpened(true); setEditing({ q: current.n, target: "answer" }); } : undefined}
-                  onSaveAnswer={(text) => save(current.n, "answer", text)}
-                  onCancelAnswer={() => setEditing(null)}
-                  focusEditor={userOpened}
-                />
-              </div>
-            ) : null}
+          ) : null}
+          <div ref={chat}>
+            <Conversation turns={turns} />
           </div>
+          {model.skipped ? (
+            <p className={s.skipped}>
+              {model.skipped.from === model.skipped.to
+                ? t("debrief.partial.skippedOne", { n: model.skipped.from })
+                : t("debrief.partial.skipped", { from: model.skipped.from, to: model.skipped.to })}
+            </p>
+          ) : null}
         </section>
-      ) : null}
+      )}
     </div>
   );
 }

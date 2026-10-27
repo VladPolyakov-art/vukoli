@@ -2,7 +2,7 @@
  * into it (`mapRecord.ts`), stories and the review page use the fixtures. Text that comes from the model or the
  * user (questions, answers, fixes) is plain English data; every chrome string comes from the locale file. */
 import type { IconName } from "../../ds";
-import type { LayerOrder } from "../../lib/types";
+import type { LayerOrder, ScoreKey } from "../../lib/types";
 
 export type Layer = "content" | "language" | "delivery";
 export type DebriefVariant = "interview" | "english" | "example";
@@ -24,11 +24,19 @@ export interface MetaItem {
 /** Evidence under a weak spot: "Questions 1, 2, 4" or "Most in question 4 (12)". Numbers are links to the cards. */
 export interface Evidence { kind: "questions" | "most"; ids: number[]; trail?: string }
 
+/** What the user said (D98, rubric §9.2): an exact fragment (`quote`, shown in quotation marks) or a delivery number (`metric`, plain text). */
+export interface SaidModel { text: string; kind: "quote" | "metric" }
+
 export interface WeakSpotModel {
   id: string;
   layer: Layer;
   title: string;
   evidence?: Evidence;
+  /** "What you said". Absent: the line is left out, never made up. */
+  said?: SaidModel;
+  /** "How it lands": the interviewer's likely reading. Absent: the line is left out. */
+  lands?: string;
+  /** "How to fix". */
   fix?: string;
   /** Content only: a second point under a hairline. */
   also?: { text: string; ids: number[]; fix?: string };
@@ -36,11 +44,24 @@ export interface WeakSpotModel {
 
 export type ScaleStep = 0 | 1 | 2;
 export interface VerdictModel {
-  /** Index in `Not ready yet · Getting there · Ready`; absent when the server gives only a sentence. */
+  /** Index in `Not ready yet · Getting there · Ready`, computed from the scorecard (D99); absent: no scale, no line. */
   step?: ScaleStep;
+  /** D99: the scorecard rows between the user and the next step, lowest first; `target`: the score they need (3 or 4). */
+  gap?: ScoreKey[];
+  target?: 3 | 4;
+  /** The step's name when there is a step, else the model's sentence. */
   headline: string;
+  /** The model's sentence, under the headline (only when the headline is the step's name). */
   line?: string;
+  /** What went well (the server's `strength`); only the "Ready" step uses it ("Keep it: …"). */
+  strength?: string;
 }
+
+/** One scorecard row (D98, rubric §9.1). `score: null` = "Not asked this time", no meter. `lost` = question numbers. */
+export interface ScoreRowModel { key: ScoreKey; score: number | null; answers: number; lost: number[] }
+
+/** One step of "Plan for the next session" (D98, rubric §9.3). The `drill` step carries the "Drill these weak spots" action. */
+export interface PlanStepModel { id: string; layer: Layer; text: string; drill: boolean }
 
 export interface Correction {
   id: string;
@@ -138,7 +159,11 @@ export interface DebriefModel {
   /** Live only: the verdict is being written (`pending`), could not be written (`missing`) or was built without the model (`template`). */
   verdictNotice?: "pending" | "missing" | "template";
   partial?: { answered: number; total: number };
+  /** Interview with a verdict only (D98): seven rows in a fixed order. Absent: old session or server, no section. */
+  scorecard?: ScoreRowModel[];
   weakSpots: WeakSpotModel[];
+  /** Up to three steps (D98). Absent or empty: no section, and the drill action stays in the Actions block. */
+  plan?: PlanStepModel[];
   /** `questions` and `minutes` are absent when the server does not tell them (live data). */
   drill?: { questions?: number; points: number; minutes?: number };
   questions: QuestionModel[];
@@ -147,11 +172,16 @@ export interface DebriefModel {
   english?: EnglishModel;
   /** The saved transcript; without it (fixtures) the chat is rebuilt from the questions. */
   conversation?: ConversationTurn[];
+  /** Nothing to show besides the conversation (a too-short session with no feedback): the page has no "Debrief" view and no switch. */
+  empty?: boolean;
 }
+
+/** The two views of a saved session: the debrief (default, D101) and the chat (`?view=conversation`). */
+export type DebriefViewMode = "conversation" | "debrief";
 
 /** Local UI state a static state can start in (review frames, stories). */
 export interface DebriefUi {
-  /** The question whose breakdown shows next to the chat (default: the first one in `open`, else the first question). */
+  /** The question whose breakdown shows in the debrief view (default: the first one in `open`, else the first question). */
   selected?: number;
   open?: number[];
   /** Questions whose "stronger answer" starts open. */
@@ -159,8 +189,8 @@ export interface DebriefUi {
   renaming?: boolean;
   editing?: { question: number; correction: string };
   rechecking?: number;
-  /** D80: the folded verdict bar starts open (review, stories). */
-  verdictOpen?: boolean;
+  /** Which view the page starts in (review, stories). Default: the debrief (D101). */
+  view?: DebriefViewMode;
 }
 
 export interface DebriefActions {
@@ -203,6 +233,13 @@ export interface DebriefViewProps extends DebriefActions {
   rerunning?: boolean;
   /** Live: an action failed (flag, stronger answer, trash); shown as an error callout under the header. */
   notice?: string;
+  /** Which view shows. The live container keeps it in the URL (`?view=conversation`; the debrief is the default); without it the view keeps its own state. */
+  view?: DebriefViewMode;
+  onViewChange?: (view: DebriefViewMode) => void;
+  /** The question the viewer shows (a question number). The live container keeps it in the URL (`?q=n`); without it the
+   * view keeps its own state (starting at `ui.selected`, else the first question). */
+  question?: number;
+  onQuestionChange?: (n: number) => void;
   /** Live: the question being checked again (the container knows when it is done); undefined = the view's own state. */
   rechecking?: number | null;
   className?: string;

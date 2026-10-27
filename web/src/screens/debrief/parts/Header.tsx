@@ -1,7 +1,7 @@
 /* Debrief header (debrief.md §3.1): H1 with rename + "more" menu, structured meta row. No back link since D80: every
  * chat is in the sidebar. Rename swaps the H1 for InlineRename (Swap, `fast`). The menu: Export to Obsidian (only when a
  * folder is set), Download as Markdown, Archive, Delete (asks first; goes to Trash). The example has no rename or menu. */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Button, Dialog, Icon, IconButton, InlineRename, Menu, Swap, Tooltip, type MenuEntry } from "../../../ds";
 import { t } from "../../../i18n";
@@ -23,6 +23,8 @@ export interface HeaderProps {
   onDownload?: () => void;
   onArchive?: () => void;
   onTrash?: () => void;
+  /** Under the meta line: the view switch and "Practise again". */
+  toolbar?: ReactNode;
 }
 
 export function Header(p: HeaderProps) {
@@ -68,6 +70,7 @@ export function Header(p: HeaderProps) {
           </li>
         ))}
       </ul>
+      {p.toolbar ? <div className={s.toolbar} data-review-id="Debrief/Toolbar">{p.toolbar}</div> : null}
       <Dialog
         open={confirming}
         title={t("rail.deleteTitle")}

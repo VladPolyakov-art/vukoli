@@ -1,0 +1,19 @@
+/* "Your level" (layout D, look "blocks"): monochrome (P1), the filled cells are the text colour, the rest `--color-subtle`;
+ * no red / green. The cells appear once on load; global.css sets every duration to 0 under reduced motion. */
+.level { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: 36rem; padding-top: var(--space-3); }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
+.label { color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.caption { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); font-variant-numeric: tabular-nums; }
+.strong { color: var(--color-text-primary); font-weight: var(--weight-medium); }
+
+/* The steps as one line of names: the passed ones muted, the user's own step in bold. */
+.crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); margin: 0; padding: 0; list-style: none; }
+.crumbs > li + li::before { content: "›"; margin-inline-end: var(--space-2); color: var(--color-text-tertiary); font-weight: var(--weight-regular); }
+.stop { color: var(--color-text-tertiary); font-size: var(--text-sm); line-height: var(--leading-tight); }
+.passed { color: var(--color-text-secondary); }
+.here { color: var(--color-text-primary); font-weight: var(--weight-semibold); }
+
+.cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1); margin-block: var(--space-1); }
+.cell { height: var(--space-3); border-radius: var(--radius-sm); background: var(--color-subtle); }
+.cellOn { background: var(--color-text-primary); animation: level-cell var(--duration-base) var(--ease-enter) backwards; }
+@keyframes level-cell { from { opacity: 0; transform: scaleY(0.4); } }

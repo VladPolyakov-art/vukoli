@@ -1,0 +1,39 @@
+/* Plan for the next session (layout D): a heading row and up to three one-line steps in a card. Tokens only. */
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.label { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.drill { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2) var(--space-4); }
+.hint { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.steps { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.step { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); }
+.num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.text { margin: 0; font-size: var(--text-md); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.title { font-weight: var(--weight-semibold); }
+.do { color: var(--color-text-secondary); }
+.links { color: var(--color-text-secondary); font-size: var(--text-sm); white-space: nowrap; }
+
+@container page (width < 640px) {
+  .step { grid-template-columns: auto minmax(0, 1fr); }
+  .links { grid-column: 2; white-space: normal; }
+}
+@container page (width < 560px) {
+  .drill { justify-content: stretch; width: 100%; }
+  .drill > button { width: 100%; }
+}

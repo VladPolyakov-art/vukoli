@@ -90,9 +90,12 @@ export function HomeView(props: HomeViewProps) {
       engine={props.engineBanner}
       browser={props.browserBanner}
       storage={props.storageError}
+      install={step === "start" && props.installCard}
       onRetryEngine={props.onRetryEngine}
       onUseTextMode={props.onUseTextMode}
       onDismissBrowser={props.onDismissBrowser}
+      onInstall={props.onInstall}
+      onDismissInstall={props.onDismissInstall}
     />
   );
   const dictation = props.dictation;

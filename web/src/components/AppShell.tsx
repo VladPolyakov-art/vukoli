@@ -5,7 +5,8 @@
  * Rail, top to bottom: app mark + name with the sidebar toggle · New practice (a round filled plus) · Archive (D80: replaced
  * History) · "Recents" = every chat not archived, newest first (one line each, no dates, a quiet EN marker for English; the
  * middle part scrolls; a "…" menu on hover or focus: Rename, Download as Markdown, Archive, Delete — Delete asks first,
- * then goes to Trash with Undo) · an "AI engine · Not ready" row (only when it is not ready: P6) · the account row (avatar
+ * then goes to Trash with Undo; a chat still being saved after End is the top row at once, its title shimmering and
+ * "2 of 5" in the trailing slot, until its debrief is ready, then one toast with "Open debrief") · an "AI engine · Not ready" row (only when it is not ready: P6) · the account row (avatar
  * with the initial, the user's name or "You", the engine in use) which opens a menu (Settings, Privacy and data, Help &
  * what's free; the theme lives in Settings → General since D80). Collapsed: toggle, round plus, archive, a warning icon
  * (only when not ready) and the avatar, each with a Tooltip. The rail is set off from the content by its fill, no line.
@@ -15,12 +16,12 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { Link, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 import { Badge, Button, Dialog, Drawer, Icon, IconButton, InlineRename, Menu, NavRow, Skeleton, Tooltip, ToastProvider, useToast } from "../ds";
 import type { LinkComponent, MenuEntry, ToastOptions } from "../ds";
-import { t, tp } from "../i18n";
+import { t } from "../i18n";
 import { api } from "../lib/api";
 import { pendingSave } from "../lib/pendingSave";
 import { prefs } from "../lib/prefs";
 import { errorMessage, useApp } from "../lib/store";
-import { railSessions, type RailSession } from "./railItems";
+import { pendingLabel, railSessions, withPending, type RailSession } from "./railItems";
 import { SESSIONS_CHANGED, TITLE_MAX } from "../screens/debrief/rename";
 import { LogoMark, Wordmark } from "./Wordmark";
 import { engineShort } from "./engine/meta";
@@ -318,6 +319,31 @@ function ChatRow({ item, current, menuOpen, actions, onNavigate }: {
     { id: "open", track: "rail-row-open", label: t("rail.rowOpen"), icon: "chat", onSelect: () => { navigate(`/sessions/${encodeURIComponent(item.id)}`); onNavigate?.(); } },
   ];
   const label = t("rail.rowActions", { title: item.title });
+  // A chat still being saved after End: its title shimmers, the numbers sit in the trailing slot, and it has no "…" menu
+  // yet (there is nothing to rename, archive or delete until it is on disk).
+  if (item.pending) {
+    return (
+      <li className={s.chatItem} data-pending="true">
+        <NavRow
+          href={`/sessions/${encodeURIComponent(item.id)}`}
+          label={item.title}
+          loading
+          end={(
+            <>
+              {item.progress && item.progress.stage === "feedback"
+                ? <span className={s.track}>{t("rail.pendingProgress", { done: item.progress.done, n: item.progress.total })}</span>
+                : item.track === "english" ? <span className={s.track} title={t("rail.english")}>EN</span> : null}
+              <span className="visually-hidden">{pendingLabel(item.progress)}</span>
+            </>
+          )}
+          current={current}
+          linkAs={RouterLink}
+          track="rail-session-pending"
+          className={s.chat}
+        />
+      </li>
+    );
+  }
   if (renaming && actions) {
     return (
       <li className={s.chatItem}>
@@ -452,64 +478,61 @@ export function AppShell({ children }: { children: ReactNode }) {
 const SAVE_POLL_MS = 2000;
 const SAVE_WAIT_MS = 3 * 60_000;
 
-/** D96: what the "saving" toast says. Before the server reports progress: "Saving…"; then "Preparing feedback · 2 of 5
- * answers"; the debrief last. It reads the shell's progress store itself (the toast has no update call), and the
- * numbers are not a live region of their own: the toast announces a change once, politely. */
-export function SavingMessage() {
-  const progress = useSyncExternalStore(pendingSave.subscribe, pendingSave.getProgress, pendingSave.getProgress);
-  const text = !progress ? t("session.afterEnd.saving")
-    : progress.stage === "debrief" ? t("session.debriefPending")
-      : tp("session.afterEnd.preparing", progress.total, { done: progress.done });
-  return <span className="shimmer-text">{text}</span>;
-}
-
-/** D73 toasts, shared with the review frames: "Saving…" stays (shimmer: real work is going on), "saved" offers the debrief. */
-export const savingToast = (): ToastOptions => ({ message: <SavingMessage />, duration: null });
+/** The "ready" toast shared with the review frames: the debrief is ready, "Open debrief" goes to it. While the session is
+ * being saved there is no toast: its row in Recents loads instead. */
 export const savedToast = (onOpen: () => void): ToastOptions => ({
   message: t("session.afterEnd.ready"), action: { label: t("session.afterEnd.open"), onClick: onOpen },
 });
 
-/** The page of a saved session (its debrief). UT-4: the "saved" toast is not shown there and leaves when the user gets there. */
+/** The page of a saved session. UT-4: the "ready" toast is not shown there and leaves when the user gets there (the
+ * pathname alone decides; the page may carry a `?view=` on top). */
 export const sessionPath = (id: string) => `/sessions/${encodeURIComponent(id)}`;
 export const onSessionPage = (pathname: string, id: string) => pathname === sessionPath(id);
+/** Where "Open debrief" goes: the session page on its debrief view. */
+export const debriefPath = (id: string) => `${sessionPath(id)}?view=debrief`;
 
-/** D73: the toast for a session being saved after End (lib/pendingSave). It stays while the server saves the session
- * and writes the debrief, then says it is ready, with the way in. Polled: the session's socket is gone by then. */
+/** D73: the watch over sessions being saved after End (lib/pendingSave). Each one is polled (its socket is gone by then):
+ * its row in Recents loads while the server saves it and writes the debrief (the numbers go to the store for the row),
+ * then one toast says it is ready, with the way in. Every session has its own watch, so a new practice started meanwhile
+ * inherits nothing of an older one. */
 function useSaveWatch(toast: ReturnType<typeof useToast>, loadRecent: () => Promise<void>, navigate: NavigateFunction, pathname: string) {
-  const pending = useSyncExternalStore(pendingSave.subscribe, pendingSave.get);
+  const pending = useSyncExternalStore(pendingSave.subscribe, pendingSave.getAll);
   const pathRef = useRef(pathname);
   pathRef.current = pathname;
-  const saved = useRef<{ id: string; toast: number } | null>(null);
-  // UT-4: reaching the debrief (from Recents or the toast) closes the "saved" toast.
+  const latest = useRef({ toast, loadRecent, navigate });
+  latest.current = { toast, loadRecent, navigate };
+  const watching = useRef(new Map<string, () => void>());
+  const ready = useRef(new Map<string, number>());
+  // UT-4: reaching the debrief (from Recents or the toast) closes its "ready" toast.
   useEffect(() => {
-    if (saved.current && onSessionPage(pathname, saved.current.id)) {
-      toast.dismiss(saved.current.toast);
-      saved.current = null;
+    for (const [id, toastId] of ready.current) {
+      if (onSessionPage(pathname, id)) {
+        toast.dismiss(toastId);
+        ready.current.delete(id);
+      }
     }
   }, [pathname, toast]);
-  useEffect(() => {
-    if (!pending) return;
-    const { id, at } = pending;
+
+  const watch = useCallback((id: string, at: number) => {
     let stopped = false;
     let listed = false;
     let timer = 0;
-    const saving = toast.show(savingToast());
     const finish = (ok: boolean) => {
       stopped = true;
-      toast.dismiss(saving);
       pendingSave.clear(id);
-      void loadRecent();
-      if (!ok) toast.show({ message: t("session.afterEnd.failed"), tone: "error" });
-      else if (!onSessionPage(pathRef.current, id)) saved.current = { id, toast: toast.show(savedToast(() => navigate(sessionPath(id)))) };
+      const { toast: tt, loadRecent: reload, navigate: go } = latest.current;
+      void reload();
+      if (!ok) tt.show({ message: t("session.afterEnd.failed"), tone: "error" });
+      else if (!onSessionPage(pathRef.current, id)) ready.current.set(id, tt.show(savedToast(() => go(debriefPath(id)))));
     };
     const poll = async () => {
       const late = Date.now() - at > SAVE_WAIT_MS;
       try {
         const record = await api.session(id);
         if (stopped) return;
-        // Saved: it shows in Recents now; the toast waits for the feedback and the debrief (D96: minutes, not seconds;
+        // Saved: the server lists it now; the toast waits for the feedback and the debrief (D96: minutes, not seconds;
         // the server marks the record `post_call` until it is done, and closes it itself if its job died).
-        if (!listed) { listed = true; void loadRecent(); }
+        if (!listed) { listed = true; void latest.current.loadRecent(); }
         if (record.post_call) {
           pendingSave.setProgress(id, { done: record.post_call.done, total: record.post_call.total, stage: record.post_call.stage });
         } else if (record.debrief || late) { finish(true); return; }
@@ -523,9 +546,24 @@ function useSaveWatch(toast: ReturnType<typeof useToast>, loadRecent: () => Prom
     return () => {
       stopped = true;
       window.clearTimeout(timer);
-      toast.dismiss(saving);
     };
-  }, [pending, toast, loadRecent, navigate]);
+  }, []);
+
+  useEffect(() => {
+    for (const entry of pending) {
+      if (!watching.current.has(entry.id)) watching.current.set(entry.id, watch(entry.id, entry.at));
+    }
+    for (const [id, stop] of watching.current) {
+      if (!pending.some((x) => x.id === id)) { stop(); watching.current.delete(id); }
+    }
+  }, [pending, watch]);
+  useEffect(() => {
+    const running = watching.current;
+    return () => {
+      running.forEach((stop) => stop());
+      running.clear();
+    };
+  }, []);
 }
 
 function LiveShell({ children }: { children: ReactNode }) {
@@ -553,6 +591,14 @@ function LiveShell({ children }: { children: ReactNode }) {
   ), []);
 
   useSaveWatch(toast, loadRecent, navigate, location.pathname);
+  // Sessions still being saved after End are the top rows of Recents at once, loading (lib/pendingSave).
+  const pending = useSyncExternalStore(pendingSave.subscribe, pendingSave.getAll);
+  const progress = useSyncExternalStore(pendingSave.subscribe, pendingSave.getProgress);
+  const shown = useMemo<RecentState>(() => {
+    if (!pending.length) return recent;
+    const listed = recent.status === "ready" ? recent.items : [];
+    return { status: "ready", items: withPending(listed, pending, progress, t("rail.untitled")) };
+  }, [recent, pending, progress]);
 
   // Recents: refetched on every navigation (a session may have been added, renamed or trashed), and when a screen
   // changed a chat in place (rename in the debrief, Undo from a toast).
@@ -634,7 +680,7 @@ function LiveShell({ children }: { children: ReactNode }) {
     <AppShellView
       current={navFor(location.pathname)}
       currentSessionId={sessionId}
-      recent={recent}
+      recent={shown}
       engine={engine}
       drawerOpen={drawerOpen}
       onDrawerOpenChange={setDrawerOpen}

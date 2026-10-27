@@ -3,30 +3,30 @@ import type { ReactNode } from "react";
 import { Button } from "./Button";
 import { OverlayRoot } from "./OverlayRoot";
 import { Toast, ToastProvider, useToast } from "./Toast";
-import { t } from "../i18n";
+import { t, tp } from "../i18n";
 
+/* The toasts the app really shows (components/AppShell.tsx, screens/History.tsx, screens/Debrief.tsx): a neutral one
+ * with "Undo" after archive, delete and move-back; an error; and the two after End (saving, then saved + "Open debrief").
+ * D79: no "Saved" toasts for things the screen already shows (a rename, a setting). */
 const meta: Meta = { title: "DS/Toast" };
 export default meta;
 
-/** Neutral with an action (open and static). */
+/** Neutral with an action (open and static): Archive, Delete and "Move back to Recents" all end in "Undo". */
 export const Neutral: StoryObj = {
-  render: () => <Toast inline message="Moved to Trash." action={{ label: "Undo", onClick: () => {} }} onDismiss={() => {}} />,
+  render: () => <Toast inline message={t("rail.archived")} action={{ label: t("common.undo"), onClick: () => {} }} onDismiss={() => {}} />,
 };
-
-/** Message only. */
-export const MessageOnly: StoryObj = { render: () => <Toast inline message="Title saved." /> };
 
 /** System error: stays until dismissed, role="alert". */
 export const ErrorTone: StoryObj = {
-  render: () => <Toast inline tone="error" message="Couldn't move the session to Trash. Check that the app server is running." onDismiss={() => {}} />,
+  render: () => <Toast inline tone="error" message={t("rail.renameFailed")} onDismiss={() => {}} />,
 };
 
 function Buttons() {
   const toast = useToast();
   return (
     <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", padding: "var(--space-4)" }}>
-      <Button size="sm" onClick={() => toast.show({ message: "Moved to Trash.", action: { label: "Undo", onClick: () => toast.show({ message: "Restored." }) } })}>Move to Trash</Button>
-      <Button size="sm" onClick={() => toast.show({ tone: "error", message: "Couldn't save the title. Try again." })}>Show an error</Button>
+      <Button size="sm" onClick={() => toast.show({ message: t("rail.archived"), action: { label: t("common.undo"), onClick: () => toast.show({ message: t("history.toast.unarchived") }) } })}>{t("rail.rowArchive")}</Button>
+      <Button size="sm" onClick={() => toast.show({ tone: "error", message: t("rail.renameFailed") })}>Show an error</Button>
     </div>
   );
 }
@@ -48,9 +48,24 @@ export const Interactive: StoryObj = {
   ),
 };
 
-/** D73/D74: after End the shell goes Home and says the session is being saved (stays, shimmer while real work runs)… */
+/* D73/D74/D96: after End the shell goes Home and says the session is being saved. The toast stays (`duration: null`) and its
+ * text follows the real work, in a shimmer: "Saving your session…" → "Preparing feedback · 2 of 5 answers" → "Writing your
+ * debrief…" (SavingMessage in AppShell.tsx). */
+const shimmer = (text: string): ReactNode => <span className="shimmer-text">{text}</span>;
+
+/** D73/D74: first the session is being saved (stays, shimmer while real work runs)… */
 export const AfterEndSaving: StoryObj = {
-  render: () => <Toast inline message={<span className="shimmer-text">{t("session.afterEnd.saving")}</span>} onDismiss={() => {}} />,
+  render: () => <Toast inline message={shimmer(t("session.afterEnd.saving"))} onDismiss={() => {}} />,
+};
+
+/** D96: …then the feedback for each answer, with a live count… */
+export const AfterEndPreparing: StoryObj = {
+  render: () => <Toast inline message={shimmer(tp("session.afterEnd.preparing", 5, { done: 2 }))} onDismiss={() => {}} />,
+};
+
+/** D96: …then the debrief is being written… */
+export const AfterEndDebrief: StoryObj = {
+  render: () => <Toast inline message={shimmer(t("session.debriefPending"))} onDismiss={() => {}} />,
 };
 
 /** …then that it is ready, with the way to the debrief. */

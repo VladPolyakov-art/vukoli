@@ -6,16 +6,17 @@ export default meta;
 
 const noop = () => {};
 
-/** Size md: a History row. Enter saves, Esc cancels. */
+/** Size md: a chat row in the sidebar (Rename in the "…" menu). The field takes the row, `label="Chat name"`, `max` 80.
+ * The Archive rows rename the same way (see ListRow → Renaming). Enter saves, Esc cancels. */
 export const Medium: StoryObj = {
   render: () => (
-    <div style={{ width: 560, maxWidth: "100%" }}>
-      <InlineRename value="Lumen Health · HR screen, first try" onSave={noop} onCancel={noop} autoFocus={false} />
+    <div style={{ width: 208, padding: "var(--space-2)", background: "var(--color-sidebar)", borderRadius: "var(--radius-lg)" }}>
+      <InlineRename value="Kestrel Pay · Senior Product Designer" label="Chat name" max={80} onSave={noop} onCancel={noop} autoFocus={false} />
     </div>
   ),
 };
 
-/** Size lg: the Debrief H1. */
+/** Size lg: the Debrief title (its H1), default label "Session title". */
 export const Large: StoryObj = {
   render: () => (
     <div style={{ width: 720, maxWidth: "100%" }}>

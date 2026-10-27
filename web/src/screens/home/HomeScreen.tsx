@@ -17,6 +17,7 @@ import { browserSttSupported } from "../../audio/browserStt";
 import { useDictation } from "../../audio/dictation";
 import { api, ApiError, fileToBase64 } from "../../lib/api";
 import { useInterval, useLoad } from "../../lib/hooks";
+import { useInstallOffer } from "../../lib/installApp";
 import { prefs } from "../../lib/prefs";
 import { useApp } from "../../lib/store";
 import { homeUtScreen, useUtScreen } from "../../lib/utScreen";
@@ -85,6 +86,7 @@ export function HomeScreen() {
   const [textMode, setTextMode] = useState(prefs.input() === "text");
   const [browserDismissed, setBrowserDismissed] = useState(browserBannerDismissed);
   const [editor, setEditor] = useState<EditorState>({ open: false, editId: null });
+  const installOffer = useInstallOffer();
 
   // "Start over" (home.md §4.1): the Practice nav row (a new location on "/") returns to the start screen.
   useEffect(() => { setSetup(null); }, [location.key]);
@@ -298,6 +300,7 @@ export function HomeScreen() {
         browserBanner={unsupportedSpeech && !browserDismissed && !textMode}
         textMode={textMode}
         storageError={Boolean(sessions.error)}
+        installCard={installOffer.showCard}
         suggestions={loading ? [] : suggestionsFor(ctx)}
         quickStart={quick ? { detail: quick.detail, answer: quick.answer, wait: quickWaits } : loading && track === "interview" ? { detail: "" } : null}
         onQuickStart={quickStart}
@@ -339,6 +342,8 @@ export function HomeScreen() {
         onUseTextMode={() => { prefs.setInput("text"); setTextMode(true); }}
         onDismissBrowser={() => { browserBannerDismissed = true; setBrowserDismissed(true); }}
         onRetryEngine={() => { void refreshEngines(); }}
+        onInstall={() => { void installOffer.install(); }}
+        onDismissInstall={installOffer.dismiss}
         overlay={(
           <VacancyEditor
             open={editor.open}

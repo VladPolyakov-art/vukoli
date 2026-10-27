@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { IconButton } from "./Button";
+import { MicButton } from "./MicButton";
 import { Tooltip } from "./Tooltip";
 
 const meta: Meta = { title: "DS/Tooltip" };
@@ -31,11 +32,41 @@ export const OnlyWhenTruncated: StoryObj = {
   ),
 };
 
-/** A short label on an icon button (describes it: aria-describedby). Delay on hover, none on keyboard focus. */
-export const OnIconButton: StoryObj = {
+/** The rail's icon buttons (their name is the tooltip, so the native `title` is off). Each tip is forced open here;
+ * in the app it shows on hover (after `--duration-slow`) or keyboard focus. Placements: the sidebar toggle `bottom-end`
+ * expanded, `bottom-start` collapsed; New practice and Archive `bottom-start`; the engine warning and the account
+ * `top-start` (they sit at the bottom of the rail, the tip opens upward). */
+export const RailPlacements: StoryObj = {
   render: () => (
-    <Tooltip content="Saved on this computer only">
-      <IconButton icon="lock" label="Storage" />
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 11rem)", gap: "var(--space-4)", alignItems: "center", minHeight: "9rem", paddingBlock: "var(--space-8)" }}>
+      <Tooltip content="Close sidebar" placement="bottom-end" open>
+        <IconButton icon="sidebar" size="sm" label="Close sidebar" title={undefined} />
+      </Tooltip>
+      <Tooltip content="Open sidebar" placement="bottom-start" open>
+        <IconButton icon="sidebar" size="sm" label="Open sidebar" title={undefined} />
+      </Tooltip>
+      <Tooltip content="New practice" placement="bottom-start" open>
+        <IconButton icon="plus" size="sm" label="New practice" title={undefined} />
+      </Tooltip>
+      <Tooltip content="AI engine: Not ready" placement="top-start" open>
+        <IconButton icon="alert" size="sm" label="AI engine: Not ready" title={undefined} />
+      </Tooltip>
+      <Tooltip content="Alex · Ollama" placement="top-start" open>
+        <IconButton icon="user" size="sm" label="Alex. Account menu" title={undefined} />
+      </Tooltip>
+    </div>
+  ),
+};
+
+/** The Session island status: "Question 2 of 5" and the timer carry the session context in a tooltip
+ * (title · round · strictness), hover only. */
+export const IslandStatus: StoryObj = {
+  render: () => (
+    <Tooltip content="Kestrel Pay · Senior Product Designer · Behavioural · Standard" open inline placement="top-start">
+      <span style={{ display: "inline-flex", gap: "var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
+        <span>Question 2 of 5</span>
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>07:12</span>
+      </span>
     </Tooltip>
   ),
 };
@@ -43,8 +74,17 @@ export const OnIconButton: StoryObj = {
 /** `size="lg"` (D75): a message the user must notice — the muted-speech tip over the mic in a session. One line, 16 px, rounded. */
 export const Large: StoryObj = {
   render: () => (
-    <Tooltip content="You're talking, but the microphone is muted. Press M to unmute." open inline size="lg">
-      <IconButton icon="micOff" label="Unmute" />
+    <Tooltip content="You're talking, but the microphone is muted. Press M to unmute." open inline size="lg" placement="top-start">
+      <MicButton label="Unmute" muted live />
+    </Tooltip>
+  ),
+};
+
+/** `disabled`: never shows, even on hover. The collapsed rail's account button while its menu is open. */
+export const Disabled: StoryObj = {
+  render: () => (
+    <Tooltip content="Alex · Ollama" placement="top-start" disabled>
+      <IconButton icon="user" size="sm" label="Alex. Account menu" title={undefined} />
     </Tooltip>
   ),
 };

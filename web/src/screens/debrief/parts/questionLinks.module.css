@@ -1,0 +1,10 @@
+/* Question links (D98): "1, 2, 3" with the comma against its number. The DS link button keeps its 24px target (WCAG
+ * 2.5.8); its side padding and the empty space of the 24px box are pulled back with an equal negative margin so the
+ * comma sits right after the digit. The target stays; only the empty space around the digit stops pushing text away. */
+.links { display: inline; min-width: 0; }
+.unit { white-space: nowrap; }
+.num {
+  min-width: 0;
+  padding-inline: var(--space-2);
+  margin-inline: calc(-1 * var(--space-2));
+}

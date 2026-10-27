@@ -5,7 +5,15 @@
   background: var(--color-raised);
   color: var(--color-text-primary);
   box-shadow: var(--shadow-overlay);
-  overflow: auto;
+  /* D101: an info Callout / EmptyState disc inside an island falls back to the sunken grey, no shadow. */
+  --note-fill: var(--color-subtle);
+  --note-shadow: none;
+  /* Card tone="subtle" inside a Dialog keeps the chip grey: the dialog is white already. */
+  --plaque-fill: var(--color-surface-chip);
+  --plaque-shadow: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   /* The actions row adapts to the dialog's own width (full width minus gutters on a phone). */
   container: dialog / inline-size;
 }
