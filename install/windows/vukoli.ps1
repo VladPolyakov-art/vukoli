@@ -34,6 +34,10 @@ $venvPy = Join-Path $prefix 'venv\Scripts\python.exe'
 $logDir = Join-Path $prefix 'logs'
 $logFile = Join-Path $logDir 'server.log'
 $pidFile = Join-Path $prefix 'server.pid'
+# The app window uses its own browser profile: no extensions in it, so none of them can read what you type in Vukoli and
+# the window shows no extension icons. VUKOLI_OWN_PROFILE=0 uses your normal profile instead.
+$browserDir = Join-Path $prefix 'browser'
+$ownProfile = ($env:VUKOLI_OWN_PROFILE -ne '0')
 
 $port = 8000
 if ($env:IC_PORT -and ($env:IC_PORT.Trim() -match '^\d+$')) { $port = [int]$env:IC_PORT.Trim() }
@@ -183,6 +187,8 @@ function Find-InstalledApp {
                 if ($lnk.Arguments -notmatch '--app-id=') { continue }
                 # Edge also records the address; skip an app installed from another port
                 if ($lnk.Arguments -match '--app-url=(\S+)' -and -not $Matches[1].Trim('"').StartsWith($url)) { continue }
+                # With the own profile, only an app installed from that profile counts (one from the normal profile has extensions)
+                if ($ownProfile -and $lnk.Arguments -notlike ('*' + $browserDir + '*')) { continue }
                 return $f.FullName
             } catch { $null = $_ }
         }
@@ -192,8 +198,8 @@ function Find-InstalledApp {
 
 function Open-Browser {
     if ($noBrowser) { Write-Host ('Vukoli is running: {0}' -f $url); return }
-    # Own window in the normal browser profile, so the microphone permission is remembered: the installed app first,
-    # else Chromium app mode
+    # Own window in Vukoli's own browser profile (kept across updates, so the microphone permission is remembered): the
+    # app installed from that profile first, else Chromium app mode
     if (-not $useTab) {
         $installed = Find-InstalledApp
         if ($installed) {
@@ -202,7 +208,12 @@ function Open-Browser {
         $exe = Find-Chromium
         if ($exe) {
             try {
-                Start-Process -FilePath $exe -ArgumentList @("--app=$url", '--window-size=1280,860')
+                $browserArgs = @()
+                if ($ownProfile) {
+                    if (-not (Test-Path -LiteralPath $browserDir)) { $null = New-Item -ItemType Directory -Path $browserDir -Force }
+                    $browserArgs = @(('--user-data-dir="{0}"' -f $browserDir), '--no-first-run', '--no-default-browser-check', '--disable-extensions')
+                }
+                Start-Process -FilePath $exe -ArgumentList ($browserArgs + @("--app=$url", '--window-size=1280,860'))
                 return
             } catch { $null = $_ }
         }

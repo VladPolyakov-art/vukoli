@@ -254,7 +254,7 @@ do_uninstall() {
   fi
   rm -f "$HOME/.local/share/applications/vukoli.desktop" 2>/dev/null || true
   local d
-  for d in app venv python uv cache logs bin .download .stage; do
+  for d in app venv python uv cache logs bin browser .download .stage; do
     if [ -e "$PREFIX/$d" ]; then rm -rf "${PREFIX:?}/$d"; fi
   done
   rm -f "$PREFIX/install-state" "$PREFIX/install-state.tmp" "$PREFIX/server.pid"
