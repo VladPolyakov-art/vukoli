@@ -7,6 +7,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button, Callout, EmptyState, motionMemory } from "../ds";
 import { t, tMaybe } from "../i18n";
 import { api } from "../lib/api";
+import { shouldAskAfterSession } from "../lib/feedback";
+import { feedbackUi } from "../lib/feedbackUi";
 import { useElapsed } from "../lib/hooks";
 import { pendingSave } from "../lib/pendingSave";
 import { useStorageWritable } from "../lib/storageProbe";
@@ -103,16 +105,29 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
    * Home at once, any mode; the session is a loading row at the top of Recents until its debrief is ready, then a toast
    * opens it (lib/pendingSave, AppShell). Without an answer nothing is saved: stay for that message. */
   const handedOff = useRef(false);
+  /* US-60: only the user's own End can open "How did it go?" (AC2); a session the server ended is counted, not asked. */
+  const endedByUser = useRef(false);
   const handOff = () => {
     const id = state.sessionId;
     if (handedOff.current || !id || userTurns === 0 || !storageOk) return false;
     handedOff.current = true;
     pendingSave.start(id, { title, track: english ? "english" : "interview" });
     navigate("/", { replace: true });
+    // The session reached its debrief: count it, and ask when it is the 1st or the 6th, 11th… (lib/feedback.isAskTurn).
+    const asked = endedByUser.current;
+    if (asked) feedbackUi.hold();   // the debrief toast waits for the answer (lib/feedbackUi)
+    api.sessionFinished(id).then(
+      (r) => {
+        if (asked && shouldAskAfterSession(r.count, r.ask, r.configured)) feedbackUi.openSession(id);
+        else if (asked) feedbackUi.release();
+      },
+      () => { if (asked) feedbackUi.release(); },
+    );
     return true;
   };
   const end = () => {
     const leave = state.phase === "live" || state.phase === "connecting" || !!state.interrupted;
+    endedByUser.current = true;
     actions.end();
     if (leave) handOff();
   };

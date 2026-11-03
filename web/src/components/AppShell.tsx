@@ -18,11 +18,13 @@ import { Badge, Button, Dialog, Drawer, Icon, IconButton, InlineRename, Menu, Na
 import type { LinkComponent, MenuEntry, ToastOptions } from "../ds";
 import { t } from "../i18n";
 import { api } from "../lib/api";
+import { feedbackUi } from "../lib/feedbackUi";
 import { pendingSave } from "../lib/pendingSave";
 import { prefs } from "../lib/prefs";
 import { errorMessage, useApp } from "../lib/store";
 import { pendingLabel, railSessions, withPending, type RailSession } from "./railItems";
 import { SESSIONS_CHANGED, TITLE_MAX } from "../screens/debrief/rename";
+import { FeedbackHost } from "./FeedbackHost";
 import { LogoMark, Wordmark } from "./Wordmark";
 import { engineShort } from "./engine/meta";
 import s from "./AppShell.module.css";
@@ -407,6 +409,7 @@ function Account({ collapsed, defaultOpen, onNavigate, name, engine }: {
     { id: "sep", separator: true },
     { id: "privacy", track: "nav-privacy", label: t("settings.section.privacy"), icon: "lock", onSelect: go("/settings/privacy") },
     { id: "help", track: "nav-help", label: t("rail.help"), icon: "info", onSelect: go("/settings/about#free") },
+    { id: "feedback", track: "nav-feedback", label: t("support.menu"), icon: "chat", onSelect: () => { feedbackUi.openSupport(); onNavigate?.(); } },
   ];
   return (
     <Menu
@@ -520,10 +523,17 @@ function useSaveWatch(toast: ReturnType<typeof useToast>, loadRecent: () => Prom
     const finish = (ok: boolean) => {
       stopped = true;
       pendingSave.clear(id);
-      const { toast: tt, loadRecent: reload, navigate: go } = latest.current;
+      const { toast: tt, loadRecent: reload } = latest.current;
       void reload();
       if (!ok) tt.show({ message: t("session.afterEnd.failed"), tone: "error" });
-      else if (!onSessionPage(pathRef.current, id)) ready.current.set(id, tt.show(savedToast(() => go(debriefPath(id)))));
+      else if (!onSessionPage(pathRef.current, id)) {
+        // A toast shown over a modal is carried into it and lost when it closes: if "How did it go?" is open (or about to), the toast waits for it to close.
+        const show = () => {
+          if (onSessionPage(pathRef.current, id)) return;
+          ready.current.set(id, latest.current.toast.show(savedToast(() => latest.current.navigate(debriefPath(id)))));
+        };
+        feedbackUi.onceClosed(show);
+      }
     };
     const poll = async () => {
       const late = Date.now() - at > SAVE_WAIT_MS;
@@ -677,21 +687,24 @@ function LiveShell({ children }: { children: ReactNode }) {
   }), [drop, fail, loadRecent, toast]);
 
   return (
-    <AppShellView
-      current={navFor(location.pathname)}
-      currentSessionId={sessionId}
-      recent={shown}
-      engine={engine}
-      drawerOpen={drawerOpen}
-      onDrawerOpenChange={setDrawerOpen}
-      collapsed={collapsed}
-      onCollapsedChange={setCollapsed}
-      actions={actions}
-      userName={settings?.name}
-      mainRef={mainRef}
-      rootRef={rootRef}
-    >
-      {children}
-    </AppShellView>
+    <>
+      <AppShellView
+        current={navFor(location.pathname)}
+        currentSessionId={sessionId}
+        recent={shown}
+        engine={engine}
+        drawerOpen={drawerOpen}
+        onDrawerOpenChange={setDrawerOpen}
+        collapsed={collapsed}
+        onCollapsedChange={setCollapsed}
+        actions={actions}
+        userName={settings?.name}
+        mainRef={mainRef}
+        rootRef={rootRef}
+      >
+        {children}
+      </AppShellView>
+      <FeedbackHost />
+    </>
   );
 }

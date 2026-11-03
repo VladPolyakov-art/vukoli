@@ -349,3 +349,22 @@ asked the next question (see Turns). Times are measured from the moment the serv
 **Gemini Live.** Same messages; Mike's voice and both transcripts come from Gemini, `speech_preview` and
 `user_transcript` are not sent (user captions arrive as `transcript_delta` with `speaker: "user"`), feedback uses
 the Gemini text model, and delivery metrics are text-mode (no word timings).
+
+## REST: in-app feedback (US-60, D102)
+
+Not part of the socket; listed here because it is the only call the server makes on its own account to a service that is
+not the user's engine. It happens only when the user presses Send in "Send feedback" or "How did it go?".
+
+| Call | Body | Answer |
+|---|---|---|
+| `GET /api/feedback/config` | - | `{configured, issues_url, app_line}`. `configured` is false until `IC_FEEDBACK_URL` (or `config.FEEDBACK_URL`) holds an https address (http only for localhost). `app_line` is the exact line "Attach app version..." adds. |
+| `POST /api/feedback` | `{kind: "idea"\|"problem"\|"other"\|"session", message, rating?: 1..5, email?, attach_meta, session_id?}` | `{sent: true}`, or an error: `not_configured` (409), `network` / `service_error` (502), `empty_message` / `bad_email` / validation (422). Same Origin guard as the other POSTs. |
+| `POST /api/feedback/session-finished` | `{session_id}` | `{count, ask, configured}`: counts a finished session that reached its debrief (once per id) and says whether the "How did it go?" dialog is due (`count` is 1, 6, 11, ... and the Settings switch is on). |
+
+What leaves the computer is built on the server from these fields only, as JSON with `Accept: application/json` and a
+10 s timeout (no redirects followed): `{kind, message, rating?, email?, app?}`. `app` is
+`Vukoli <version> · <OS> · <engine name>` and is present only when `attach_meta` is true. No path, user name, key, answer,
+transcript, CV or job is ever included; `session_id` is accepted but not forwarded. The settings `feedback_ask` (default
+true), `sessions_finished` and `sessions_counted_last` live in `settings.json`; only `feedback_ask` is editable
+(Settings, Privacy and data). Test mode (`IC_E2E=1`) replaces the service with a stand-in that remembers the payloads:
+`GET` / `POST /api/_e2e/feedback`, no request ever leaves the machine.

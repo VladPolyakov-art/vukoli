@@ -84,6 +84,10 @@ PORT = int(os.getenv("IC_PORT", "8000"))
 DEV_ORIGINS = {o.strip().rstrip("/") for o in os.getenv(
     "IC_DEV_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()}
 
+# US-60 (D102): the form service for in-app feedback, the owner's Formspree form (https). IC_FEEDBACK_URL overrides it;
+# with neither, "Send feedback" offers Copy text and the GitHub issues link.
+FEEDBACK_URL = "https://formspree.io/f/xgaarepw"
+
 DEFAULT_SETTINGS: dict[str, Any] = {
     "engine": "ollama",                       # ollama | openai_compatible | claude_cli | codex_cli | antigravity_cli | gemini_live
     # "" url = env OLLAMA_URL or localhost; "" model = chosen by RAM; "" voice_model = qwen3:4b-instruct
@@ -109,6 +113,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "questions_per_session": 5,
     "name": "",                               # how Mike addresses the user (D80); "" = no name
     "disconnected": [],                       # local engines switched off with Disconnect (D84)
+    "feedback_ask": True,                     # D102: ask "How did it go?" after the 1st finished session, then every 5th
+    "sessions_finished": 0,                   # sessions that reached their debrief (the counter behind that rule)
+    "sessions_counted_last": "",              # the last session counted, so one session is not counted twice in a row
 }
 SECRET_PATHS = [("openai_compatible", "api_key"), ("gemini_live", "api_key")]
 ENGINES = ("ollama", "openai_compatible", "claude_cli", "codex_cli", "antigravity_cli", "gemini_live")
@@ -158,6 +165,12 @@ def _validate(settings: dict) -> dict:
         settings["kokoro_speed"] = 1.0
     settings["answer_suggester"] = bool(settings.get("answer_suggester"))
     settings["telemetry_opt_in"] = bool(settings.get("telemetry_opt_in"))
+    settings["feedback_ask"] = bool(settings.get("feedback_ask", True))
+    try:
+        settings["sessions_finished"] = max(0, int(settings.get("sessions_finished", 0)))
+    except (TypeError, ValueError):
+        settings["sessions_finished"] = 0
+    settings["sessions_counted_last"] = str(settings.get("sessions_counted_last") or "")[:80]
     # D80: one line, no control characters, at most 60 characters.
     settings["name"] = " ".join(str(settings.get("name") or "").split())[:60]
     for cli in ("claude_cli", "codex_cli", "antigravity_cli"):

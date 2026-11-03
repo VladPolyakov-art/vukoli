@@ -1,0 +1,45 @@
+/* "How did it go?" after End (US-60 AC2): five steps, a note, Send / Not now. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+/* As wide as the five steps, so "Rough" and "Great" sit under the first and the last. */
+.scale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-self: flex-start;
+}
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--color-text-secondary);
+}
+.note {
+  color: var(--color-text-secondary);
+}
+.sent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.sentIcon {
+  display: inline-flex;
+  flex: none;
+  padding-top: var(--space-1);
+  color: var(--color-text-secondary);
+}
+.sentText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.sentTitle {
+  font-weight: var(--weight-semibold);
+}
+.sentBody {
+  color: var(--color-text-secondary);
+}

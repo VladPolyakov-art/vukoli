@@ -18,6 +18,7 @@ import { EnginePanel } from "../components/EnginePanel";
 import { ProfileEditor } from "../components/ProfileEditor";
 import { browserSttSupported } from "../audio/browserStt";
 import { api } from "../lib/api";
+import { feedbackUi } from "../lib/feedbackUi";
 import { useLoad } from "../lib/hooks";
 import { iconPlace, useInstallOffer } from "../lib/installApp";
 import { prefs, type PausePref } from "../lib/prefs";
@@ -67,11 +68,13 @@ const SEARCH: SearchItem[] = [
   { id: "profile-cv", section: "general", label: "settings.profile.title", description: "settings.profile.hint", keywords: "resume cv upload pdf docx file profile" },
   { id: "general-theme", section: "general", label: "theme.label", description: "settings.appearance.themeHint", keywords: "dark light mode system appearance" },
   { id: "privacy-telemetry", section: "privacy", label: "settings.privacy.telemetry", description: "settings.privacy.telemetryHint", keywords: "analytics usage statistics" },
+  { id: "privacy-feedback-ask", section: "privacy", label: "support.settings.askLabel", description: "support.settings.askHint", keywords: "feedback rating survey ask rate session" },
   { id: "privacy-folder", section: "privacy", label: "settings.privacy.folder", description: "settings.privacy.folderHint", keywords: "storage files path disk" },
   { id: "privacy-obsidian", section: "privacy", label: "settings.privacy.obsidian", description: "settings.privacy.obsidianHint", keywords: "obsidian markdown export notes" },
   { id: "privacy-trash", section: "privacy", label: "settings.privacy.trash", description: "settings.privacy.trashHint", keywords: "deleted restore" },
   { id: "free", section: "about", label: "settings.about.freeTitle", description: "settings.about.freeIntro", keywords: "premium price cost" },
   { id: "about-setup", section: "about", label: "settings.about.setupRun", description: "settings.about.setupHint", keywords: "onboarding wizard start first run welcome" },
+  { id: "about-feedback", section: "about", label: "support.settings.aboutLabel", description: "support.settings.aboutHint", keywords: "feedback idea problem bug report contact support" },
   { id: "about-licence", section: "about", label: "settings.about.licenceTitle", description: "settings.about.licence", keywords: "agpl open source license" },
 ];
 
@@ -559,6 +562,10 @@ function PrivacySection() {
           )}>
           <Toggle label={t("settings.privacy.telemetry")} hideLabel track="settings-telemetry" checked={Boolean(info?.opt_in)} disabled={!info} onChange={(v) => setOpt(v)} />
         </SettingRow>
+        <SettingRow id="privacy-feedback-ask" label={t("support.settings.askLabel")} description={t("support.settings.askHint")}>
+          <Toggle label={t("support.settings.askLabel")} hideLabel track="settings-feedback-ask" checked={settings?.feedback_ask ?? true} disabled={!settings}
+            onChange={(v) => void save({ feedback_ask: v })} />
+        </SettingRow>
       </SettingGroup>
       <SettingGroup title={t("settings.privacy.files")} id="privacy-files-title">
         <SettingRow id="privacy-folder" layout="stack" label={t("settings.privacy.folder")} description={t("settings.privacy.folderHint")}>
@@ -651,6 +658,11 @@ function AboutSection() {
       <SettingGroup title={t("settings.about.setupTitle")} id="about-setup-title">
         <SettingRow id="about-setup" label={t("settings.about.setupRun")} description={t("settings.about.setupHint")}>
           <Button size="sm" variant="secondary" icon="refresh" data-track="settings-run-setup" onClick={() => navigate("/setup")}>{t("settings.about.setupRun")}</Button>
+        </SettingRow>
+      </SettingGroup>
+      <SettingGroup title={t("support.settings.aboutTitle")} id="about-feedback-title">
+        <SettingRow id="about-feedback" label={t("support.settings.aboutLabel")} description={t("support.settings.aboutHint")}>
+          <Button size="sm" variant="secondary" icon="chat" data-track="settings-send-feedback" onClick={() => feedbackUi.openSupport()}>{t("support.settings.aboutLabel")}</Button>
         </SettingRow>
       </SettingGroup>
       <div id="about-licence" className={s.anchor}>

@@ -23,6 +23,24 @@ export type EngineStatus = "ready" | "not_running" | "no_model" | "not_installed
 export async function resetApp(request: APIRequestContext) {
   const res = await request.post("/api/_e2e/reset");
   expect(res.ok()).toBeTruthy();
+  // US-60: "How did it go?" would open after the first session of every test; only feedback.spec turns it on.
+  await steerFeedback(request, { ask: false });
+}
+
+/** US-60: steer the stand-in for the feedback service and the "How did it go?" counter (see server/e2e.py). */
+export async function steerFeedback(
+  request: APIRequestContext,
+  body: { configured?: boolean; fail?: "network" | "service_error"; clear_fail?: boolean; sessions_finished?: number; ask?: boolean },
+) {
+  const res = await request.post("/api/_e2e/feedback", { data: body });
+  expect(res.ok()).toBeTruthy();
+}
+
+/** US-60: what the stand-in feedback service received (the payloads, exactly as the server built them). */
+export async function sentFeedback(request: APIRequestContext) {
+  const res = await request.get("/api/_e2e/feedback");
+  expect(res.ok()).toBeTruthy();
+  return ((await res.json()) as { sent: Record<string, unknown>[] }).sent;
 }
 
 /** A returning user: a CV, two jobs and three finished interviews (1, 8 and 15 days ago). */

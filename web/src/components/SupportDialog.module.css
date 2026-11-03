@@ -1,0 +1,32 @@
+/* Send feedback (US-60). One column: the form, or the "Thanks — sent" note. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.intro {
+  color: var(--color-text-secondary);
+}
+.sent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.sentIcon {
+  display: inline-flex;
+  flex: none;
+  padding-top: var(--space-1);
+  color: var(--color-text-secondary);
+}
+.sentText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.sentTitle {
+  font-weight: var(--weight-semibold);
+}
+.sentBody {
+  color: var(--color-text-secondary);
+}

@@ -39,6 +39,9 @@ No mock layer: screens talk to the real local server (`/api/*`, see `app/server/
 ## What 12d wired (ui-spec §10, decision D94)
 Interrupted (engine / voice) with Resume of the same saved session and continue in text · storage check (`/api/health` → `storage_ok`) in Session and Debrief · Edit what I said / recheck (live over WS, saved over REST) · Trash load error and Delete forever · Home greets by name · D80 naming in copy · Setup save errors · `beforeunload` guard · engine-specific interrupted copy · mic help opens by itself · `dvh` instead of `vh`. Status per item: `docs/ui-spec.md` §10 "Status at 12d".
 
+## Feedback (US-60, D102)
+In-app feedback: "Send feedback" (account menu, Settings → About) and "How did it go?" after End on the 1st finished session, then the 6th, 11th… The server builds the payload (text, kind, rating, email, and the line "Vukoli <version> · <OS> · <engine>" only when the box is ticked) and posts it to `IC_FEEDBACK_URL` only on Send; with no address set the form offers Copy text and the GitHub issues link. Endpoints and payload: `app/server/PROTOCOL.md` ("REST: in-app feedback"); screens and states: `docs/ui-spec.md` §1.9; e2e: `app/web/e2e/feedback.spec.ts` (test mode stands in for the service, `GET /api/_e2e/feedback`). `resetApp` in the e2e helpers turns the ask off so other specs are not interrupted after the first session.
+
 ## Run and check
 From `app/web`:
 - `npm run dev` (Vite) against a running server, or `npm run build` and the server serves `dist`.

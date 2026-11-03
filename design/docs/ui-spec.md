@@ -56,7 +56,7 @@ Prefix: `patterns-appshell--`. Review: `#sidebar-<state>`.
 | Recents | heading "Recents"; ChatRow per non-archived session | reloads on every route change and on the `ic:sessions-changed` event |
 | Row "…" menu ("Actions for {title}") | "Rename" · "Download as Markdown" · "Archive" · separator · "Delete" | Rename = InlineRename in the row (max 80) |
 | Engine not ready | row "AI engine" + "Not ready" → `/settings/engine`; collapsed: alert icon with a tooltip | only when the engine in use is not ready |
-| Account menu ("Account menu") | header: name (or "You") + "Saved on this computer"; items: Settings → `/settings`, Privacy → `/settings/privacy`, "Help & what's free" → `/settings/about#free` | placement right-end |
+| Account menu ("Account menu") | header: name (or "You") + "Saved on this computer"; items: Settings → `/settings`, Privacy → `/settings/privacy`, "Help & what's free" → `/settings/about#free`, "Send feedback" (icon `chat`) → opens the feedback dialog (§1.9) | placement right-end |
 | Top bar (`shell` < 1024) | "Open menu" button · wordmark · engine badge link (only when not ready) | the menu opens the rail in a left Drawer |
 
 | State | When | Sees | Story | Review |
@@ -175,7 +175,65 @@ Everything floating (Dialog, Drawer, Menu, Tooltip, Toast) renders through `Over
 | "Practice only: this app is for rehearsal, never for help during a real interview." | Settings → About |
 
 - Telemetry: one unticked checkbox on Setup's "It works" (US-44, US-02 AC7) and a toggle in Settings → Privacy.
+- Feedback (US-60): nothing is sent until the user presses Send; the line "Attach app version, system and AI engine" shows exactly what it adds (§1.9).
 - No account anywhere (US-28).
+
+### 1.9 Feedback (US-60 · F66, D102)
+
+- Code: `components/SupportDialog.tsx` (view `SupportDialogView`, live `SupportDialog`), `components/SessionAskDialog.tsx`, `components/FeedbackHost.tsx` (mounted once in `LiveShell`), `lib/feedbackUi.ts` (which dialog is open), `lib/feedback.ts` (pure rules).
+- Stories `patterns-feedback--support-*` and `--ask-*`. Server: `GET /api/feedback/config`, `POST /api/feedback`, `POST /api/feedback/session-finished` (`app/server/PROTOCOL.md`).
+- Both dialogs are native `Dialog`s of the DS (no new component); copy is `support.*` in `i18n/en.json`.
+
+**Where to open "Send feedback".**
+- Account menu: "Send feedback" (icon `chat`), last item.
+- Settings → About and what's free: group "Feedback", one `secondary` button "Send feedback". It opens over Settings and closes back to it.
+
+**Send feedback dialog.**
+
+| Part | Content | Rule |
+|---|---|---|
+| Intro | "Tell us what works, what doesn't, or what you'd like to see. Nothing is sent until you press Send." | — |
+| Type | ChipGroup (radio): Idea · Problem · Something else | default Idea |
+| Message | Textarea "Message", hint "Required. Don't include anything private: only this text is sent." | required; trimmed; max 4000 |
+| Email | Input "Email · optional", hint "Only if you'd like a reply." | sent only when filled; a bad address shows its error and does not send |
+| Attach | Checkbox "Attach app version, system and AI engine", **on** by default; the description is the exact line the server adds ("Vukoli 0.2.3 · macOS 15.3 · Ollama (local)"), or "Not attached." when off | no path, user name or key is ever in the line |
+| Actions | Cancel · primary Send (off until there is a message) | Enter in the email field sends (a form submit); in the message it adds a line |
+
+| State | Sees | Story |
+|---|---|---|
+| Empty / filled | form; Send off until a message | `support-empty`, `support-filled`, `support-no-metadata`, `support-bad-email` |
+| Checking | form, Send and the box off for a moment while the dialog asks the server whether it can send | `support-checking` |
+| Sending | form disabled, Send shows a spinner | `support-sending` |
+| Sent | "Thanks — sent" + "Your message reached the people who make Vukoli." + Close | `support-sent` |
+| Error (AC5) | red Callout "Not sent" + the reason (no connection / the service did not accept it / generic); the text stays; "Copy text" on the left, Cancel, primary "Try again" | `support-error`, `support-network-error` |
+| Not set up (AC6) | blue Callout "This copy can't send feedback"; no email field, no Send; "Copy text" + primary "Open GitHub issues" (new tab, `…/issues/new`); close ×; the server answering `not_configured` to a Send switches to this state with the text kept | `support-not-configured` |
+
+"Copy text" copies the message, then a blank line and the attach line when the box is ticked; the button says "Copied" for 2 s. No clipboard access: the message is selected instead.
+
+**"How did it go?" dialog (after End).**
+- Shown on top of Home right after the user presses **End** (or End practice) on a session that reached its debrief, before they open the debrief. The debrief keeps preparing in Recents either way (D73).
+- When: the Settings switch is on, the service is set up, and the count of finished sessions is 1, then 6, 11, 16, … (`lib/feedback.isAskTurn`; counted once per session on the server, English practice counts like an interview).
+- Never: during a session, for a session with no answer (nothing is saved, so nothing to rate), when the server ended the session itself (round over, connection lost) and the user did not press End, or when this copy cannot send (AC6).
+- Content: title "How did it go?"; five round steps 1–5 with "Rough" / "Great" under the ends (one click picks, radio group "How did the session go?"); optional Textarea "What should we improve?"; the line "Sends your rating and note only." (before a pick: "Pick a rating to send."); actions "Don't ask again" (link button, left) · Not now · primary Send (off until a step is picked; the rating alone is enough).
+- Sends `{kind: "session", rating, message}` only: no session id is forwarded and no app line is attached.
+- Closing in any way (Not now, Esc, Continue after Sent, "Don't ask again") carries on as before: the "Open debrief" toast appears when the debrief is ready (it waits while the dialog is open or about to open, and until the dialog has left the screen: a toast shown over a modal is carried into it and lost when it closes), or the user opens it from Recents.
+
+| State | Sees | Story |
+|---|---|---|
+| Idle | steps unselected, Send off | `ask-empty` |
+| Picked | the step filled, Send on; with a note | `ask-rated`, `ask-with-note` |
+| Sending / Sent / Error | spinner; "Thanks — sent" + "That helps. Your debrief is on its way." + Continue; red Callout and "Try again", the pick and the note stay | `ask-sending`, `ask-sent`, `ask-error` |
+
+- "Don't ask again" turns the switch off (Settings → Privacy and data → "Ask how a session went") and closes the dialog; the same switch turns it back on. It is also in Settings search ("feedback", "rating", "survey").
+
+**What happens if…**
+
+| Event | Result |
+|---|---|
+| Send fails (no connection, service refuses) | the form stays with its text; Try again / Copy text |
+| No form address configured | Copy text + GitHub issues instead of Send; no "How did it go?" |
+| The user presses End twice or reloads | the session is counted once (by id) |
+| The server cannot be reached to count the session | no dialog; the debrief flow is unchanged |
 
 ---
 
@@ -866,8 +924,8 @@ When the debrief has `said` / `lands_as`, the card heading is the short tag name
 | AI engine | §7 |
 | Voice | voice Select + sample (disabled without TTS: "Mike's voice isn't installed. He'll show his questions as text.") · speed 0.8–1.2 · "Mike speaks aloud" toggle ("Off: Mike only writes. Useful in a quiet office.") · recognition Server / Browser (disabled options with "Local recognition isn't installed. Use the browser or the keyboard." / "This browser has no speech recognition.") · pause 2 / 3 / 5 s / manual |
 | Practice | sample-answer toggle (US-58) · layer order content-first / delivery-first (US-16) · strictness · questions per session · English level |
-| Privacy | telemetry toggle + clear (US-44) · data folder CopyField · "Markdown export folder · optional" + "Save folder" (US-23 AC3) · Trash link "Trash ({n})" |
-| About | free-vs-premium table (`#free`, US-30) · practice-only statement (US-31) · "Run setup again" → `/setup` ("AI engine, voice check, your name and CV. Sessions and settings stay as they are.") · licence |
+| Privacy | telemetry toggle + clear (US-44) · "Ask how a session went" toggle (US-60; default on; "After your first session, and then every fifth, Vukoli asks how it went. Nothing is sent unless you press Send.") · data folder CopyField · "Markdown export folder · optional" + "Save folder" (US-23 AC3) · Trash link "Trash ({n})" |
+| About | free-vs-premium table (`#free`, US-30) · practice-only statement (US-31) · "Run setup again" → `/setup` ("AI engine, voice check, your name and CV. Sessions and settings stay as they are.") · group "Feedback": button "Send feedback" → §1.9 (US-60) · licence |
 
 | State | Story | Review |
 |---|---|---|

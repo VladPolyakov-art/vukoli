@@ -5,6 +5,10 @@ without the flag these paths do not exist (404) and `config.e2e_enabled()` is Fa
   GET  /api/_e2e/engine           the scripted engine's state (status, kinds that fail, delay, calls per kind)
   POST /api/_e2e/engine           steer it: {"status": "ready|not_running|no_model|not_installed", "fail": ["p2b", ...], "delay_ms": 0}
   POST /api/_e2e/storage          {"writable": false}: GET /api/health reports storage_ok=false until reset (US-23 AC4)
+  GET  /api/_e2e/feedback         what the stand-in feedback service received: {"configured", "fail", "sent": [payloads]}
+  POST /api/_e2e/feedback         {"configured": false} (no form address), {"fail": "network|service_error"}, {"clear_fail": true},
+                                  {"sessions_finished": n} (the counter behind "How did it go?"), {"ask": bool} (the Settings switch),
+                                  {"reset": true}
   POST /api/_e2e/seed             {"fixture": "returning"}: a returning user with a CV, a job and three past sessions;
                                   {"fixture": "followups"}: one finished interview of 5 questions with 2 follow-ups on question 4
 """
@@ -20,7 +24,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from . import config, content, feedback, planner, storage
+from . import config, content, feedback, feedback_form, planner, storage
 from .engines import scripted
 
 router = APIRouter(prefix="/api/_e2e")
@@ -42,6 +46,7 @@ def wipe() -> None:
 async def reset() -> dict:
     wipe()
     scripted.reset()
+    feedback_form.reset_e2e()
     return {"ok": True}
 
 
@@ -69,6 +74,38 @@ class StorageBody(BaseModel):
 async def set_storage(body: StorageBody) -> dict:
     config.E2E_STORAGE_BLOCKED = not body.writable
     return {"ok": True, "writable": body.writable}
+
+
+class FeedbackStandIn(BaseModel):
+    configured: Optional[bool] = None
+    fail: Optional[str] = None
+    clear_fail: bool = False
+    sessions_finished: Optional[int] = None
+    ask: Optional[bool] = None
+    reset: bool = False
+
+
+@router.get("/feedback")
+async def get_feedback() -> dict:
+    return dict(feedback_form.E2E)
+
+
+@router.post("/feedback")
+async def set_feedback(body: FeedbackStandIn) -> dict:
+    """Steer the stand-in for the form service (nothing is ever sent to a real one in test mode)."""
+    if body.reset:
+        feedback_form.reset_e2e()
+    if body.configured is not None:
+        feedback_form.E2E["configured"] = body.configured
+    if body.fail in ("network", "service_error"):
+        feedback_form.E2E["fail"] = body.fail
+    if body.clear_fail:
+        feedback_form.E2E["fail"] = None
+    if body.sessions_finished is not None:
+        config.update_settings({"sessions_finished": body.sessions_finished, "sessions_counted_last": ""})
+    if body.ask is not None:
+        config.update_settings({"feedback_ask": body.ask})
+    return dict(feedback_form.E2E)
 
 
 # ---------- seeded history ----------

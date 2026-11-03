@@ -123,7 +123,7 @@ export const SETTINGS: Settings = {
   codex_cli: { model: "" },
   antigravity_cli: { model: "" },
   gemini_live: { model: "", text_model: "", voice: "", has_api_key: false },
-  voice: "", kokoro_speed: 1, stt: { backend: "auto", model: "" }, answer_suggester: true, telemetry_opt_in: false,
+  voice: "", kokoro_speed: 1, stt: { backend: "auto", model: "" }, answer_suggester: true, telemetry_opt_in: false, feedback_ask: true,
   obsidian_dir: "", layer_order: "content-first", level: "B2", strictness: 2, questions_per_session: 5,
 };
 

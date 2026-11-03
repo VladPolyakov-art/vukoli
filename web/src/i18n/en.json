@@ -1116,6 +1116,72 @@
       "label": "Answer structure"
     }
   },
+  "support": {
+    "menu": "Send feedback",
+    "title": "Send feedback",
+    "intro": "Tell us what works, what doesn't, or what you'd like to see. Nothing is sent until you press Send.",
+    "kind": "What is it about?",
+    "kinds": {
+      "idea": "Idea",
+      "problem": "Problem",
+      "other": "Something else"
+    },
+    "message": "Message",
+    "messageHint": "Required. Don't include anything private: only this text is sent.",
+    "messagePlaceholder": "What happened, or what would help?",
+    "email": "Email",
+    "emailHint": "Only if you'd like a reply.",
+    "attach": "Attach app version, system and AI engine",
+    "attachOff": "Not attached.",
+    "send": "Send",
+    "cancel": "Cancel",
+    "close": "Close",
+    "tryAgain": "Try again",
+    "copy": "Copy text",
+    "copied": "Copied",
+    "github": "Open GitHub issues",
+    "checking": "Checking…",
+    "sentTitle": "Thanks — sent",
+    "sentBody": "Your message reached the people who make Vukoli.",
+    "errorTitle": "Not sent",
+    "errorBody": "Your text is still here. {reason}",
+    "errors": {
+      "network": "Check your connection and try again, or copy the text.",
+      "service_error": "The feedback service didn't accept it. Try again in a minute, or copy the text.",
+      "bad_email": "That email address doesn't look right. Fix it or clear it, then try again.",
+      "empty_message": "Write a message first.",
+      "generic": "Something went wrong. Try again, or copy the text."
+    },
+    "offTitle": "This copy can't send feedback",
+    "offBody": "Copy your text and post it as an issue on GitHub. Nothing was sent.",
+    "ask": {
+      "title": "How did it go?",
+      "rating": "How did the session go?",
+      "ratingOption": "{n} of 5",
+      "low": "Rough",
+      "high": "Great",
+      "improve": "What should we improve?",
+      "improveHint": "Optional.",
+      "note": "Sends your rating and note only.",
+      "pick": "Pick a rating to send.",
+      "send": "Send",
+      "notNow": "Not now",
+      "dontAsk": "Don't ask again",
+      "tryAgain": "Try again",
+      "sentTitle": "Thanks — sent",
+      "sentBody": "That helps. Your debrief is on its way.",
+      "continue": "Continue",
+      "errorTitle": "Not sent",
+      "errorBody": "Your answer is still here. {reason}"
+    },
+    "settings": {
+      "aboutTitle": "Feedback",
+      "aboutLabel": "Send feedback",
+      "aboutHint": "Tell us what works, what doesn't, or what you'd like to see.",
+      "askLabel": "Ask how a session went",
+      "askHint": "After your first session, and then every fifth, Vukoli asks how it went. Nothing is sent unless you press Send."
+    }
+  },
   "debrief": {
     "title": "Debrief",
     "loading": "Loading your debrief…",

@@ -94,6 +94,8 @@ export interface Settings {
   questions_per_session: number;
   /** D80: how Mike addresses the user; "" = no name ("You" in the app). */
   name: string;
+  /** D102: ask "How did it go?" after the 1st finished session and then every 5th (Settings → Privacy and data). */
+  feedback_ask: boolean;
 }
 
 export interface SettingsPatch {
@@ -112,6 +114,7 @@ export interface SettingsPatch {
   obsidian_dir?: string;
   layer_order?: LayerOrder;
   name?: string;
+  feedback_ask?: boolean;
   level?: Level;
   strictness?: number;
   questions_per_session?: number;
@@ -480,3 +483,16 @@ export type ServerMessage =
   | { type: "save_error"; code: string; message: string }
   | ServerError
   | { type: "pong"; t: number };
+
+/** US-60 (D102): in-app feedback. `app_line` is the exact line the "attach" box adds. */
+export type FeedbackKind = "idea" | "problem" | "other" | "session";
+export interface FeedbackConfig { configured: boolean; issues_url: string; app_line: string }
+export interface FeedbackBody {
+  kind: FeedbackKind;
+  message: string;
+  rating?: number;
+  email?: string;
+  attach_meta: boolean;
+  session_id?: string;
+}
+export interface SessionFinished { count: number; ask: boolean; configured: boolean }

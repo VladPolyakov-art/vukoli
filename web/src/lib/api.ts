@@ -2,7 +2,7 @@
 import type {
   Debrief, EngineId, EngineLimits, EngineStatus, EnginesResponse, EngineConnectResult, EngineTestResult, Health, MemorySummary, OllamaModelsResponse, OllamaPull,
   Profile, Question, SessionRecord, SessionSummary, Settings, SettingsPatch, SttInfo, StrongerVersion, TelemetryInfo, VoiceCheckResult,
-  TrashItem, Vacancy, VacancySummary, VoicesResponse, LanguageItem, LanguageLayer, FeedbackRecord, TranscriptTurn,
+  TrashItem, Vacancy, FeedbackBody, FeedbackConfig, SessionFinished, VacancySummary, VoicesResponse, LanguageItem, LanguageLayer, FeedbackRecord, TranscriptTurn,
 } from "./types";
 
 export class ApiError extends Error {
@@ -122,4 +122,10 @@ export const api = {
   memory: () => request<MemorySummary>("/memory"),
   telemetry: () => request<TelemetryInfo>("/telemetry"),
   setTelemetry: (optIn: boolean, clear = false) => post<TelemetryInfo>("/telemetry", { opt_in: optIn, clear }),
+  /** US-60: can this copy send feedback; the GitHub issues link; the exact "attach" line. */
+  feedbackConfig: () => request<FeedbackConfig>("/feedback/config"),
+  /** US-60: sent only on the user's Send. */
+  sendFeedback: (body: FeedbackBody) => post<{ sent: true }>("/feedback", body),
+  /** US-60: a session reached its debrief: count it; the answer carries the count the ask rule needs. */
+  sessionFinished: (sessionId: string) => post<SessionFinished>("/feedback/session-finished", { session_id: sessionId }),
 };

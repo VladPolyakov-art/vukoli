@@ -4,14 +4,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import time
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from . import (DATA_VERSION, __version__, config, content, debrief_view, engines, feedback, memory, planner, postcall, storage, stt,
-               telemetry, tts, usage)
+from . import (DATA_VERSION, __version__, config, content, debrief_view, engines, feedback, feedback_form, memory, planner,
+               postcall, storage, stt, telemetry, tts, usage)
 from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
 from .engines import ollama as ollama_engine
@@ -233,6 +233,7 @@ class SettingsPatch(BaseModel):
     strictness: Optional[int] = None
     questions_per_session: Optional[int] = None
     name: Optional[str] = Field(default=None, max_length=200)
+    feedback_ask: Optional[bool] = None            # D102: "Ask how a session went" (Settings → Privacy and data)
 
 
 @router.get("/settings")
@@ -795,3 +796,50 @@ async def post_telemetry(body: TelemetryBody, request: Request) -> dict:
         telemetry.clear()
     return telemetry.info(settings)
 
+
+# ---------- in-app feedback (US-60, D102) ----------
+
+class FeedbackBody(BaseModel):
+    model_config = {"extra": "forbid"}
+    kind: Literal["idea", "problem", "other", "session"]
+    message: str = Field(default="", max_length=feedback_form.MESSAGE_MAX * 2)
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
+    email: Optional[str] = Field(default=None, max_length=feedback_form.EMAIL_MAX * 2)
+    attach_meta: bool = False
+    session_id: Optional[str] = Field(default=None, max_length=80)     # accepted, never forwarded
+
+
+@router.get("/feedback/config")
+async def feedback_config() -> dict:
+    """Can this copy send feedback, where to go when it can't, and the exact line the "attach" box adds."""
+    return {"configured": feedback_form.configured(), "issues_url": feedback_form.ISSUES_URL,
+            "app_line": feedback_form.app_line()}
+
+
+@router.post("/feedback")
+async def post_feedback(body: FeedbackBody, request: Request) -> dict:
+    """Send the user's message to the form service. Only on their Send; the payload is what the dialog showed."""
+    check_origin(request)
+    try:
+        payload = feedback_form.build_payload(kind=body.kind, message=body.message, rating=body.rating, email=body.email,
+                                              attach_meta=body.attach_meta)
+        if not feedback_form.configured():
+            raise feedback_form.FeedbackError("not_configured", "Sending isn't set up in this copy of Vukoli.")
+        await feedback_form.send(payload)
+    except feedback_form.FeedbackError as exc:
+        status = {"not_configured": 409, "network": 502, "service_error": 502}.get(exc.code, 422)
+        raise fail(status, exc.code, exc.message)
+    return {"sent": True}
+
+
+class SessionFinishedBody(BaseModel):
+    model_config = {"extra": "forbid"}
+    session_id: str = Field(min_length=1, max_length=80)
+
+
+@router.post("/feedback/session-finished")
+async def feedback_session_finished(body: SessionFinishedBody, request: Request) -> dict:
+    """A session reached its debrief: count it. The page decides from `count` whether it is time to ask (1st, 6th, 11th…)."""
+    check_origin(request)
+    count = await asyncio.to_thread(feedback_form.count_session, body.session_id)
+    return {"count": count, "ask": bool(config.load_settings()["feedback_ask"]), "configured": feedback_form.configured()}
