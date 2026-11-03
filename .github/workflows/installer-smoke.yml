@@ -89,11 +89,22 @@ jobs:
           [ "$mtype" = "application/manifest+json" ] || { echo "::error::manifest served as '$mtype'"; exit 1; }
           curl -fsS "http://127.0.0.1:${IC_PORT}/sw.js" -o /dev/null
           curl -fsS "http://127.0.0.1:${IC_PORT}/offline.html" | grep -q "Start Vukoli" || { echo "::error::offline.html is not served"; exit 1; }
-          # with an app that Chrome / Edge installed for Vukoli, the launcher opens that app (open is stubbed: nothing really opens)
+          # The window opens in Vukoli's own browser profile (D103). open is stubbed: nothing really opens.
           STUB="$RUNNER_TEMP/stub"; FAKEHOME="$RUNNER_TEMP/fakehome"; SHIM="$FAKEHOME/Applications/Chrome Apps.localized/Vukoli.app"
           mkdir -p "$STUB" "$SHIM/Contents"
           printf '#!/bin/bash\necho "$*" >> "%s/open.log"\n' "$RUNNER_TEMP" > "$STUB/open"; chmod +x "$STUB/open"
+          # 1. an app installed from the normal profile (extensions) is skipped: the app window opens in the own profile
           /usr/libexec/PlistBuddy -c "Add :CrAppModeShortcutURL string http://127.0.0.1:${IC_PORT}/" "$SHIM/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :CrAppModeUserDataDir string $FAKEHOME/Library/Application Support/Google/Chrome/-/Web Applications/_crx_x" "$SHIM/Contents/Info.plist"
+          HOME="$FAKEHOME" PATH="$STUB:$PATH" VUKOLI_NO_BROWSER=0 "$PREFIX/bin/vukoli" start
+          if grep -qF -- "-a $SHIM" "$RUNNER_TEMP/open.log"; then echo "::error::launcher opened an app installed from the normal profile"; cat "$RUNNER_TEMP/open.log"; exit 1; fi
+          if [ -d "/Applications/Google Chrome.app" ] || [ -d "/Applications/Microsoft Edge.app" ]; then
+            grep -qF -- "--user-data-dir=$PREFIX/browser" "$RUNNER_TEMP/open.log" && grep -qF -- "--disable-extensions" "$RUNNER_TEMP/open.log" \
+              || { echo "::error::app window did not use Vukoli's own profile"; cat "$RUNNER_TEMP/open.log"; exit 1; }
+          fi
+          # 2. an app installed from the own profile is opened
+          : > "$RUNNER_TEMP/open.log"
+          /usr/libexec/PlistBuddy -c "Set :CrAppModeUserDataDir $PREFIX/browser/-/Web Applications/_crx_x" "$SHIM/Contents/Info.plist"
           HOME="$FAKEHOME" PATH="$STUB:$PATH" VUKOLI_NO_BROWSER=0 "$PREFIX/bin/vukoli" start
           grep -qF -- "-a $SHIM" "$RUNNER_TEMP/open.log" || { echo "::error::launcher did not open the installed app"; cat "$RUNNER_TEMP/open.log" || true; exit 1; }
           "$PREFIX/bin/vukoli" stop
