@@ -161,6 +161,17 @@ export interface SessionSummary {
   /** D80: in the Archive, not in Recents. */
   archived?: boolean;
 }
+/** D105: one hit of `GET /sessions/search`. `match.q` is the question number the Debrief shows it under (`?q=n`). */
+export interface SearchResult {
+  id: string;
+  title: string;
+  /** "Job · date" (the job is left out when the title already says it). */
+  subtitle: string;
+  mode: "interview" | "english" | "";
+  archived: boolean;
+  started_at: string;
+  match: { field: "title" | "job" | "question" | "answer"; snippet: string; q?: number };
+}
 export interface TrashItem { trash_id: string; id: string; title: string; started_at: string; deleted_at: string }
 
 export interface TranscriptTurn { role: "user" | "model"; text: string; question_id?: string; kind?: string }

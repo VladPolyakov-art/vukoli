@@ -283,3 +283,29 @@ export async function savedSessionId(request: APIRequestContext) {
     .not.toBe("");
   return id;
 }
+
+/** D104: the browser offers to install Vukoli. Dispatches a fake `beforeinstallprompt` (its `prompt()` is counted in
+ * `window.__installPrompted`, `userChoice` resolves to `outcome`) `afterMs` after the page's scripts ran, and replaces
+ * `window.close` with a counter (`window.__closed`): a test page cannot close itself. */
+export async function offerInstall(page: Page, outcome: "accepted" | "dismissed" = "accepted", afterMs = 0) {
+  await page.addInitScript(
+    ([choice, delay]) => {
+      const w = window as unknown as Record<string, unknown>;
+      w.__installPrompted = 0;
+      w.__closed = 0;
+      window.close = () => { w.__closed = (w.__closed as number) + 1; };
+      window.addEventListener("DOMContentLoaded", () => {
+        window.setTimeout(() => {
+          const e = new Event("beforeinstallprompt", { cancelable: true }) as Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+          e.prompt = async () => { w.__installPrompted = (w.__installPrompted as number) + 1; };
+          e.userChoice = Promise.resolve({ outcome: choice as string });
+          window.dispatchEvent(e);
+        }, delay as number);
+      });
+    },
+    [outcome, afterMs] as const,
+  );
+}
+
+export const installPrompted = (page: Page) => page.evaluate(() => (window as unknown as { __installPrompted: number }).__installPrompted);
+export const windowCloseCalls = (page: Page) => page.evaluate(() => (window as unknown as { __closed: number }).__closed);

@@ -12,6 +12,7 @@ import { prefs } from "../../lib/prefs";
 import { useApp } from "../../lib/store";
 import type { InputMode } from "../../lib/types";
 import { buildSessionConfig } from "../../session/startConfig";
+import { readProgress, saveAnswer } from "./progress";
 import { StepFooter, StepHead, type HeadingRef } from "./SetupFrame";
 import { useSetupSave } from "./useSetupSave";
 import s from "./Setup.module.css";
@@ -34,10 +35,15 @@ export function AboutStep({ headingRef, onBack, initialJob = "", initialSaveErro
   const { save, view: saveView } = useSetupSave(initialSaveError);
   const blocked = useRef(false);
   const stt = useLoad(() => api.stt());
-  const [name, setName] = useState<string | null>(null);
-  const [job, setJob] = useState(initialJob);
+  // A window opened later (the installed app, a reload) takes up what was typed or picked before (setup/progress.ts).
+  const [resumed] = useState(readProgress);
+  const [name, setNameState] = useState<string | null>(resumed?.name ?? null);
+  const [job, setJobState] = useState(initialJob || resumed?.job || "");
   const [editor, setEditor] = useState(false);
-  const [answer, setAnswer] = useState<Answer>(prefs.input() === "text" ? "text" : "voice");
+  const [answer, setAnswerState] = useState<Answer>(resumed?.answer ?? (prefs.input() === "text" ? "text" : "voice"));
+  const setName = (v: string | null) => { setNameState(v); saveAnswer({ name: v ?? undefined }); };
+  const setJob = (v: string) => { setJobState(v); saveAnswer({ job: v }); };
+  const setAnswer = (v: Answer) => { setAnswerState(v); saveAnswer({ answer: v }); };
   const value = name ?? settings?.name ?? "";
 
   /** Resolves `false` when the save failed: the typed name stays in the field and the error shows above the rows. */

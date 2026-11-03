@@ -18,6 +18,16 @@ export const Keys: StoryObj<typeof Kbd> = {
   ),
 };
 
+/** Ghost: the pill used for the hint that shows on hover in the sidebar's Search row. */
+export const Ghost: StoryObj<typeof Kbd> = {
+  render: () => (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-2)" }}>
+      <Kbd variant="ghost">⌘K</Kbd>
+      <Kbd variant="ghost">Ctrl K</Kbd>
+    </div>
+  ),
+};
+
 /** The shortcuts list pattern (Session → Keyboard shortcuts): Kbd in the term, the action in the description, then the hint. */
 export const ShortcutsList: StoryObj<typeof Kbd> = {
   render: () => {

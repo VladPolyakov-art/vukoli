@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ScaledStage } from "../debrief/frames";
 import { SetupScene, type SetupSceneId } from "./frames";
 
-/* Setup wizard (D81): AI engine → Check → About you. Fixtures: components/engine/fixtures.tsx, docs/ia.md §6. Each story
+/* Setup wizard (D81): AI engine → Check → About you, with Install first when the browser can install Vukoli (D104). Fixtures: components/engine/fixtures.tsx, docs/ia.md §6. Each story
  * is a frame of a real width, scaled to fit. Light; dark with the toolbar. */
 const meta: Meta = { title: "Screens/Setup", parameters: { layout: "padded" } };
 export default meta;
@@ -14,6 +14,14 @@ const mobile = (id: SetupSceneId): StoryObj => ({
   render: () => <ScaledStage width={375} height={812}><SetupScene id={id} /></ScaledStage>,
   parameters: { viewport: { defaultViewport: "mobile1" } },
 });
+
+/** D104: the first step when the browser can install Vukoli: its own window and icon in the Dock. */
+export const InstallFirst = desktop("installFirst");
+export const InstallFirstMobile = mobile("installFirst");
+/** Windows / Linux: the taskbar and the Start menu in the copy. */
+export const InstallTaskbar = desktop("installTaskbar");
+/** The browser's install dialog is open, then the installed app's window is awaited (this window closes itself): Install is busy, Skip waits. */
+export const InstallBusy = desktop("installBusy");
 
 /** First run, Ollama is Ready: it is picked for you (it is the recommended one) and Continue is enabled. */
 export const EngineFirst = desktop("engineFirst");

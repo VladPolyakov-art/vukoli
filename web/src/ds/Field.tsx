@@ -51,10 +51,13 @@ export type Common = { label: string; hideLabel?: boolean; hint?: ReactNode; err
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size">, Common {
   /** Element rendered inside the right edge of the field (e.g. show/hide key). */
   adornment?: ReactNode;
+  /** A borderless line: no fill, no box, no focus ring, no hover fill; only the text and the caret. For a field that is the
+   * only text control of a dialog and takes the caret as it opens (Search). Do not use it for forms. */
+  bare?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, hideLabel, hint, error, optionalText, adornment, id: idProp, className, ...rest },
+  { label, hideLabel, hint, error, optionalText, adornment, bare, id: idProp, className, ...rest },
   ref,
 ) {
   const auto = useId();
@@ -63,7 +66,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <input
       ref={ref}
       id={id}
-      className={`${s.control} ${className ?? ""}`}
+      className={`${s.control} ${bare ? s.bare : ""} ${className ?? ""}`}
       aria-invalid={error ? true : undefined}
       aria-describedby={describedBy(id, hint, error)}
       {...rest}

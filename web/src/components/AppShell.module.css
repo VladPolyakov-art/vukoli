@@ -133,6 +133,19 @@
   height: calc(var(--icon-lg) + var(--space-1));
   color: var(--color-fg-icon);
 }
+/* D105: a row that is a button (Search) looks like the link rows around it. */
+.rowButton { width: 100%; border: 0; background: transparent; text-align: start; cursor: pointer; }
+/* The ⌘K hint is a ghost pill that only shows while the row is hovered or keyboard-focused (fades in `fast`; reduced motion: no fade). Never on touch. */
+.shortcut {
+  display: inline-flex;
+  flex: none;
+  margin-inline-start: auto;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.rowButton:hover .shortcut,
+.rowButton:focus-visible .shortcut { opacity: 1; }
+@media (pointer: coarse), (hover: none) { .shortcut { display: none; } }
 .newLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .railBody[data-collapsed] .newRow { width: var(--rail-slot); }
 

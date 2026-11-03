@@ -33,6 +33,7 @@ Any interface task (a screen, a state, a component, a layout or copy change that
 4. **Loading:** Skeleton for content areas; the 3-dot pill (or `Button loading`) for a button that is working; Spinner only inside small buttons or a one-line status; text shimmer for "preparing…" lines. Loading containers set `aria-busy` and a visually hidden "Loading…".
 5. **Nothing while the user speaks (GR6, motion rule 3):** no toast, counter, new card, loop or shimmer. Only the mic indicator follows the voice, and the user's own caption updates in place. Feedback waits until the user stops. The timer stays visible and static.
 6. **The orb's state is always text** (`role="status"`, polite). Colour never tells Mike's states apart (P6).
+7. **Modals close the same way, everywhere (D108):** every modal (`Dialog`, `Drawer`, and the sheets built on them) closes on **Esc** and on a **click on the dimmed area** (the press and the click both on the backdrop, so a text selection dragged out of the box does not close it). Closing by the backdrop is the dialog's own Close / Cancel / "Not now": a confirmation is cancelled, nothing destructive happens. There is no opt-out prop. Menus and popovers close on a press outside them. Text the user typed into a dialog is kept as a **draft in memory** (`lib/drafts`) for the rest of the app session, so a stray click loses nothing; sending or saving clears it.
 
 ## 4. Motion
 1. **Durations and curves only from tokens** (`--duration-fast|base|slow|slower|exit|stagger|loop-*|orb`, `--ease-standard|enter|exit|orb`). Hard ease-out, no springs, no overshoot. Distances from the space scale or the numbers in `docs/motion.md`.
@@ -44,7 +45,7 @@ Any interface task (a screen, a state, a component, a layout or copy change that
 
 ## 5. Accessibility
 1. **WCAG 2.2 AA in both themes** (GR10): text 4.5:1, large text and non-text UI 3:1. A new text / surface pair gets a `pb.contrast` entry in `tokens.json` and passes `tokens_build.py`; a new border or non-text element is computed by hand and added to `docs/design-system.md` §4.
-2. **Keyboard:** everything reachable and operable; Tabs and Segmented move with arrow keys; dialogs use native `<dialog>` (Esc, focus trap, focus returns); session shortcuts (`Space`, `M`, `R`, `Enter`, `T`) are shown in a help line with `Kbd`.
+2. **Keyboard:** everything reachable and operable; Tabs and Segmented move with arrow keys; dialogs use native `<dialog>` (Esc and a click on the backdrop close it, focus trap, focus returns); session shortcuts (`Space`, `M`, `R`, `Enter`, `T`) are shown in a help line with `Kbd`.
 3. **Touch targets ≥ 44 × 44px on touch screens** (tablet 1024 / 768, `@media (pointer: coarse)`): 32 / 40px controls (`--control-h-sm|md`, IconButton, Chip, Segmented) extend their hit area with padding or a `::before`, without changing the visual size.
 4. **Names and state:** IconButton always has `label`; state is never colour alone (text, icon or aria next to it); `lang="en"`, all strings from the locale file (GR3).
 

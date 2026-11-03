@@ -156,10 +156,10 @@ function SettingsBody() {
   );
 }
 
-/** Settings (D76): `size="lg"` is a tall panel with its own layout in the body, a × (`closeLabel`) and no actions; a press on the backdrop closes it (`closeOnBackdrop`). Full screen on a phone. */
+/** Settings (D76): `size="lg"` is a tall panel with its own layout in the body, a × (`closeLabel`) and no actions; a click on the backdrop closes it, like every modal (D108). Full screen on a phone. */
 export const SettingsLarge: StoryObj = {
   render: () => (
-    <Dialog inline open size="lg" onClose={() => {}} title={t("settings.title")} closeLabel={t("common.close")} closeOnBackdrop>
+    <Dialog inline open size="lg" onClose={() => {}} title={t("settings.title")} closeLabel={t("common.close")}>
       <SettingsBody />
     </Dialog>
   ),

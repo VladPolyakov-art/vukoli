@@ -316,9 +316,15 @@ async def session_socket(websocket: WebSocket) -> None:
         """"Edit what I said" (US-18 AC3): this answer's feedback again from the corrected text. The record, the
         history Mike answers from and the client change only when everything is ready."""
         try:
+            checker = None
+            if opts["mode"] == "english":                # D106: the same larger model as after the call
+                try:
+                    checker = await asyncio.wait_for(engines.language_checker(llm), postcall.CHECKER_LOOKUP_S)
+                except (asyncio.TimeoutError, EngineError):
+                    checker = None
             fields = await asyncio.wait_for(in_background(lambda: feedback.recheck_answer(
                 llm, record, text, mode=opts["mode"], level=opts["level"], known=opts.get("context_terms", []),
-                ignored=ignored_terms | set(feedback.ignored_fragments(records)))), timeout=180)
+                ignored=ignored_terms | set(feedback.ignored_fragments(records)), language_llm=checker)), timeout=180)
             feedback.apply_recheck(record, fields)
             history = driver.transcript_history
             if 0 <= record.get("history_index", -1) < len(history):

@@ -3,7 +3,7 @@
  * localStorage `ic.railCollapsed`) · 640–1023 / < 640 top bar (menu button, app name, a warning badge only while the AI
  * engine is not ready) with the same sidebar, always expanded, in a left Drawer (G5).
  * Rail, top to bottom: app mark + name with the sidebar toggle · New practice (a round filled plus) · Archive (D80: replaced
- * History) · "Recents" = every chat not archived, newest first (one line each, no dates, a quiet EN marker for English; the
+ * History) · Search (D105: opens the search dialog, ⌘K / Ctrl+K from anywhere in the shell; under Archive) · "Recents" = every chat not archived, newest first (one line each, no dates, a quiet EN marker for English; the
  * middle part scrolls; a "…" menu on hover or focus: Rename, Download as Markdown, Archive, Delete — Delete asks first,
  * then goes to Trash with Undo; a chat still being saved after End is the top row at once, its title shimmering and
  * "2 of 5" in the trailing slot, until its debrief is ready, then one toast with "Open debrief") · an "AI engine · Not ready" row (only when it is not ready: P6) · the account row (avatar
@@ -14,7 +14,7 @@
  * `AppShellView` is pure (every state by props: review frames, stories); `AppShell` is the live container. */
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode, type Ref } from "react";
 import { Link, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
-import { Badge, Button, Dialog, Drawer, Icon, IconButton, InlineRename, Menu, NavRow, Skeleton, Tooltip, ToastProvider, useToast } from "../ds";
+import { Badge, Button, Dialog, Drawer, Icon, IconButton, InlineRename, Kbd, Menu, NavRow, Skeleton, Tooltip, ToastProvider, useToast } from "../ds";
 import type { LinkComponent, MenuEntry, ToastOptions } from "../ds";
 import { t } from "../i18n";
 import { api } from "../lib/api";
@@ -27,6 +27,8 @@ import { SESSIONS_CHANGED, TITLE_MAX } from "../screens/debrief/rename";
 import { FeedbackHost } from "./FeedbackHost";
 import { LogoMark, Wordmark } from "./Wordmark";
 import { engineShort } from "./engine/meta";
+import { SearchDialog } from "./search/SearchDialog";
+import { isMac, isSearchShortcut } from "./search/searchModel";
 import s from "./AppShell.module.css";
 
 /** react-router adapter for DS rows (NavRow, ListRow): `href` → `to`. */
@@ -96,6 +98,8 @@ export interface AppShellViewProps {
   actions?: SessionActions;
   /** D80: the name from Settings → General; "You" when there is none. */
   userName?: string;
+  /** D105: the "Search" row was chosen (the live shell opens the search dialog). */
+  onSearch?: () => void;
   mainRef?: Ref<HTMLElement>;
   rootRef?: Ref<HTMLDivElement>;
   children: ReactNode;
@@ -103,7 +107,7 @@ export interface AppShellViewProps {
 
 export function AppShellView({
   current, currentSessionId, recent, engine, drawerOpen, onDrawerOpenChange, collapsed, onCollapsedChange, initialMenu,
-  actions, userName, mainRef, rootRef, children,
+  actions, userName, onSearch, mainRef, rootRef, children,
 }: AppShellViewProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = drawerOpen ?? ownOpen;
@@ -123,7 +127,7 @@ export function AppShellView({
     if ((e.target as Element).closest("a")) setOpen(false);
   };
   // The menus are portalled out of the drawer, so they close it themselves (see `onNavigate`).
-  const common = { current, currentSessionId, recent, engine, actions, userName };
+  const common = { current, currentSessionId, recent, engine, actions, userName, onSearch };
 
   return (
     <div ref={rootRef} className={s.shell} data-review-id="AppShell">
@@ -190,10 +194,11 @@ interface RailProps {
   initialMenu?: InitialMenu;
   actions?: SessionActions;
   userName?: string;
+  onSearch?: () => void;
 }
 
 /** The sidebar, expanded or collapsed. The body keeps a fixed width per state, so the rail's width animation only reveals it. */
-function Rail({ current, currentSessionId, recent, engine, collapsed, drawer, onToggle, onNavigate, initialMenu, actions, userName }: RailProps) {
+function Rail({ current, currentSessionId, recent, engine, collapsed, drawer, onToggle, onNavigate, initialMenu, actions, userName, onSearch }: RailProps) {
   const toggleLabel = drawer || !collapsed ? t("rail.toggleClose") : t("rail.toggleOpen");
   // D78: collapsed, the toggle is the app mark; pointing at it (or focusing it) turns it into the "open sidebar" icon.
   const toggle = collapsed && !drawer ? (
@@ -212,6 +217,7 @@ function Rail({ current, currentSessionId, recent, engine, collapsed, drawer, on
       <nav aria-label={t("nav.main")} className={s.nav} data-review-id="AppShell/nav">
         <NewPractice current={current === "practice"} collapsed={collapsed} />
         <ArchiveLink current={current === "archive"} collapsed={collapsed} />
+        <SearchRow collapsed={collapsed} onSearch={() => { onNavigate?.(); onSearch?.(); }} />
       </nav>
 
       {collapsed ? <div className={s.recentSpacer} aria-hidden="true" /> : (
@@ -269,6 +275,20 @@ function ArchiveLink({ current, collapsed }: { current: boolean; collapsed: bool
     </Link>
   );
   return collapsed ? <Tooltip content={t("rail.archive")} placement="bottom-start">{link}</Tooltip> : link;
+}
+
+/** D105: "Search" (a button, not a page): the same row as Archive, with the shortcut as a ghost pill at its end, shown only on hover / keyboard focus. Collapsed: the icon alone. */
+function SearchRow({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
+  const mac = isMac();
+  const shortcut = mac ? "⌘K" : "Ctrl K";
+  const button = (
+    <button type="button" className={`${s.newRow} ${s.rowButton}`} aria-keyshortcuts={mac ? "Meta+K" : "Control+K"} onClick={onSearch} data-track="nav-search" data-review-id="AppShell/search">
+      <span className={s.navIcon}><Icon name="search" size="sm" /></span>
+      <span className={collapsed ? "visually-hidden" : s.newLabel}>{t("search.nav")}</span>
+      {collapsed ? null : <span className={s.shortcut} aria-hidden="true"><Kbd variant="ghost">{shortcut}</Kbd></span>}
+    </button>
+  );
+  return collapsed ? <Tooltip content={`${t("search.nav")} ${shortcut}`} placement="bottom-start">{button}</Tooltip> : button;
 }
 
 function Recents({ recent, currentSessionId, openRowMenu, actions, onNavigate }: {
@@ -585,6 +605,9 @@ function LiveShell({ children }: { children: ReactNode }) {
   const [recent, setRecent] = useState<RecentState>({ status: "loading" });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useRailCollapsed();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchUsed, setSearchUsed] = useState(false);       // the dialog is built on first use
+  const openSearch = useCallback(() => { setSearchUsed(true); setSearchOpen(true); }, []);
   const mainRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const aliveRef = useRef(true);
@@ -621,6 +644,20 @@ function LiveShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SESSIONS_CHANGED, reload);
   }, [loadRecent]);
 
+
+  // D105: ⌘K / Ctrl+K opens the search from anywhere in the shell (a live session is not in the shell, so it never
+  // sees it). It leaves the key alone while another dialog is open (Settings, a confirmation): that one is modal.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isSearchShortcut(e)) return;
+      if (searchOpen) { e.preventDefault(); return; }
+      if (document.querySelector("dialog[open]")) return;
+      e.preventDefault();
+      openSearch();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openSearch, searchOpen]);
 
   // A new page starts at the top (<main> is the scroll container). Settings is a popup over the page (D76): opening and
   // closing it keeps the page where it was.
@@ -699,11 +736,13 @@ function LiveShell({ children }: { children: ReactNode }) {
         onCollapsedChange={setCollapsed}
         actions={actions}
         userName={settings?.name}
+        onSearch={openSearch}
         mainRef={mainRef}
         rootRef={rootRef}
       >
         {children}
       </AppShellView>
+      {searchUsed ? <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} /> : null}
       <FeedbackHost />
     </>
   );

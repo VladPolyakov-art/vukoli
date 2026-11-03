@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type Ref } from "react";
 import { Button, Callout, Checkbox, Chip, ChipGroup, Dialog, Icon, Input, Textarea } from "../ds";
 import { t, tMaybe } from "../i18n";
 import { api, ApiError } from "../lib/api";
+import { drafts } from "../lib/drafts";
 import { attachPreview, canSendSupport, copyText, supportBody, type SupportDraft } from "../lib/feedback";
 import type { FeedbackConfig } from "../lib/types";
 import s from "./SupportDialog.module.css";
@@ -118,7 +119,10 @@ export function SupportDialogView({
   );
 }
 
-/** The live dialog. State is cleared each time it opens; the text survives a failed send (AC5). */
+const DRAFT_KEY = "support";
+
+/** The live dialog. The status is cleared each time it opens; the text survives a failed send (AC5) and closing the
+ * dialog (D108: a click on the dimmed area is a Cancel): it is a draft in memory until it is sent. */
 export function SupportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [draft, setDraft] = useState<SupportDraft>(EMPTY_DRAFT);
   const [status, setStatus] = useState<SupportStatus>("idle");
@@ -131,7 +135,7 @@ export function SupportDialog({ open, onClose }: { open: boolean; onClose: () =>
   useEffect(() => {
     if (!open) return;
     let alive = true;
-    setDraft(EMPTY_DRAFT);
+    setDraft(drafts.get<SupportDraft>(DRAFT_KEY) ?? EMPTY_DRAFT);
     setStatus("idle");
     setErrorCode(undefined);
     setCopied(false);
@@ -152,7 +156,7 @@ export function SupportDialog({ open, onClose }: { open: boolean; onClose: () =>
   const send = () => {
     setStatus("sending");
     api.sendFeedback(supportBody(draft)).then(
-      () => setStatus("sent"),
+      () => { drafts.clear(DRAFT_KEY); setStatus("sent"); },
       (e: unknown) => {
         const code = e instanceof ApiError ? e.code : "generic";
         if (code === "not_configured") { setService("off"); setStatus("idle"); return; }
@@ -171,7 +175,7 @@ export function SupportDialog({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <SupportDialogView
       open={open} service={service} appLine={config.app_line} issuesUrl={config.issues_url}
-      draft={draft} onDraft={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+      draft={draft} onDraft={(patch) => { const next = { ...draft, ...patch }; drafts.set(DRAFT_KEY, next); setDraft(next); }}
       status={status} errorCode={errorCode} copied={copied}
       onSend={send} onCopy={copy} onClose={onClose} messageRef={message}
     />

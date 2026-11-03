@@ -29,7 +29,7 @@ Rule: a screen = container (data, side effects) + pure view (props only). Storie
 | `/session` | live interview / English talk (outside the shell) |
 | `/sessions/:id` | Debrief |
 | `/archive`, `/archive/trash` | Archive, Trash (`/history*` redirects) |
-| `/setup` | setup wizard (engine → check → about you) |
+| `/setup` | setup wizard (install when the browser can → engine → check → about you) |
 | Settings | drawer over the shell (`settings.open`) |
 | `*` | NotFound; server down → ServerUnavailable |
 
@@ -39,8 +39,14 @@ No mock layer: screens talk to the real local server (`/api/*`, see `app/server/
 ## What 12d wired (ui-spec §10, decision D94)
 Interrupted (engine / voice) with Resume of the same saved session and continue in text · storage check (`/api/health` → `storage_ok`) in Session and Debrief · Edit what I said / recheck (live over WS, saved over REST) · Trash load error and Delete forever · Home greets by name · D80 naming in copy · Setup save errors · `beforeunload` guard · engine-specific interrupted copy · mic help opens by itself · `dvh` instead of `vh`. Status per item: `docs/ui-spec.md` §10 "Status at 12d".
 
+## Install in onboarding (D104)
+Setup starts with an "Install Vukoli" step when the browser can install the app (`useInstallOffer().canInstall`, waits ≤ 1.5 s for a late `beforeinstallprompt`, frozen per run: `screens/setup/installGate.ts`, `InstallStep.tsx`). Accepted: the installed app opens in a new window; this one waits (a quiet busy Install button) for that window to say hello over a `BroadcastChannel("vukoli-window")` (`lib/windowLink.ts`, every window posts hello on load and answers a ping; only a window that loaded after Install was pressed counts) and closes itself (`setup/installHandoff.ts`: 4 s to hear it, 0.5 s for `window.close()`), with no screen in between. No hello or a refused close: setup continues here at the engine with one toast "Vukoli is installed. Next time open it from the Dock". The wizard keeps its step and answers (engine pick, name draft, job title, voice or keyboard) in `localStorage` (`prefs.setupStep`, `setup/progress.ts`), so the new window, a reload or a reopened window resume where it was (the install gate is skipped on a resumed run); the record is cleared by `prefs.setSetupDone(true)` and by Settings → About → "Run setup again". Home card, Settings row, launchers, manifest and service worker are unchanged. Spec: `docs/ui-spec.md` §2.0.
+
 ## Feedback (US-60, D102)
 In-app feedback: "Send feedback" (account menu, Settings → About) and "How did it go?" after End on the 1st finished session, then the 6th, 11th… The server builds the payload (text, kind, rating, email, and the line "Vukoli <version> · <OS> · <engine>" only when the box is ticked) and posts it to `IC_FEEDBACK_URL` only on Send; with no address set the form offers Copy text and the GitHub issues link. Endpoints and payload: `app/server/PROTOCOL.md` ("REST: in-app feedback"); screens and states: `docs/ui-spec.md` §1.9; e2e: `app/web/e2e/feedback.spec.ts` (test mode stands in for the service, `GET /api/_e2e/feedback`). `resetApp` in the e2e helpers turns the ask off so other specs are not interrupted after the first session.
+
+## Search (D105, US-61)
+"Search" row in the sidebar and ⌘K / Ctrl+K open `components/search/SearchDialog.tsx` (view `SearchDialogView` for stories, live `SearchDialog` mounted in `LiveShell` on first use). Pure rules (keys, where a hit opens, marking the words, the shortcut) are in `components/search/searchModel.ts` (vitest); the debounced call is `useSearch`. The server side is `GET /api/sessions/search` (`app/server/server/search.py`, `app/server/PROTOCOL.md`). A live session is outside the shell, so the shortcut never reaches it. The sidebar row shows its `⌘K` only on hover / keyboard focus, as a ghost pill (`Kbd variant="ghost"`); the input is the DS `Input bare` (no fill, border or focus ring: just the caret) after a muted magnifier, over a hairline divider. Spec: `docs/ui-spec.md` §1.10; e2e: `app/web/e2e/search.spec.ts`; stories `patterns-search--*`, `patterns-appshell--search-row-hover`, `ds-kbd--ghost`.
 
 ## Run and check
 From `app/web`:

@@ -80,6 +80,25 @@
     "pendingProgress": "{done} of {n}",
     "pendingPreparing": "Preparing feedback"
   },
+  "search": {
+    "nav": "Search",
+    "title": "Search",
+    "label": "Search practices",
+    "placeholder": "Search practices",
+    "hint": "Search titles, jobs and what was said.",
+    "empty": "No practices match “{query}”.",
+    "emptyBody": "Try fewer words, or a different spelling.",
+    "error": "Search isn't available right now.",
+    "results": "Results",
+    "count_one": "{n} result",
+    "count_other": "{n} results",
+    "archived": "Archived",
+    "job": "Job",
+    "mike": "Mike",
+    "mikeQ": "Mike · question {n}",
+    "you": "Your answer",
+    "youQ": "Your answer · question {n}"
+  },
   "overlay": {
     "dismiss": "Dismiss",
     "notifications": "Notifications",
@@ -343,11 +362,23 @@
   "setup": {
     "steps": "Setup steps",
     "step": {
+      "install": "Install",
       "engine": "AI engine",
       "check": "Check",
       "about": "About you"
     },
     "stepDone": "done",
+    "install": {
+      "title": "Put Vukoli {where}",
+      "whereDock": "in your Dock",
+      "whereTaskbar": "on your taskbar",
+      "body": "It gets its own window and icon, and opens from {from} like any other app.",
+      "fromDock": "the Dock",
+      "fromTaskbar": "the Start menu",
+      "action": "Install Vukoli",
+      "skip": "Skip",
+      "stay": "Vukoli is installed. Next time open it from {from}."
+    },
     "engine": {
       "title": "Choose how Mike runs",
       "later": "You can change this later in Settings.",

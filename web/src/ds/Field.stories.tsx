@@ -12,6 +12,10 @@ export default meta;
 export const TextInput: StoryObj = {
   render: () => <div style={{ maxWidth: "24rem" }}><Input label="Base URL" defaultValue="http://localhost:1234/v1" hint="The address that ends in /v1." /></div>,
 };
+/** `bare`: just the text and the caret, no fill, border or focus ring. Only for a dialog's single text line (Search). */
+export const BareInput: StoryObj = {
+  render: () => <div style={{ maxWidth: "24rem" }}><Input bare label="Search practices" hideLabel placeholder="Search practices" /></div>,
+};
 function KeyDemo() {
   const [show, setShow] = useState(false);
   return (

@@ -11,7 +11,7 @@ import re
 import secrets
 from typing import Iterable
 
-from . import content
+from . import content, documents
 from .engines.base import EngineError, LLMEngine
 from .stt import Transcript, Word
 
@@ -164,9 +164,14 @@ def language_tag(item: dict) -> str:
     return "word_choice"
 
 
+def has_term(text: str, term: str) -> bool:
+    """`term` stands in `text` as a whole word, spelled exactly like that."""
+    return bool(documents.terms_in(text, [term]))
+
+
 def validate_language_items(items: list, transcript: str, known: Iterable[str], low: set[str],
                             ignored: Iterable[str] = (), max_items: int = 3) -> list[dict]:
-    known_low = {k.lower() for k in known}
+    known = list(known)
     ignored_low = {i.lower() for i in ignored}
     out = []
     for raw in items or []:
@@ -184,8 +189,10 @@ def validate_language_items(items: list, transcript: str, known: Iterable[str], 
         if DIGITS.findall(better[0]) != DIGITS.findall(original):
             continue                                   # a "better" version must not change numbers
         words = {w.lower() for w in WORD.findall(original)}
-        if words & known_low or original.lower() in ignored_low:
-            continue                                   # domain terms are never errors
+        if original.lower() in ignored_low:
+            continue
+        if any(not has_term(better[0], t) for t in documents.terms_in(original, known)):
+            continue                                   # a correction must not rewrite a product or tool name
         klass = raw.get("class") if raw.get("class") in CLASS_SEVERITY else "N"
         misheard = bool(words & low)
         out.append({
@@ -214,15 +221,18 @@ def language_layer(items: list[dict]) -> dict:
 async def analyze_language(llm: LLMEngine, transcript: str, *, level: str, known: list[str], low: list[Word],
                            english_track: bool = False, ignored: Iterable[str] = ()) -> dict:
     marked = mark_misheard(transcript, low)
+    present = documents.terms_in(transcript, known)      # the model hears only the names this answer really uses
     prompt_id = "p5b_corrections" if english_track else "p2b_language"
     messages = [{"role": "system", "content": content.system(prompt_id)},
                 {"role": "user", "content": content.user(prompt_id, level=level or "unknown",
-                                                         known_terms=", ".join(known) or "none", transcript=marked)}]
+                                                         known_terms=", ".join(present) or "none", transcript=marked)}]
     data = await llm.complete_json(messages, content.schema(prompt_id), temperature=0.1, max_tokens=350)
     raw_items = data.get("corrections" if english_track else "items") or []
     items = validate_language_items(raw_items, transcript, known, low_tokens(low), ignored,
                                     max_items=2 if english_track else 3)
     layer = language_layer(items)
+    if llm.model:
+        layer["model"] = llm.model                     # which model checked the language (visible in the saved JSON)
     if english_track:
         keep = data.get("phrase_to_keep")
         if isinstance(keep, dict) and keep.get("phrase"):
@@ -701,14 +711,14 @@ def ignored_fragments(records: Iterable[dict]) -> list[str]:
 
 
 async def recheck_answer(llm: LLMEngine, record: dict, text: str, *, mode: str, level: str, known: list[str],
-                         ignored: Iterable[str] = ()) -> dict:
+                         ignored: Iterable[str] = (), language_llm: LLMEngine | None = None) -> dict:
     """Feedback for one corrected answer: language and content are asked again, delivery keeps the audio's length and
     pace and recounts the fillers, and a stronger answer that existed is written again. Returns the fields to put on
     the record and touches nothing: a failure or a cancel leaves the record as it was."""
     text = text.strip()
     layers: dict = {"delivery": redo_delivery((record.get("layers") or {}).get("delivery"), text,
                                               main_answer=record.get("answer_kind") == "main")}
-    layers["language"] = await analyze_language(llm, text, level=level, known=known, low=[],
+    layers["language"] = await analyze_language(language_llm or llm, text, level=level, known=known, low=[],
                                                 english_track=mode == "english", ignored=ignored)
     if mode == "interview":
         layers["content"] = await analyze_content(llm, question=record.get("question", ""),

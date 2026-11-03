@@ -53,6 +53,7 @@ Prefix: `patterns-appshell--`. Review: `#sidebar-<state>`.
 | Rail top | wordmark + toggle "Close sidebar" / "Open sidebar" | collapsed state saved in `ic.railCollapsed` |
 | New practice | NavRow → `/` | — |
 | Archive | NavRow "Archive" → `/archive` | — |
+| Search (D105) | same row as Archive but a button, magnifier icon, "Search" and, at its end, a ghost pill `⌘K` (`Ctrl K` off a Mac) that is hidden until the row is hovered or keyboard-focused (never on touch); collapsed: the icon with a Tooltip "Search ⌘K" | opens the search dialog (§1.10); in the drawer it closes the drawer first |
 | Recents | heading "Recents"; ChatRow per non-archived session | reloads on every route change and on the `ic:sessions-changed` event |
 | Row "…" menu ("Actions for {title}") | "Rename" · "Download as Markdown" · "Archive" · separator · "Delete" | Rename = InlineRename in the row (max 80) |
 | Engine not ready | row "AI engine" + "Not ready" → `/settings/engine`; collapsed: alert icon with a tooltip | only when the engine in use is not ready |
@@ -143,7 +144,7 @@ Viewport media queries are used only for `pointer: coarse`, `prefers-reduced-mot
 | Dialog / Drawer / Menu closes | the control that opened it |
 | Debrief evidence link "Go to question {n}" | that question's heading |
 
-- **Dialogs.** In the app they are native `<dialog>` + `showModal()`, so the focus trap, Esc and the inert background come from the platform. In review frames the trap and Esc are scripted. A backdrop press closes them (Settings: `closeOnBackdrop`).
+- **Dialogs.** In the app they are native `<dialog>` + `showModal()`, so the focus trap, Esc and the inert background come from the platform. In review frames the trap and Esc are scripted. **Closing (D108, every modal and drawer):** Esc and a click on the dimmed area close it (the press and the click both on the backdrop; a text selection dragged out of the box does not). Closing by the backdrop is the dialog's own Close / Cancel / "Not now": a confirmation (Delete this chat?, Delete forever?, Delete job?) is cancelled and nothing is deleted; "How did it go?" is "Not now"; Search just closes; a phone's full-screen Settings has no dimmed area (× and Esc). Text typed in Send feedback, "How did it go?" and Add / Edit job is kept as a draft in memory for the rest of the app session (a reload clears it); Send / Save clears it. Menus and hover cards close on a press outside.
 - **Session shortcuts:** §4.4.
 - **Plain Enter:** sends in a Composer, submits in a form. **Shift+Enter** adds a new line.
 
@@ -216,7 +217,7 @@ Everything floating (Dialog, Drawer, Menu, Tooltip, Toast) renders through `Over
 - Never: during a session, for a session with no answer (nothing is saved, so nothing to rate), when the server ended the session itself (round over, connection lost) and the user did not press End, or when this copy cannot send (AC6).
 - Content: title "How did it go?"; five round steps 1–5 with "Rough" / "Great" under the ends (one click picks, radio group "How did the session go?"); optional Textarea "What should we improve?"; the line "Sends your rating and note only." (before a pick: "Pick a rating to send."); actions "Don't ask again" (link button, left) · Not now · primary Send (off until a step is picked; the rating alone is enough).
 - Sends `{kind: "session", rating, message}` only: no session id is forwarded and no app line is attached.
-- Closing in any way (Not now, Esc, Continue after Sent, "Don't ask again") carries on as before: the "Open debrief" toast appears when the debrief is ready (it waits while the dialog is open or about to open, and until the dialog has left the screen: a toast shown over a modal is carried into it and lost when it closes), or the user opens it from Recents.
+- Closing in any way (Not now, Esc, a click on the dimmed area, Continue after Sent, "Don't ask again") carries on as before: the "Open debrief" toast appears when the debrief is ready (it waits while the dialog is open or about to open, and until the dialog has left the screen: a toast shown over a modal is carried into it and lost when it closes), or the user opens it from Recents.
 
 | State | Sees | Story |
 |---|---|---|
@@ -237,14 +238,69 @@ Everything floating (Dialog, Drawer, Menu, Tooltip, Toast) renders through `Over
 
 ---
 
+### 1.10 Search (US-61 · F67, D105)
+
+- Code: `components/search/SearchDialog.tsx` (pure `SearchDialogView`, live `SearchDialog`), `searchModel.ts` (keys, where a hit opens, marking the words, the shortcut: unit-tested), `useSearch.ts` (the debounced call). Server: `GET /api/sessions/search` (`app/server/PROTOCOL.md`). Stories `patterns-search--empty|results|no-results|server-error|mobile`. e2e: `e2e/search.spec.ts`.
+- No new DS component: the dialog is the DS `Dialog` (title "Search", the × "Close"), the input is the DS `Input` with `bare` (label hidden, "Search practices"), the archived mark is `Badge`, the shortcut hint is `Kbd variant="ghost"`. The only local style is the list (rows on the selected / hover fills, the matched words as `<mark>` in semibold primary text, no fill).
+- Opening: the sidebar row "Search" (under New practice and Archive) or ⌘K (Mac, `metaKey`) / Ctrl+K (other systems, `ctrlKey`), from every page of the shell. A live session (`/session`) and the setup wizard are outside the shell, so the shortcut never reaches them and the answer box keeps its focus and its text. While another native dialog is open (Settings, a delete confirmation, "Send feedback") the key is left alone; with the search itself open it only keeps the cursor in the input. Opening puts the cursor in the input; closing (Esc, ×, a hit) forgets the query and returns focus to what had it.
+- **The ⌘K hint (owner, 2026-11-03: «сделать гост-кнопку… только при наведении показывать»).** In the sidebar row the shortcut is invisible at rest. While the row is hovered or has keyboard focus (`:hover`, `:focus-visible`) a ghost pill fades in at its end (opacity, `--duration-fast`, `--ease-standard`; no fade under reduced motion): fully rounded (`--radius-pill`), hairline `--color-border-subtle` outline, no fill, `--color-text-secondary`, `--text-sm`. It stays out of the accessibility tree (`aria-hidden`): the button's name is "Search" and `aria-keyshortcuts` carries `Meta+K` / `Control+K`. On touch (`pointer: coarse`, `hover: none`) it is never shown. Collapsed rail: unchanged, the Tooltip "Search ⌘K".
+- **The input line (owner: «не нужно делать такое чёткое выделение инпута… чтобы курсор просто мигал»).** The input is the dialog's first line, not a box: a muted magnifier (`Icon search`, `--color-text-tertiary`), then the text, then a hairline divider (`--color-border-subtle`) above the results. No fill, no border, no hover fill and no focus ring (`Input bare`); the blinking caret is the only sign of focus. This is an accepted exception to the focus-ring rule (CONTRACT §3.2, which already exempts text fields): the dialog opens with the caret already in the field and the field is its only text control, so focus is never ambiguous; the × and the rows keep the normal ring. Keep `role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant` and the placeholder.
+- It is a combobox: focus stays in the input, `aria-activedescendant` names the highlighted row (`role="option"` in a `role="listbox"`), a polite live region says "{n} results" / the empty line.
+
+| Part | Content | Rule |
+|---|---|---|
+| Input | bare line after the magnifier; placeholder "Search practices" | results as you type, 150 ms after the last key; fewer than 2 characters (after trimming) sends nothing and shows the hint |
+| Hint (before typing) | "Search titles, jobs and what was said." | quiet, centred in the list area |
+| Row | line 1: the title (one line, ellipsis, matched words semibold) + a `Badge` "Archived" when archived · line 2: "job · date" (the job is left out when the title already says it) · line 3, only for a hit in a job, a question or an answer: "**Mike · question 3:** …line around the first hit…" / "**Your answer · question 3:** …" / "**Job:** …" (2 lines max, matched words semibold) | a title hit has no line 3 (the title shows the match). An English practice has no question number ("Your answer") |
+| Highlight | first row on arrival (the same practice stays highlighted while the list changes under it); the mouse moves it; ↑ / ↓ move and wrap | selected fill `--color-selected`; hover = highlight |
+| Open | Enter or click | `/sessions/<id>`, plus `?q=<n>` when the hit is in a question or an answer (the number the Debrief uses); closes the dialog; archived practices open the same |
+| No results | «No practices match “{query}”.» + "Try fewer words, or a different spelling." | Enter does nothing |
+| Server down | "Search isn't available right now." (`role="alert"`) | the next keystroke asks again |
+
+Layout: the list area keeps its height while the user types (min 40 %, max 70 % of the dialog width, never more than half the window) and scrolls inside, so the dialog does not jump. On a phone (375) the dialog is the width of the window minus the gutters, like every Dialog; the row in the drawer closes the drawer and opens the dialog. Motion: the Dialog's own (`dialog-in`, `dialog-out`); rows only change fill on `fast`; nothing else moves (reduced motion changes nothing).
+
+| State | When | Story |
+|---|---|---|
+| Empty | opened, nothing typed | `empty` |
+| Results | 2+ characters with hits | `results` |
+| No results | no match | `no-results` |
+| Server down | the call failed | `server-error` |
+| Mobile | 375 | `mobile` |
+
 ## 2. Setup (`/setup`)
 
 - Code: `screens/Setup.tsx`, `screens/setup/*`.
 - Story prefix `screens-setup--`. Review `#setup-<state>`.
-- Map: no composition map. Sources are D81/D82 (three steps, nothing preselected), D83–D88 (engines) and `_index.md` §2. §2b of `_index.md` is superseded.
+- Map: no composition map. Sources are D81/D82 (three steps, nothing preselected), D104 (a first step "Install" when the browser can install Vukoli), D83–D88 (engines) and `_index.md` §2. §2b of `_index.md` is superseded.
 - PRD: US-02, US-03, US-04, US-05.
 
-**Frame.** Brand, a stepper ("Setup steps": "AI engine" · "Check" · "About you", done steps marked "done"), one content column, then the step heading, body and a footer (Back on the left, actions on the right). Below 768 (`setup` container) it is a single column. Focus moves to the step heading on each change.
+**Frame.** Brand, a stepper ("Setup steps": "AI engine" · "Check" · "About you", done steps marked "done"; D104: "Install" first when the browser can install Vukoli, so four steps then), one content column, then the step heading, body and a footer (Back on the left, actions on the right). Below 768 (`setup` container) it is a single column. Focus moves to the step heading on each change.
+
+### 2.0 Step 0 — Install (`InstallStep`, `setup/installGate.ts`; D104)
+
+Why: the launcher opens Vukoli in a Chrome / Edge `--app=` window; until Vukoli is installed as an app, the Dock / taskbar shows the browser's icon. Installed, the launcher opens the app with its own icon. Owner D104 (2026-11-03): put it in the onboarding so nobody misses it.
+
+**When it is there.** Only if `useInstallOffer().canInstall` (the browser holds a `beforeinstallprompt` event; the Home card's "Not now" flag is ignored here, onboarding asks once). The event may arrive after load (the service worker registers on `load`), so on entering `/setup` the frame waits up to 1.5 s (`INSTALL_WAIT_MS`) with a quiet empty column, then starts at "AI engine" as before. An event after that is not inserted mid-wizard (the Home card covers it). A browser that never fires the event (no `onbeforeinstallprompt` on `window`: Safari, Firefox) starts at "AI engine" at once. The decision is frozen for the run, so the stepper never changes under the user. Settings → About → "Run setup again" (AC6) follows the same rule; in the installed app there is normally no event, so no step.
+
+| State | Sees | Can do | Story | Review |
+|---|---|---|---|---|
+| Idle | h1 "Put Vukoli in your Dock" (Windows / Linux: "on your taskbar"); "It gets its own window and icon, and opens from the Dock like any other app." (taskbar: "…from the Start menu…"); primary "Install Vukoli", secondary "Skip" | Install · Skip | `install-first`, `-mobile`, `install-taskbar` | `install-first` |
+| Busy | "Install Vukoli" busy (`loading`), "Skip" disabled: first the browser's dialog, then the quiet wait for the installed app's window (≤ 4 s) | answer the browser's dialog | `install-busy` | `install-busy` |
+
+There is no "installed" screen (owner, 2026-11-03: the "Close this window" screen made people close and reopen the app and "ломает полностью experience").
+
+**Hand-off after `accepted`** (`setup/installHandoff.ts`, `lib/windowLink.ts`).
+1. When Install is pressed the wizard stores "step = engine, with Install" (see Progress below) and notes the time. Every outcome of the step leads to the engine, so the new window can resume there even if it loads before the browser's answer reaches this one.
+2. `accepted`: Chrome opens the installed app in a new window of the same profile (same `localStorage`). Every Vukoli window posts `hello` on a `BroadcastChannel("vukoli-window")` when it loads and answers a `ping`; each message carries a random per-window id and the load time. This window pings and waits up to 4 s (`HELLO_WAIT_MS`) for a `hello` from another window that **loaded after Install was pressed** (a tab open all along does not count). Meanwhile only the busy button shows.
+3. `hello` → `window.close()` (the `--app=` launcher window closes from the page; checked in Chrome 156: `history.length === 1`). The user sees the new window take over, with nothing in between.
+4. No `hello` in 4 s, or `window.close()` refused / still open after 0.5 s (`CLOSE_GRACE_MS`) → this window carries on: it goes to "AI engine" and shows the existing toast once: "Vukoli is installed. Next time open it from the Dock" ("…from the Start menu" on Windows / Linux).
+5. `dismissed` / `unavailable` → "AI engine", no toast. "Skip" → "AI engine".
+
+**The new window.** It opens `/`, `FirstRunGate` sends it to `/setup` (`setupDone` is false), and the wizard resumes at the stored step. The install gate is skipped on a resumed run (no 1.5 s wait, no Install step, even if the browser holds the event); the stepper still shows four steps, Install marked done.
+
+**Progress** (`setup/progress.ts`, `prefs.setupStep`, key `ic.setupStep`). The wizard stores the current step on entering "AI engine", "Check" or "About you" and, with it, the answers that otherwise live only in React state: the engine picked, the name typed (the draft, until it is saved), the job's title, voice or keyboard. Any window opened later (the installed app, a reload, the app closed and reopened) resumes there. "Install" is never stored (a reload there re-asks the browser). Cleared when setup completes (`prefs.setSetupDone(true)`) and when Settings → About → "Run setup again" starts a fresh run. Stories and review frames never store anything (answers are written only when the wizard has stored a step).
+
+Tracking (13b): screen `/setup/install`; `data-track` `setup-install`, `setup-install-skip`. "AI engine" has no Back button, so there is no way back to Install (it is offered once).
 
 ### 2.1 Step 1 — AI engine (`EngineStep`, `EngineChoice`)
 
@@ -322,6 +378,8 @@ PRD conflict: US-03 AC3 says Ollama is preselected when ready. D82 overrides thi
 | Long text | Name is capped at 60 by `maxLength`. A long job title is clamped on one line |
 | User leaves mid-check | Back / step change calls `check.stop()`. Closing the tab ends the recording |
 | Browser without speech API | Server STT is used. Without it, the "no speech recognition" state appears |
+| Install event late / never (D104) | Late (≤ 1.5 s): Install step. Later, or a browser without the event: starts at "AI engine", three steps |
+| Installed app window cannot be closed by script (D104) | After 300 ms "Continue here" appears and the wizard goes on in this window |
 
 ---
 
@@ -902,7 +960,7 @@ When the debrief has `said` / `lands_as`, the card heading is the short tag name
 
 **Opening and closing.**
 - Opens over the page you came from (D76). On a direct visit, Home is behind it.
-- Close (×, Esc, backdrop) goes back in history when opened from inside the app; otherwise it replaces with the page or `/`.
+- Close (×, Esc, a click on the dimmed area) goes back in history when opened from inside the app; otherwise it replaces with the page or `/`.
 - Section switches replace history.
 
 **Sections.**

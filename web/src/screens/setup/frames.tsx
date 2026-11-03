@@ -7,8 +7,9 @@ import type { OllamaPull, Settings } from "../../lib/types";
 import { AboutStep } from "./AboutStep";
 import { CheckStep } from "./CheckStep";
 import { EngineStep } from "./EngineStep";
+import { InstallStep, type InstallPhase } from "./InstallStep";
 import { SetupFrame } from "./SetupFrame";
-import type { CheckState } from "./types";
+import { setupSteps, type CheckState } from "./types";
 
 const noop = () => {};
 const withModel: Settings = { ...SETTINGS, ollama: { ...SETTINGS.ollama, model: "qwen3:8b" } };
@@ -23,7 +24,14 @@ interface SetupSceneSpec { engines?: Engines; settings?: Settings; pull?: Ollama
 const check = (initial: CheckState, level?: number, speaking?: boolean) => () =>
   <SetupFrame step="check"><CheckStep onNext={noop} onBack={noop} onEngine={noop} initial={initial} level={level} speaking={speaking} /></SetupFrame>;
 
+/** D104: the run that starts with Install shows four steps. */
+const install = (phase: InstallPhase, place: "dock" | "taskbar" = "dock") => () =>
+  <SetupFrame step="install" steps={setupSteps(true)}><InstallStep onNext={noop} initialPhase={phase} place={place} /></SetupFrame>;
+
 export const SETUP_SCENES = {
+  installFirst: { render: install("idle") },
+  installTaskbar: { render: install("idle", "taskbar") },
+  installBusy: { render: install("installing") },
   engineFirst: { render: () => <SetupFrame step="engine"><EngineStep onNext={noop} /></SetupFrame> },
   enginePicked: { render: () => <SetupFrame step="engine"><EngineStep onNext={noop} initialPick="ollama" /></SetupFrame> },
   engineNoOllama: {

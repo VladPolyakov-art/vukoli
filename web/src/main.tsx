@@ -7,10 +7,12 @@ import { guardFileDrops } from "./lib/fileDrops";
 import { applyTheme } from "./lib/theme";
 import { registerServiceWorker } from "./lib/installApp";
 import { prefs } from "./lib/prefs";
+import { announceWindow } from "./lib/windowLink";
 
 applyTheme(prefs.theme());
 guardFileDrops();
 registerServiceWorker();
+announceWindow();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

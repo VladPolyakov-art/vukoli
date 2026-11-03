@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
-from . import config, feedback, telemetry
+from . import config, engines, feedback, telemetry
 from .engines.base import EngineError, LLMEngine
 from .stt import STT, Transcript
 
@@ -92,7 +92,26 @@ class Context:
     ignored: set = field(default_factory=set)
     dropped: set = field(default_factory=set)
     owner_ok: Callable[[], bool] = lambda: True
+    language_llm: LLMEngine | None = None                # D106: a larger model for the English corrections, if any
+    language_chosen: bool = False
     save: Callable[[int], Awaitable[bool]] = None        # type: ignore[assignment]
+
+
+CHECKER_LOOKUP_S = 10            # asking Ollama which models are installed
+
+
+async def choose_language_llm(ctx: Context) -> None:
+    """English practice on Ollama (D106): the corrections are made by a larger installed model while Mike's replies
+    were made by the session model. Looked up once per job; any failure keeps the session model."""
+    if ctx.language_chosen:
+        return
+    ctx.language_chosen = True
+    if ctx.mode != "english":
+        return
+    try:
+        ctx.language_llm = await asyncio.wait_for(engines.language_checker(ctx.llm), CHECKER_LOOKUP_S)
+    except (asyncio.TimeoutError, EngineError):
+        ctx.language_llm = None
 
 
 def public(record: dict) -> dict:
@@ -138,7 +157,7 @@ async def process_answer(record: dict, transcript: Transcript | None, ctx: Conte
     try:
         record["layers"]["language"] = await budget.run(lambda: asyncio.wait_for(ctx.run(
             lambda: feedback.analyze_language(
-                ctx.llm, record["answer"], level=ctx.level, known=ctx.known_terms, low=low,
+                ctx.language_llm or ctx.llm, record["answer"], level=ctx.level, known=ctx.known_terms, low=low,
                 english_track=ctx.mode == "english", ignored=ctx.ignored)), timeout=LLM_TIMEOUT_S))
     except (EngineError, asyncio.TimeoutError) as exc:
         code = getattr(exc, "code", "timeout")
@@ -175,6 +194,7 @@ async def run_answers(items: list[tuple[dict, Transcript | None]], ctx: Context)
     total = len(items)
     budget = Budget(budget_s(total))
     done = 0
+    await choose_language_llm(ctx)
     ctx.emit("feedback_progress", done=0, total=total)
     try:
         for record, transcript in items:

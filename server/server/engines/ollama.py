@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +27,12 @@ VOICE_MODEL = MODEL_SMALL
 # and strip a leading <think> block, but warn in the status.
 THINKING_ONLY_TAGS = {"qwen3:4b", "qwen3:4b-thinking", "deepseek-r1", "qwq"}
 NUM_CTX = 4096
+# The model family the app recommends (MODEL_SMALL / MODEL_LARGE) and the memory a larger model needs: the same
+# 15.5 GB line that picks MODEL_LARGE as the default. Both models stay loaded for the after-call work, so together
+# they must fit in about half of the RAM (the speech models and the system need the rest).
+FAMILY = MODEL_LARGE.split(":")[0]
+LARGE_MIN_RAM_GB = 15.5
+LOADED_SHARE_OF_RAM = 0.55
 
 DESCRIPTOR = EngineDescriptor(
     id="ollama",
@@ -54,7 +61,7 @@ def recommended_model(ram_gb: float | None = None) -> str:
 
 def is_thinking_only(model: str) -> bool:
     name = model.lower()
-    return name in THINKING_ONLY_TAGS or any(name.startswith(tag + ":") for tag in THINKING_ONLY_TAGS
+    return name in THINKING_ONLY_TAGS or "thinking" in name or any(name.startswith(tag + ":") for tag in THINKING_ONLY_TAGS
                                              if ":" not in tag)
 
 
@@ -178,6 +185,15 @@ def install_hint(model: str) -> str:
     return f"Install Ollama from {DOWNLOAD_URL}, start it, then run: ollama pull {model}"
 
 
+def _billions(model: dict) -> float:
+    """Parameter count in billions: Ollama's "8.2B" label, else the size in the tag, else file size as a guess."""
+    for text in (model.get("parameter_size", ""), model.get("name", "")):
+        match = re.search(r"(\d+(?:\.\d+)?)\s*b\b", text.lower().replace(":", " "))
+        if match:
+            return float(match.group(1))
+    return model.get("size", 0) / 0.6e9
+
+
 class OllamaEngine(LLMEngine):
     id = "ollama"
 
@@ -218,6 +234,26 @@ class OllamaEngine(LLMEngine):
                            "family": details.get("family", ""),
                            "thinking_only": is_thinking_only(item.get("name", ""))})
         return models
+
+    async def bigger_sibling(self) -> "OllamaEngine | None":
+        """For the after-call language check in English practice (D106): the best installed model of the
+        recommended family that is larger than this one (not a reasoning-only tag), or None when there is none or
+        this machine cannot hold both. Same server, same transport; it never downloads anything."""
+        ram = total_ram_gb() if self._ram_gb is None else self._ram_gb
+        if ram < LARGE_MIN_RAM_GB:
+            return None
+        models = {m["name"]: m for m in await self.list_models()}
+        mine = models.get(await self._ensure_model())
+        if not mine:
+            return None
+        mine_size = _billions(mine)
+        options = [m for m in models.values()
+                   if m["name"].split(":")[0] == FAMILY and not m["thinking_only"] and _billions(m) > mine_size + 0.5
+                   and (m["size"] + mine["size"]) / 1024 ** 3 <= ram * LOADED_SHARE_OF_RAM]
+        if not options:
+            return None
+        best = max(options, key=_billions)
+        return OllamaEngine(self.url, best["name"], transport=self._transport, ram_gb=self._ram_gb)
 
     async def _resolve(self) -> tuple[str, list[str]]:
         """Pick the effective model: the user's choice, else the RAM default, else a close installed one."""

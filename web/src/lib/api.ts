@@ -2,7 +2,7 @@
 import type {
   Debrief, EngineId, EngineLimits, EngineStatus, EnginesResponse, EngineConnectResult, EngineTestResult, Health, MemorySummary, OllamaModelsResponse, OllamaPull,
   Profile, Question, SessionRecord, SessionSummary, Settings, SettingsPatch, SttInfo, StrongerVersion, TelemetryInfo, VoiceCheckResult,
-  TrashItem, Vacancy, FeedbackBody, FeedbackConfig, SessionFinished, VacancySummary, VoicesResponse, LanguageItem, LanguageLayer, FeedbackRecord, TranscriptTurn,
+  TrashItem, SearchResult, Vacancy, FeedbackBody, FeedbackConfig, SessionFinished, VacancySummary, VoicesResponse, LanguageItem, LanguageLayer, FeedbackRecord, TranscriptTurn,
 } from "./types";
 
 export class ApiError extends Error {
@@ -97,6 +97,8 @@ export const api = {
   deleteVacancy: (id: string) => request<{ id: string; trash_id: string }>(`/vacancies/${encodeURIComponent(id)}`, { method: "DELETE" }),
   vacancyQuestions: (id: string) => post<{ questions: Question[] }>(`/vacancies/${encodeURIComponent(id)}/questions`),
   sessions: () => request<{ sessions: SessionSummary[] }>("/sessions"),
+  /** D105: find past practices by title, job, mode or what was said. */
+  searchSessions: (q: string, limit = 20) => request<SearchResult[]>(`/sessions/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   session: (id: string) => request<SessionRecord>(`/sessions/${encodeURIComponent(id)}`),
   sessionMarkdownUrl: (id: string) => `/api/sessions/${encodeURIComponent(id)}/markdown`,
   /** D80: rename, or move to the Archive and back. */

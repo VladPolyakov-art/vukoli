@@ -1,6 +1,8 @@
 """Engine registry: descriptors, status and factories for the selected engine."""
 from __future__ import annotations
 
+import httpx
+
 from .. import config
 from . import antigravity_cli, claude_cli, codex_cli, gemini_live, ollama, openai_compat
 from .base import EngineDescriptor, EngineError, EngineStatus, LLMEngine
@@ -67,6 +69,18 @@ def make_llm(settings: dict | None = None, engine_id: str | None = None, *, voic
     raise EngineError("unknown_engine", f"Unknown engine {engine_id}")
 
 
+async def language_checker(llm: LLMEngine | None) -> LLMEngine | None:
+    """D106: in English practice the language corrections are checked after the call by a larger installed model
+    when the session runs on Ollama and the machine can hold both. None = keep using the session model (also for
+    every other engine, and when Ollama does not answer)."""
+    if not isinstance(llm, ollama.OllamaEngine):
+        return None
+    try:
+        return await llm.bigger_sibling()
+    except (EngineError, httpx.HTTPError):
+        return None
+
+
 async def engine_status(engine_id: str, settings: dict | None = None) -> EngineStatus:
     settings = settings or config.load_settings()
     try:
@@ -84,4 +98,4 @@ async def all_engines(settings: dict | None = None) -> list[dict]:
 
 
 __all__ = ["DESCRIPTORS", "DisconnectedEngine", "EngineDescriptor", "EngineError", "EngineStatus", "LLMEngine", "make_llm",
-           "engine_status", "all_engines"]
+           "engine_status", "all_engines", "language_checker"]

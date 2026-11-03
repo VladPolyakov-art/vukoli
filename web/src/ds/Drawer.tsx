@@ -2,7 +2,7 @@
  * - left: the rail below 1024 (AppShell top bar → menu button), `--layout-rail` wide, sidebar surface.
  * - right: the Session feedback panel at mid width (`--layout-panel`).
  * - bottom: the Session feedback sheet on a phone (top radius `--radius-xl`, max height under the top bar).
- * Modal: role="dialog" + aria-modal, focus moves in and is trapped, Esc and a scrim click close it, focus returns
+ * Modal: role="dialog" + aria-modal, focus moves in and is trapped, Esc and a click on the scrim (press and click both on it, D108) close it, focus returns
  * to the opener. Renders into the OverlayRoot layer when there is one (review frames), else into document.body.
  * Motion (docs/motion.md 3.7): slide from the edge `slow` `--ease-standard`, exit `exit`, scrim plain fade, no blur. */
 import { useId, useRef, type ReactNode } from "react";
@@ -11,7 +11,7 @@ import { IconButton } from "./Button";
 import { usePresence } from "./motion";
 import { OverlayPortal } from "./OverlayRoot";
 import { useScrollFocusable } from "./scrollFocus";
-import { trapTab, useOverlayFocus } from "./overlay";
+import { trapTab, useBackdropClose, useOverlayFocus } from "./overlay";
 import s from "./Drawer.module.css";
 
 export type DrawerSide = "left" | "right" | "bottom";
@@ -45,6 +45,7 @@ export function Drawer({
   const bodyFocus = useScrollFocusable(typeof title === "string" ? title : label);
   const id = useId();
   useOverlayFocus(panel, open && !inline && mounted);
+  const backdrop = useBackdropClose(open, onClose);
   const surface = tone ?? (side === "left" ? "sidebar" : "raised");
 
   const body = (
@@ -86,7 +87,7 @@ export function Drawer({
   return (
     <OverlayPortal>
       <div className={s.root}>
-        <div className={`${s.scrim} ${leaving ? s.scrimOut : ""}`} aria-hidden="true" onClick={onClose} />
+        <div className={`${s.scrim} ${leaving ? s.scrimOut : ""}`} aria-hidden="true" {...backdrop} />
         {body}
       </div>
     </OverlayPortal>

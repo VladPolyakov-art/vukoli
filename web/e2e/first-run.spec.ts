@@ -7,7 +7,10 @@ import {
   NAME,
   collectPageErrors,
   denyMicrophone,
+  installPrompted,
+  offerInstall,
   resetApp,
+  windowCloseCalls,
   steerEngine,
 } from "./helpers";
 
@@ -143,6 +146,137 @@ test.describe("US-02 First-run wizard", () => {
     await expect(job.getByRole("button", { name: "Save job" })).toBeDisabled();
     await job.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByRole("dialog", { name: "Add a job" })).toBeHidden();
+  });
+});
+
+test.describe("US-02 D104 Install Vukoli as an app", () => {
+  const stepNames = (page: import("@playwright/test").Page) => page.getByRole("navigation", { name: "Setup steps" }).getByRole("listitem");
+  const installHeading = (page: import("@playwright/test").Page) => page.getByRole("heading", { name: /^Put Vukoli (in your Dock|on your taskbar)$/, level: 1 });
+
+  test("no install event: the wizard has its three steps and starts at the engine", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await expect(stepNames(page)).toHaveText([/AI engine/, /Check/, /About you/]);
+    await expect(page.getByRole("button", { name: "Install Vukoli" })).toHaveCount(0);
+  });
+
+  test("the browser can install Vukoli: Install is the first of four steps; Skip goes on to the engine", async ({ page }) => {
+    await offerInstall(page, "accepted");
+    await page.goto("/");
+    await expect(installHeading(page)).toBeVisible();
+    await expect(page.getByText(/its own window and icon/i)).toBeVisible();
+    await expect(stepNames(page)).toHaveText([/Install/, /AI engine/, /Check/, /About you/]);
+    await expect(page.getByRole("button", { name: "Install Vukoli" })).toBeVisible();
+    await page.getByRole("button", { name: "Skip" }).click();
+    expect(await installPrompted(page)).toBe(0);
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await expect(stepNames(page)).toHaveText([/Install/, /AI engine/, /Check/, /About you/]);
+  });
+
+  test("a late event (inside the wait) still gets the Install step", async ({ page }) => {
+    await offerInstall(page, "accepted", 600);
+    await page.goto("/");
+    await expect(installHeading(page)).toBeVisible();
+  });
+
+  test("an event after the wait is not inserted mid-wizard: the wizard stays at the engine with three steps", async ({ page }) => {
+    await offerInstall(page, "accepted", 2500);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await page.waitForTimeout(3000); // the event has fired by now (the one pause: the thing under test is that nothing happens)
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await expect(installHeading(page)).toHaveCount(0);
+    await expect(stepNames(page)).toHaveText([/AI engine/, /Check/, /About you/]);
+  });
+
+  test("negative: the browser's install dialog is cancelled, the wizard goes on to the engine", async ({ page }) => {
+    await offerInstall(page, "dismissed");
+    await page.goto("/");
+    await page.getByRole("button", { name: "Install Vukoli" }).click();
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    expect(await installPrompted(page)).toBe(1);
+  });
+
+  test("installed: the new app window says hello, the old window closes itself with no screen in between, and the new one resumes at the engine", async ({ page, context }) => {
+    await offerInstall(page, "accepted");
+    await page.goto("/");
+    await page.getByRole("button", { name: "Install Vukoli" }).click();
+    await expect(page.getByRole("button", { name: "Install Vukoli" })).toBeDisabled();   // busy while it waits (loading button)
+    // Chrome opens the installed app in a new window of the same profile: it lands on / -> /setup and resumes.
+    const app = await context.newPage();
+    await app.goto("/");
+    await expect(app.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await expect(stepNames(app)).toHaveText([/Install/, /AI engine/, /Check/, /About you/]);   // Install is done, not offered again
+    await expect(app.getByRole("button", { name: "Install Vukoli" })).toHaveCount(0);
+    await expect.poll(() => windowCloseCalls(page)).toBe(1);                             // the old window closed itself
+    expect(await installPrompted(page)).toBe(1);
+    await expect(page.getByRole("heading", { name: "Vukoli is installed" })).toHaveCount(0);   // there is no "installed" screen any more
+    await expect(page.getByRole("button", { name: "Close this window" })).toHaveCount(0);
+  });
+
+  test("negative: installed but no window says hello (4 s): setup goes on here at the engine, with one toast about the Dock", async ({ page }) => {
+    await offerInstall(page, "accepted");
+    await page.goto("/");
+    await page.getByRole("button", { name: "Install Vukoli" }).click();
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/^Vukoli is installed\. Next time open it from (the Dock|the Start menu)\.$/)).toHaveCount(1);
+    expect(await windowCloseCalls(page)).toBe(0);                                         // nobody to hand over to: it stays open
+    expect(await installPrompted(page)).toBe(1);
+    await expect(stepNames(page)).toHaveText([/Install/, /AI engine/, /Check/, /About you/]);
+  });
+
+  test("negative: the new window says hello but this one cannot close (the browser refuses): setup goes on here with the toast", async ({ page, context }) => {
+    // In the suite window.close is a counter that closes nothing, which is exactly a refused close.
+    await offerInstall(page, "accepted");
+    await page.goto("/");
+    await page.getByRole("button", { name: "Install Vukoli" }).click();
+    const app = await context.newPage();
+    await app.goto("/");
+    await expect.poll(() => windowCloseCalls(page)).toBe(1);
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await expect(page.getByText(/Next time open it from/)).toHaveCount(1);
+  });
+
+  test("a window that was open before Install does not count as the app window", async ({ page, context }) => {
+    const other = await context.newPage();
+    await other.goto("/");                                       // open all along, loaded before Install is pressed
+    await offerInstall(page, "accepted");
+    await page.goto("/");
+    await page.getByRole("button", { name: "Install Vukoli" }).click();
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible({ timeout: 15_000 });
+    expect(await windowCloseCalls(page)).toBe(0);
+  });
+});
+
+test.describe("US-02 Setup remembers where you are", () => {
+  test("a reload mid-setup resumes at the step it was on, with the name typed", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("radio", { name: /^Ollama/ }).click();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Choose how Mike runs", level: 1 })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^Ollama/ })).toBeChecked();             // (Ollama is also the default pick when it is Ready; the stored pick matters for the others)
+
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "Quick mic check", level: 1 })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Quick mic check", level: 1 })).toBeVisible();   // not back at the engine
+
+    await page.getByRole("button", { name: "I'll type instead" }).first().click();
+    await expect(page.getByRole("heading", { name: "About you", level: 1 })).toBeVisible();
+    await page.getByRole("textbox", { name: "What should Mike call you?" }).fill("Sam");
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "About you", level: 1 })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "What should Mike call you?" })).toHaveValue("Sam");
+  });
+
+  test("finishing setup forgets the progress: a new window opens Home, not the wizard", async ({ page, context }) => {
+    await reachAboutStep(page);
+    await page.getByRole("button", { name: "Not now" }).click();
+    await expect(page.getByRole("heading", { name: "What are we practising today?", level: 1 })).toBeVisible();
+    const again = await context.newPage();
+    await again.goto("/");
+    await expect(again).not.toHaveURL(/\/setup/);
+    expect(await again.evaluate(() => window.localStorage.getItem("ic.setupStep"))).toBeNull();
   });
 });
 

@@ -13,3 +13,12 @@
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }
+
+/* Ghost: fully rounded, no fill, a hairline outline (no thick bottom edge), muted text. */
+.ghost {
+  padding: 0 var(--space-2);
+  border-bottom-width: var(--border-width);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+}

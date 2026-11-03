@@ -1,0 +1,80 @@
+/* Search dialog (D105): an input over a list of hits, inside the DS Dialog. Tokens only. */
+.panel { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* D105 follow-up: the input is the dialog's first line, not a box: a muted magnifier, the text and the caret (the DS
+ * `Input bare` has no fill, no border, no focus ring), then a hairline divider above the results. */
+.inputLine {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border-subtle);
+}
+.inputIcon { display: inline-flex; color: var(--color-text-tertiary); }
+
+/* The list owns its height: the dialog does not jump while the user types. 70% of the dialog width, never taller than half the window. */
+.results {
+  min-height: calc(var(--layout-dialog) * 0.4);
+  max-height: min(calc(var(--layout-dialog) * 0.7), 50dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-inline: calc(var(--space-2) * -1);
+}
+.list { display: flex; flex-direction: column; gap: var(--space-0); margin: 0; padding: 0; list-style: none; }
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.row[aria-selected="true"] { background: var(--color-selected); }
+.row:active { background: var(--color-hover); }
+
+.titleLine { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.sub { font-size: var(--text-sm); color: var(--color-text-secondary); }
+.said {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.who { font-weight: var(--weight-medium); color: var(--color-text-tertiary); }
+
+/* The matched words: heavier and in the primary colour, no fill (the row's own fill is the selection). */
+.mark {
+  background: transparent;
+  color: var(--color-text-primary);
+  font-weight: var(--weight-semibold);
+}
+
+/* Before typing and when nothing matches: a quiet centred line, like the other empty states. */
+.note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: inherit;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.noteTitle { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--color-text-primary); overflow-wrap: anywhere; }

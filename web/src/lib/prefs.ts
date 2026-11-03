@@ -18,6 +18,7 @@ const KEYS = {
   vacancy: "ic.vacancyId",
   railCollapsed: "ic.railCollapsed",
   installDismissed: "ic.installDismissed",
+  setupStep: "ic.setupStep",
 } as const;
 
 function read(key: string): string | null {
@@ -63,6 +64,14 @@ export const prefs = {
   },
   setSetupDone(v: boolean) {
     write(KEYS.setupDone, v ? "1" : null);
+    if (v) write(KEYS.setupStep, null);        // the wizard's progress has served its purpose
+  },
+  /** Where the setup wizard is, as JSON (screens/setup/progress.ts owns the shape): any window opened later resumes there. */
+  setupStep(): string | null {
+    return read(KEYS.setupStep);
+  },
+  setSetupStep(v: string | null) {
+    write(KEYS.setupStep, v);
   },
   input(): InputPref {
     return read(KEYS.input) === "text" ? "text" : "voice";

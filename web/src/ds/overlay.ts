@@ -1,7 +1,7 @@
 /* Shared overlay behaviour for Dialog, Drawer, Menu, Tooltip, Toast: focus handling and anchored positioning.
  * No library. Positions are computed in the overlay container's own CSS pixels, so a menu stays attached to its
  * trigger inside a scaled review frame (getBoundingClientRect returns scaled numbers; we divide the scale out). */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 
 export const FOCUSABLE =
   'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), ' +
@@ -250,4 +250,35 @@ export function useOutsidePress(active: boolean, refs: RefObject<HTMLElement | n
     // refs are stable ref objects
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
+}
+
+/** D108: is this click a click on the backdrop? True only when the press started on the backdrop itself and the click
+ * ended there too (`onSelf`), and, for a native <dialog> whose box is the element itself, the point lies outside the
+ * box (`rect`). A text selection dragged out of the box starts inside: it never closes. Pure, so it is unit-tested. */
+export function isBackdropClick(
+  pressStartedOnBackdrop: boolean,
+  onSelf: boolean,
+  rect: { left: number; right: number; top: number; bottom: number } | null,
+  x: number,
+  y: number,
+): boolean {
+  if (!pressStartedOnBackdrop || !onSelf) return false;
+  if (!rect) return true;
+  return x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
+}
+
+/** D108: every modal (Dialog, Drawer) closes on a click on the dimmed area. Spread the result on the element that IS the
+ * backdrop: the scrim element (Drawer, contained Dialog) or the native <dialog> itself (`boxIsSelf`: its own box does
+ * not count). Closing this way is the dialog's own Close / Cancel / "Not now": `onClose` is the same callback. */
+export function useBackdropClose(active: boolean, onClose: () => void, boxIsSelf = false) {
+  const down = useRef(false);
+  return {
+    onPointerDown: (e: ReactPointerEvent<HTMLElement>) => { down.current = e.target === e.currentTarget; },
+    onClick: (e: ReactMouseEvent<HTMLElement>) => {
+      const started = down.current;
+      down.current = false;
+      const rect = boxIsSelf ? e.currentTarget.getBoundingClientRect() : null;
+      if (active && isBackdropClick(started, e.target === e.currentTarget, rect, e.clientX, e.clientY)) onClose();
+    },
+  };
 }

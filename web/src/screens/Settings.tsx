@@ -22,6 +22,7 @@ import { feedbackUi } from "../lib/feedbackUi";
 import { useLoad } from "../lib/hooks";
 import { iconPlace, useInstallOffer } from "../lib/installApp";
 import { prefs, type PausePref } from "../lib/prefs";
+import { clearProgress } from "./setup/progress";
 import { errorMessage, useApp } from "../lib/store";
 import { useTheme } from "../lib/theme";
 import type { Level, SettingsPatch } from "../lib/types";
@@ -161,7 +162,7 @@ export function SettingsScreen(props: ReviewProps) {
 
 export function SettingsDialog({ open, section, onClose, ...review }: { open: boolean; section: SectionId; onClose: () => void } & ReviewProps) {
   return (
-    <Dialog open={open} size="lg" title={t("settings.title")} closeLabel={t("common.close")} onClose={onClose} closeOnBackdrop>
+    <Dialog open={open} size="lg" title={t("settings.title")} closeLabel={t("common.close")} onClose={onClose}>
       <SettingsBody section={section} {...review} />
     </Dialog>
   );
@@ -657,7 +658,7 @@ function AboutSection() {
       </SettingGroup>
       <SettingGroup title={t("settings.about.setupTitle")} id="about-setup-title">
         <SettingRow id="about-setup" label={t("settings.about.setupRun")} description={t("settings.about.setupHint")}>
-          <Button size="sm" variant="secondary" icon="refresh" data-track="settings-run-setup" onClick={() => navigate("/setup")}>{t("settings.about.setupRun")}</Button>
+          <Button size="sm" variant="secondary" icon="refresh" data-track="settings-run-setup" onClick={() => { clearProgress(); navigate("/setup"); }}>{t("settings.about.setupRun")}</Button>
         </SettingRow>
       </SettingGroup>
       <SettingGroup title={t("support.settings.aboutTitle")} id="about-feedback-title">

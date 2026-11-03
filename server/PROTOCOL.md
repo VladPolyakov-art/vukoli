@@ -241,6 +241,9 @@ asked the next question (see Turns). Times are measured from the moment the serv
   "Heard as ...", not counted until confirmed), `confirmed`, `dismissed`. Only `active` and `confirmed` items with
   severity 2 or 3 count in the debrief.
 - In English mode the language layer may carry `"phrase_to_keep": {"phrase": "...", "why": "..."}`.
+- The language layer carries `"model": "<id>"`, the model that checked it (D106). In English practice on Ollama it
+  is the larger installed model of the recommended family (`qwen3:8b`) when the computer has 15.5 GB of RAM or more
+  and room for both models; otherwise the session model. Absent when the engine reports no model.
 - Delivery `metrics.mode` is `text` for typed answers, with `"not_available": ["pace", "fillers", "pauses"]`.
   Delivery tips only talk about length, pace, fillers and pauses. Typed answers are judged by word count
   (main answer: tip below 25 words or above 420; strong tip below 12 or above 560) with text-mode copy; restarts
@@ -368,3 +371,30 @@ transcript, CV or job is ever included; `session_id` is accepted but not forward
 true), `sessions_finished` and `sessions_counted_last` live in `settings.json`; only `feedback_ask` is editable
 (Settings, Privacy and data). Test mode (`IC_E2E=1`) replaces the service with a stand-in that remembers the payloads:
 `GET` / `POST /api/_e2e/feedback`, no request ever leaves the machine.
+
+## REST: search across practices (D105, US-61)
+
+| Call | Answer |
+|---|---|
+| `GET /api/sessions/search?q=<text>&limit=20` | a JSON array (empty for a query under 2 characters), at most `limit` (1..50, default 20) results, best first |
+
+Local only: it reads the saved sessions (`sessions/*.json`, archived ones too, not the trash); nothing is indexed on disk and
+nothing leaves the computer. A session is kept in memory after its first read and read again only when its file changes.
+The route is registered before `/api/sessions/{id}`, so `search` is never taken for an id.
+
+- **Matching.** Case-insensitive, every whitespace-separated word of `q` (at most 8) must be found somewhere in the
+  session, as a part of a word (AND). Searched: the title as shown, the job (`vacancy_title` and the title of its vacancy
+  record), the mode (`english` / `interview`), Mike's questions and the user's answers (`transcript`, then
+  `feedback[].question/answer` for text the transcript does not hold, e.g. an answer edited with "Edit what I said").
+  Mike's closing line is not searched.
+- **Order.** Sessions whose title / job / mode match first (more of the query's words there first), then the number of hits
+  in the whole session, then the newest `started_at`.
+- **Result.** `{id, title, subtitle, mode, archived, started_at, match}`. `subtitle` is "job · date" ("27 Oct 2026"; the
+  job is left out when the title already says it). `match = {field, snippet, q?}`: `field` is `title`, `job`, `question` or
+  `answer` (where the first hit is: a head match wins; else the line holding most of the words, the earliest on a tie);
+  `snippet` is the line, or about 120 characters around the first hit cut at word edges with "…"; `q` is the number of the
+  question the Debrief shows the line under (the 1-based place in the session's `questions`, else the order the questions were
+  answered, the same as `threadsFromRecord`), present for `question` / `answer` hits and never for an English practice,
+  which has no question tabs. The page opens `/sessions/<id>?q=<q>`.
+- A session with a missing or odd field (not a dict, a non-string title, a broken file) is searched with what it has or
+  skipped; it never fails the call.

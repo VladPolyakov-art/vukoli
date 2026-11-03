@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { userEvent, within } from "storybook/test";
 import { Button, Card } from "../ds";
 import { OverlayRoot } from "../ds/OverlayRoot";
 import { AppShellView, NOOP_ACTIONS, type AppShellViewProps, type RecentState } from "./AppShell";
@@ -73,6 +74,14 @@ function Shell({ width, height, path = "/archive", start, ...props }: Partial<Ap
 /** ≥ 1024, expanded (D57, claude.ai sidebar): brand + toggle, New practice (round plus), Recents (one line each, no dates),
  * Archive (D80, replaced History), the account row at the bottom (name + engine in use). */
 export const Expanded: StoryObj = { render: () => <Shell width={1440} height={900} /> };
+
+/** D105 follow-up: the "Search" row at rest shows no shortcut; hovered (this story hovers it) or keyboard-focused it fades in a ghost pill "⌘K" (never on touch). */
+export const SearchRowHover: StoryObj = {
+  render: () => <Shell width={1440} height={900} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.hover(within(canvasElement).getByRole("button", { name: "Search" }));
+  },
+};
 
 /** ≥ 1024, collapsed to the icon rail: the toggle, the round plus and the avatar, each with a tooltip (hover or focus one). */
 export const Collapsed: StoryObj = { render: () => <Shell width={1440} height={900} collapsed /> };

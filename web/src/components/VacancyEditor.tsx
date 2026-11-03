@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Callout, Card, Dialog, FileDrop, Input, Segmented, Spinner, Textarea, TextShimmer } from "../ds";
 import { t } from "../i18n";
 import { api, fileToBase64 } from "../lib/api";
+import { drafts } from "../lib/drafts";
 import { errorMessage } from "../lib/store";
 import type { Vacancy } from "../lib/types";
 import { extractCompanyRole, joinTitle, splitTitle } from "./vacancyTitle";
@@ -212,6 +213,11 @@ export interface VacancyEditorProps {
   onDeleted?: (id: string) => void;
 }
 
+/** What the user typed, kept in memory while the dialog is closed (D108: a click on the dimmed area is Cancel). One draft
+ * for a new job, one per job being edited; gone when the job is saved or deleted. A chosen file is not kept. */
+interface JobDraft { source: VacancySource; text: string; url: string; company: string; role: string; typed: boolean; extracted: boolean }
+const draftKey = (editId?: string | null) => `job:${editId ?? "new"}`;
+
 export function VacancyEditor({ open, onClose, onSaved, initial, editId, saveLabel, onDeleted }: VacancyEditorProps) {
   const [source, setSource] = useState<VacancySource>("paste");
   const [text, setText] = useState("");
@@ -226,14 +232,35 @@ export function VacancyEditor({ open, onClose, onSaved, initial, editId, saveLab
   const [error, setError] = useState("");
   const [askDelete, setAskDelete] = useState(false);
   const wasOpen = useRef(false);
+  const key = draftKey(editId);
+  /** The user changed something in this opening: only then is there a draft worth keeping. */
+  const dirty = useRef(false);
 
-  // Each opening starts from `initial` (or from the job being edited).
+  // Each opening starts from `initial` (or from the job being edited), or from the draft left by the last closing.
   useEffect(() => {
     if (!open || wasOpen.current) {
       wasOpen.current = open;
       return;
     }
     wasOpen.current = true;
+    dirty.current = false;
+    const draft = !initial?.text && !initial?.url ? drafts.get<JobDraft>(key) : undefined;
+    if (draft) {
+      dirty.current = true;
+      setSource(initial?.source ?? draft.source);
+      setText(draft.text);
+      setUrl(draft.url);
+      setFile(null);
+      setFileState("empty");
+      setCompany(draft.company);
+      setRole(draft.role);
+      setTyped(draft.typed);
+      setExtracted(draft.extracted);
+      setError("");
+      setSaving(false);
+      setAskDelete(false);
+      return;
+    }
     setSource(initial?.source ?? "paste");
     setText(initial?.text ?? "");
     setUrl(initial?.url ?? "");
@@ -261,9 +288,15 @@ export function VacancyEditor({ open, onClose, onSaved, initial, editId, saveLab
         setTyped(true);
       }).catch(() => {});
     }
-  }, [open, initial, editId]);
+  }, [open, initial, editId, key]);
+
+  useEffect(() => {
+    if (!open || !dirty.current) return;
+    drafts.set<JobDraft>(key, { source, text, url, company, role, typed, extracted });
+  }, [open, key, source, text, url, company, role, typed, extracted]);
 
   const changeText = (v: string) => {
+    dirty.current = true;
     setText(v);
     if (typed) return;
     const guess = extractCompanyRole(v);
@@ -305,6 +338,8 @@ export function VacancyEditor({ open, onClose, onSaved, initial, editId, saveLab
         await api.deleteVacancy(editId).catch(() => {});
         onDeleted?.(editId);
       }
+      drafts.clear(key);
+      dirty.current = false;
       onSaved(vacancy);
     } catch (e) {
       setError(errorMessage(e));
@@ -317,6 +352,8 @@ export function VacancyEditor({ open, onClose, onSaved, initial, editId, saveLab
     if (!editId) return;
     await api.deleteVacancy(editId);
     setAskDelete(false);
+    drafts.clear(key);
+    dirty.current = false;
     onDeleted?.(editId);
     onClose();
   };
@@ -332,11 +369,11 @@ export function VacancyEditor({ open, onClose, onSaved, initial, editId, saveLab
         onTextChange={changeText}
         company={company}
         role={role}
-        onCompanyChange={(v) => { setCompany(v); setTyped(true); setExtracted(false); }}
-        onRoleChange={(v) => { setRole(v); setTyped(true); setExtracted(false); }}
+        onCompanyChange={(v) => { dirty.current = true; setCompany(v); setTyped(true); setExtracted(false); }}
+        onRoleChange={(v) => { dirty.current = true; setRole(v); setTyped(true); setExtracted(false); }}
         extracted={extracted}
         url={url}
-        onUrlChange={setUrl}
+        onUrlChange={(v) => { dirty.current = true; setUrl(v); }}
         link={error && source === "link" ? "error" : "idle"}
         file={file}
         fileState={fileState}

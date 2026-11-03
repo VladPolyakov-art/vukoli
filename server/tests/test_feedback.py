@@ -12,13 +12,13 @@ async def test_language_rejects_invented_quotes_and_known_terms(fake_llm):
         {"original": "I has done", "better": ["I have done"], "reason": "tense", "level": "B1", "class": "N"},
         {"original": "we has redesigned", "better": ["we redesigned"], "reason": "Past tense here.", "level": "B1",
          "class": "N"},
-        {"original": "in Figma", "better": ["with Figma"], "reason": "preposition", "level": "B1", "class": "C"},
+        {"original": "in Figma", "better": ["in the design tool"], "reason": "preposition", "level": "B1", "class": "C"},
         {"original": "with 12 users", "better": ["with 15 users"], "reason": "word", "level": "B1", "class": "C"},
         {"original": "the research", "better": ["the research"], "reason": "same", "level": "B1", "class": "C"},
     ]}})
     layer = await feedback.analyze_language(llm, ANSWER, level="B1", known=["Figma"], low=[])
     originals = [f["original"] for f in layer["items"]]
-    assert originals == ["we has redesigned"]          # invented, known-term, number-changing, no-op dropped
+    assert originals == ["we has redesigned"]          # invented, rewrites a known term, number-changing, no-op dropped (D106: only a rewrite of the term drops it)
     assert layer["status"] == "fix" and layer["items"][0]["tag"] == "tense"
     assert layer["items"][0]["status"] == "active" and layer["severity"] == 2
 

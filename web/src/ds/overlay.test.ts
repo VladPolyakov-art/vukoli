@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { place } from "./overlay";
+import { isBackdropClick, place } from "./overlay";
 
 const space = { width: 1000, height: 800 };
 const base = { gap: 4, pad: 8, floating: { width: 200, height: 150 } };
@@ -46,5 +46,25 @@ describe("place (anchored popovers)", () => {
     expect(p.left).toBe(8);
     expect(p.width).toBe(375 - 16);
     expect(p.maxHeight).toBe(800 * 0.6);
+  });
+});
+
+describe("isBackdropClick (D108: a click on the dimmed area closes every modal)", () => {
+  const box = { left: 200, right: 760, top: 100, bottom: 500 };
+  it("closes when the press started on the backdrop and the click ended there", () => {
+    expect(isBackdropClick(true, true, null, 10, 10)).toBe(true);
+  });
+  it("native dialog: only a point outside its box counts, the dialog's own padding is inside", () => {
+    expect(isBackdropClick(true, true, box, 20, 20)).toBe(true);
+    expect(isBackdropClick(true, true, box, 900, 300)).toBe(true);
+    expect(isBackdropClick(true, true, box, 205, 105)).toBe(false);
+  });
+  it("a drag that started inside the box (a text selection) and ended on the backdrop does not close", () => {
+    expect(isBackdropClick(false, true, null, 10, 10)).toBe(false);
+    expect(isBackdropClick(false, true, box, 20, 20)).toBe(false);
+  });
+  it("a press on the backdrop released inside the box (the click lands on a common ancestor) does not close", () => {
+    expect(isBackdropClick(true, false, null, 300, 300)).toBe(false);
+    expect(isBackdropClick(true, false, box, 300, 300)).toBe(false);
   });
 });

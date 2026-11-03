@@ -11,6 +11,7 @@ import { RECOMMENDED, engineName } from "../../components/engine/meta";
 import { prefs } from "../../lib/prefs";
 import { errorMessage, useApp } from "../../lib/store";
 import type { EngineId } from "../../lib/types";
+import { readProgress, saveAnswer } from "./progress";
 import { StepFooter, StepHead, type HeadingRef } from "./SetupFrame";
 import s from "./Setup.module.css";
 
@@ -24,7 +25,8 @@ export interface EngineStepProps {
 export function EngineStep({ headingRef, onNext, initialPick }: EngineStepProps) {
   const { engines, updateSettings, refreshEngines, enginesLoading } = useApp();
   const inUse = engines?.engines.find((e) => e.id === engines.selected && e.status.ready) ?? null;
-  const [pick, setPick] = useState<EngineId | null>(initialPick ?? null);
+  const [pick, setPick] = useState<EngineId | null>(initialPick ?? readProgress()?.pick ?? null);
+  const choose = (id: EngineId) => { setPick(id); saveAnswer({ pick: id }); };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // A rerun (setup done before) starts on the engine in use; the first run starts on the recommended one when it is
@@ -55,7 +57,7 @@ export function EngineStep({ headingRef, onNext, initialPick }: EngineStepProps)
     <>
       <StepHead headingRef={headingRef} title={t("setup.engine.title")} />
       <div data-review-id="Setup/Engine" data-review-section="Setup · AI engine" data-comment-target>
-        <EngineChoice value={value} onChange={setPick} />
+        <EngineChoice value={value} onChange={choose} />
       </div>
       {error ? <Callout tone="error" live="alert">{error}</Callout> : null}
       {/* 13b: "Check again" sits in the footer, so nothing stands alone above the list. */}

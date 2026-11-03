@@ -25,6 +25,17 @@
 /* D51: no stroke; a field is a fill with a visible label / placeholder. Hover steps the fill. Invalid keeps the error stroke. */
 .control:not(:disabled):not(:focus):hover { background: var(--color-surface-chip-hover); }
 
+/* Bare (Search): just the text and the caret. No fill, no border, no radius, no padding, no outline on focus, no hover fill. */
+.control.bare,
+.control.bare:not(:disabled):not(:focus):hover {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.control.bare:focus,
+.control.bare:focus-visible { outline: none; }
+
 .textarea { resize: vertical; min-height: calc(var(--control-h-lg) * 2.5); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4); }
 
 .inputWrap { position: relative; display: flex; align-items: center; }

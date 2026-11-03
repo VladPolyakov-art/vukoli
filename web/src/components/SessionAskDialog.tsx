@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Button, Callout, Chip, ChipGroup, Dialog, Icon, Textarea } from "../ds";
 import { t, tMaybe } from "../i18n";
 import { api, ApiError } from "../lib/api";
+import { drafts } from "../lib/drafts";
 import { canSendRating, ratingBody } from "../lib/feedback";
 import { useApp } from "../lib/store";
 import type { SupportStatus } from "./SupportDialog";
@@ -84,7 +85,11 @@ export function SessionAskDialogView({ open, rating, note, onRating, onNote, sta
   );
 }
 
-/** The live dialog: sends one "session" note, or switches the ask off. Cleared each time it opens. */
+const DRAFT_KEY = "session-ask";
+interface AskDraft { sessionId: string; rating: number | null; note: string }
+
+/** The live dialog: sends one "session" note, or switches the ask off. The answer so far is a draft in memory (D108: a
+ * click on the dimmed area is "Not now"), kept for the same session until it is sent. */
 export function SessionAskDialog({ open, sessionId, onClose }: { open: boolean; sessionId: string; onClose: () => void }) {
   const { updateSettings } = useApp();
   const [rating, setRating] = useState<number | null>(null);
@@ -93,26 +98,32 @@ export function SessionAskDialog({ open, sessionId, onClose }: { open: boolean; 
   const [errorCode, setErrorCode] = useState<string>();
   useEffect(() => {
     if (!open) return;
-    setRating(null);
-    setNote("");
+    const saved = drafts.get<AskDraft>(DRAFT_KEY);
+    const mine = saved && saved.sessionId === sessionId ? saved : null;
+    setRating(mine?.rating ?? null);
+    setNote(mine?.note ?? "");
     setStatus("idle");
     setErrorCode(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+  const keep = (next: { rating: number | null; note: string }) => drafts.set<AskDraft>(DRAFT_KEY, { sessionId, ...next });
   const send = () => {
     if (rating === null) return;
     setStatus("sending");
     api.sendFeedback(ratingBody(rating, note, sessionId)).then(
-      () => setStatus("sent"),
+      () => { drafts.clear(DRAFT_KEY); setStatus("sent"); },
       (e: unknown) => { setErrorCode(e instanceof ApiError ? e.code : "generic"); setStatus("error"); },
     );
   };
   const dontAsk = () => {
+    drafts.clear(DRAFT_KEY);
     onClose();
     void updateSettings({ feedback_ask: false }).catch(() => {});
   };
   return (
     <SessionAskDialogView
-      open={open} rating={rating} note={note} onRating={setRating} onNote={setNote}
+      open={open} rating={rating} note={note}
+      onRating={(n) => { setRating(n); keep({ rating: n, note }); }} onNote={(v) => { setNote(v); keep({ rating, note: v }); }}
       status={status} errorCode={errorCode} onSend={send} onClose={onClose} onDontAsk={dontAsk}
     />
   );

@@ -11,7 +11,7 @@ from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from . import (DATA_VERSION, __version__, config, content, debrief_view, engines, feedback, feedback_form, memory, planner,
-               postcall, storage, stt, telemetry, tts, usage)
+               postcall, search, storage, stt, telemetry, tts, usage)
 from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
 from .engines import ollama as ollama_engine
@@ -554,6 +554,12 @@ def _first_question(record: dict) -> str:
         if isinstance(q, dict) and (asked is None or q.get("id") == asked):
             return str(q.get("text") or "")
     return ""
+
+
+@router.get("/sessions/search")
+async def search_sessions(q: str = "", limit: int = 20) -> list[dict]:
+    """D105: find a past practice by its title, job, mode or what was said. Registered before `/sessions/{id}`."""
+    return await asyncio.to_thread(search.search_sessions, q, limit)
 
 
 @router.get("/sessions/trash")

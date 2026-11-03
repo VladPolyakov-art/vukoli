@@ -49,6 +49,8 @@
 }
 .footerRight { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; margin-inline-start: auto; }
 .note { font-size: var(--text-sm); color: var(--color-text-secondary); }
+/* Install (D104): the step's heading, then its two buttons centred under it. */
+.installActions { display: flex; gap: var(--space-3); flex-wrap: wrap; justify-content: center; align-items: center; }
 .body { display: flex; flex-direction: column; gap: var(--space-6); }
 
 

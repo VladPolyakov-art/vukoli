@@ -131,21 +131,74 @@ def read_file(name: str, data_b64: str) -> str:
     return text[:MAX_TEXT]
 
 
-TERM = re.compile(r"\b(?:[A-Z][a-z]+[A-Z]\w*|[A-Z]{2,}[a-z]?s?|[A-Z][a-zA-Z0-9]*(?:\.js|\.io)|[A-Z][a-z]{2,})\b")
-COMMON_CAPS = {"The", "This", "That", "With", "And", "For", "You", "Your", "Our", "We", "They", "What", "When",
-               "Where", "Who", "How", "Why", "Experience", "Requirements", "Responsibilities", "About", "Role",
-               "Team", "Work", "Skills", "Education", "Summary", "Senior", "Junior", "Lead", "Present", "January",
-               "February", "March", "April", "May", "June", "July", "August", "September", "October",
-               "November", "December", "Monday", "Friday", "Must", "Nice", "Have", "Plus", "Bonus"}
+# ---------- known terms (names the language check must not rewrite) ----------
+# A token is a "term" when it looks like a name: internal capitals (PostgreSQL, iOS), an acronym (AWS, B2B), a
+# `.js` / `.io` / `.ai` name, or a capitalised word that is not an ordinary English word. The last kind is the greedy
+# one (CV bullets start with "Designed", "Built"; titles read "Native Design Lead"), so it needs three tests:
+# the word must not be on the common list, must not also appear in lowercase in the same texts, and must be
+# capitalised somewhere other than the start of a sentence or line.
+NAME_LIKE = re.compile(
+    r"(?<![\w.])(?:[A-Za-z][A-Za-z0-9]*\.(?:js|io|ai)|[a-z]+[A-Z]\w*|[A-Z][a-z]+[A-Z]\w*|[A-Z]+[0-9][A-Z0-9]*"
+    r"|[A-Z]{2,}[a-z]?s?)(?!\w)")
+CAP_WORD = re.compile(r"(?<![\w.])[A-Z][a-z]{2,}(?!\w|\.(?:js|io|ai)\b)")
+CEFR = re.compile(r"[A-C][12]")
+LOWER_WORD = re.compile(r"(?<![\w.])[a-z]{3,}(?!\w)")
+SENTENCE_START = ".!?:;\n\u2022\u00b7\u25aa\u25cf\u25a0-\u2013\u2014*|/("
+COMMON_WORDS = frozenset("""
+the this that with and for you your our we they what when where who how why from into about over under across through
+experience requirements responsibilities role team work skills education summary senior junior lead present
+january february march april may june july august september october november december
+monday tuesday wednesday thursday friday saturday sunday must nice have plus bonus
+design designer designers native product products manager managers engineer engineers developer developers
+development research researcher analyst consultant director head principal staff intern freelance remote hybrid
+company companies project projects portfolio profile contact summary objective language languages english russian
+polish german french spanish certificates certification courses course awards award interests hobbies volunteer
+mobile web app apps platform platforms system systems service services software hardware data digital interface
+user users customer customers client clients business market marketing sales growth strategy planning
+management leadership communication collaboration creative visual interaction experience prototype prototyping
+home study park run workout hub logistics studio group labs lab agency university school college institute bachelor
+master degree present current previous full part time years year months month weeks week days day
+built designed added served acted structured focused reduced conducted created redesigned defended modernized
+led managed worked developed delivered improved increased launched owned drove shipped wrote tested analyzed
+introduced established coordinated implemented maintained organized supported trained mentored
+new good great best high low open free open source public private first second third last next more most
+some any all each every other another such only also both either neither
+jan feb mar apr jun jul aug sep sept oct nov dec
+auto layout surfaces literacy validation craft material tools tool process quality testing content
+""".split())
+
+
+def _sentence_start(text: str, at: int) -> bool:
+    before = text[:at].rstrip(" \t")
+    return not before or before[-1] in SENTENCE_START
 
 
 def known_terms(*texts: str, limit: int = 60) -> list[str]:
-    """Product, tool and company names from the user's own CV / JD: never corrected as language errors."""
+    """Product, tool and company names from the user's own CV / JD. The language check keeps them as written; it does
+    not drop a correction because a quote mentions one (see feedback.validate_language_items)."""
+    joined = "\n".join(t or "" for t in texts)
+    lowered = set(LOWER_WORD.findall(joined))
     seen: dict[str, None] = {}
-    for text in texts:
-        for match in TERM.findall(text or ""):
-            if match not in COMMON_CAPS and match not in seen:
-                seen[match] = None
-            if len(seen) >= limit:
-                return list(seen)
-    return list(seen)
+    for match in NAME_LIKE.finditer(joined):
+        word = match.group(0)
+        if word.isupper() and len(word) >= 5 and (word.lower() in COMMON_WORDS or word.lower() in lowered):
+            continue                                   # a SHOUTED heading, not an acronym
+        if CEFR.fullmatch(word):
+            continue                                   # a language level (B2), not a product
+        seen.setdefault(word)
+    for match in CAP_WORD.finditer(joined):
+        word = match.group(0)
+        low = word.lower()
+        if word in seen or low in COMMON_WORDS or low in lowered or _sentence_start(joined, match.start()):
+            continue
+        seen[word] = None
+    return list(seen)[:limit]
+
+
+def _word_pattern(term: str) -> re.Pattern:
+    return re.compile(r"(?<!\w)" + re.escape(term) + r"(?!\w)")
+
+
+def terms_in(text: str, known) -> list[str]:
+    """The known terms that stand in `text` as whole words, spelled exactly like that (case counts)."""
+    return [t for t in dict.fromkeys(known or []) if t and _word_pattern(t).search(text or "")]

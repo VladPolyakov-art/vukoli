@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, type ReactNode, type Ref } from "react";
 import { IconButton } from "./Button";
 import { durationMs, runExit, usePresence } from "./motion";
 import { OverlayPortal, useOverlayRoot } from "./OverlayRoot";
-import { trapTab, useOverlayFocus } from "./overlay";
+import { trapTab, useBackdropClose, useOverlayFocus } from "./overlay";
 import s from "./Dialog.module.css";
 
 export interface DialogProps {
@@ -20,8 +20,6 @@ export interface DialogProps {
   inline?: boolean;
   /** `md` (default): a decision. `lg` (D76): a tall panel with its own layout in the body, e.g. Settings; full screen on a phone. */
   size?: "md" | "lg";
-  /** A press outside the box closes it (D78: Settings). Off for decisions, where a stray click must not cancel. */
-  closeOnBackdrop?: boolean;
 }
 
 /** Modal decision. Three render modes, one look:
@@ -29,6 +27,9 @@ export interface DialogProps {
  * - **contained** (inside an OverlayRoot, i.e. a review frame): non-modal <dialog open> in the frame's layer with a
  *   plain scrim element; Esc, a Tab trap and focus return are done here. It never escapes the scaled frame.
  * - **inline**: the open dialog box in the flow, for the gallery.
+ * Closing (D108, one rule for every modal): Esc and a click on the dimmed area both call `onClose`, the same as the
+ * dialog's own Close / Cancel / "Not now" (a confirmation: Cancel, nothing destructive). The click counts only when the
+ * press started on the backdrop too. There is no opt-out; a dialog whose text must survive keeps a draft (lib/drafts).
  * Motion (docs/motion.md 3.3 D11, 3.7): `dialog-in` and a plain scrim fade (no blur). On close the modal leaves the top
  * layer at once — the page is interactive again and focus returns immediately — while a non-interactive copy of its box
  * plays `dialog-out` (rule 5: the exit never blocks, it ends on a timer even if `animationend` never fires). */
@@ -96,23 +97,23 @@ function ContainedDialog(props: DialogProps) {
   const { mounted, leaving } = usePresence(open);
   const box = useRef<HTMLDialogElement>(null);
   useOverlayFocus(box, open && mounted);
+  const backdrop = useBackdropClose(open, props.onClose);
   if (!mounted) return null;
   return (
     <OverlayPortal>
       <div className={s.containedRoot}>
-        <div className={`${s.scrim} ${leaving ? s.scrimOut : ""}`} aria-hidden="true"
-          onClick={props.closeOnBackdrop && open ? props.onClose : undefined} />
+        <div className={`${s.scrim} ${leaving ? s.scrimOut : ""}`} aria-hidden="true" {...backdrop} />
         <DialogBox {...props} open={open && !leaving} mode="contained" ref={box} className={leaving ? s.leaving : undefined} />
       </div>
     </OverlayPortal>
   );
 }
 
-function ModalDialog({ open, title, children, actions, actionsStart, onClose, closeLabel, size, closeOnBackdrop }: DialogProps) {
+function ModalDialog({ open, title, children, actions, actionsStart, onClose, closeLabel, size }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
-  // A backdrop press is a press on the <dialog> itself, outside its inner box. It must start there too, so a text
-  // selection dragged out of the box does not close it.
-  const downOnBackdrop = useRef(false);
+  // A backdrop press is a press on the <dialog> itself, outside its box. It must start there too, so a text selection
+  // dragged out of the box does not close it.
+  const backdrop = useBackdropClose(open, onClose, true);
   const opener = useRef<HTMLElement | null>(null);
   const cancelExit = useRef<(() => void) | null>(null);
   const id = useId();
@@ -149,21 +150,13 @@ function ModalDialog({ open, title, children, actions, actionsStart, onClose, cl
       ref={ref}
       className={`${s.dialog} ${s.modal} ${size === "lg" ? s.lg : ""}`}
       aria-labelledby={`${id}-t`}
-      onClose={() => { if (open) onClose(); }}
+      // The native `close` event arrives in a later task than `el.close()`. If the dialog was opened again in between
+      // (⌘K right after a hit was chosen), that stale event is not the user closing the new one: `el.open` says so.
+      onClose={(e) => { if (open && !e.currentTarget.open) onClose(); }}
       onCancel={(e) => { e.preventDefault(); onClose(); }}
-      onPointerDown={closeOnBackdrop ? (e) => { downOnBackdrop.current = e.target === e.currentTarget; } : undefined}
-      onClick={closeOnBackdrop ? (e) => {
-        if (open && downOnBackdrop.current && e.target === e.currentTarget && outsideBox(e.currentTarget, e.clientX, e.clientY)) onClose();
-        downOnBackdrop.current = false;
-      } : undefined}
+      {...backdrop}
     >
       <Inner id={id} title={title} actions={actions} actionsStart={actionsStart} onClose={onClose} closeLabel={closeLabel}>{children}</Inner>
     </dialog>
   );
-}
-
-/** The click lies outside the dialog's box (its border box; a click on the dialog's own padding is inside). */
-function outsideBox(el: HTMLElement, x: number, y: number) {
-  const r = el.getBoundingClientRect();
-  return x < r.left || x > r.right || y < r.top || y > r.bottom;
 }
