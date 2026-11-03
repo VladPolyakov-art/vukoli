@@ -1,6 +1,6 @@
 /* Flow C: coming back. Home knows the weak spots from earlier interviews and offers to drill them.
  * US-22 (mistake memory + "drill my weak spots"), US-20 AC1 ("what next" in the debrief), US-17 (dismissed corrections). */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   ANSWER_NO_RESULT,
   ANSWER_WITH_RESULT,
@@ -14,7 +14,30 @@ import {
   viewer,
   questionTab,
   skipSetup,
+  startTextInterview,
 } from "./helpers";
+
+/** What the page sends and receives on the session socket (JSON frames only). */
+function watchSocket(page: Page) {
+  const sent: Record<string, unknown>[] = [];
+  const got: Record<string, unknown>[] = [];
+  const read = (payload: string | { length: number }, into: Record<string, unknown>[]) => {
+    if (typeof payload !== "string") return;
+    try {
+      into.push(JSON.parse(payload));
+    } catch {
+      /* not JSON */
+    }
+  };
+  page.on("websocket", (socket) => {
+    socket.on("framesent", (frame) => read(frame.payload, sent));
+    socket.on("framereceived", (frame) => read(frame.payload, got));
+  });
+  return {
+    start: () => sent.find((m) => m.type === "start"),
+    started: () => got.find((m) => m.type === "session_started") as { focus?: unknown; questions: { competency: string }[] } | undefined,
+  };
+}
 
 test.beforeEach(async ({ page, request }) => {
   await resetApp(request);
@@ -27,6 +50,7 @@ test.describe("US-22 Weak spots and drill", () => {
     request,
   }) => {
     await seedReturningUser(request);
+    const socket = watchSocket(page);
     await page.goto("/");
 
     // AC1: a returning user sees the drill next to the other starts.
@@ -51,6 +75,10 @@ test.describe("US-22 Weak spots and drill", () => {
 
     // The session is a short one aimed at the gap: an answer with no result gets a follow-up about the result.
     await expect(questionCounter(page, 1, 3)).toBeVisible();
+    // C1b: the chosen focus is what the start message carries, and the server planned its questions for it.
+    expect(socket.start()).toMatchObject({ drill: true, focus: [{ layer: "content", tag: "no_result" }] });
+    await expect.poll(() => socket.started()?.focus).toEqual([{ layer: "content", tag: "no_result" }]);
+    expect(socket.started()!.questions.map((q) => q.competency).every((c) => "BEGCD".includes(c))).toBe(true);
     await sendAnswer(page, ANSWER_NO_RESULT);
     await expect(conversation(page).getByText("Follow-up", { exact: true })).toBeVisible();
 
@@ -71,6 +99,29 @@ test.describe("US-22 Weak spots and drill", () => {
     const plan = page.getByRole("region", { name: "Here's the plan" });
     await expect(plan).toContainText("Language");
     await expect(plan).not.toContainText("end with the result");
+  });
+
+  test("C1b: with the focus on All, the start carries every weak spot, with its layer", async ({ page, request }) => {
+    await seedReturningUser(request);
+    const socket = watchSocket(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Drill my weak spots" }).click();
+    await page.getByRole("group", { name: "Quick replies" }).getByRole("button", { name: "All 2" }).click();
+    await page.getByRole("region", { name: "Here's the plan" }).getByRole("button", { name: "Type instead" }).click();
+    await expect(page).toHaveURL(/\/session$/);
+    await expect.poll(() => socket.start()).toMatchObject({
+      drill: true,
+      focus: [{ layer: "content", tag: "no_result" }, { layer: "language", tag: "preposition" }],
+    });
+  });
+
+  test("C1b: an ordinary session starts without a focus", async ({ page, request }) => {
+    await seedReturningUser(request);
+    const socket = watchSocket(page);
+    await startTextInterview(page);
+    await expect.poll(() => socket.start()).toBeTruthy();
+    expect(socket.start()).not.toHaveProperty("focus");
+    expect(socket.start()).not.toHaveProperty("drill");
   });
 
   test("home shows the finished interviews in Recents, newest first", async ({ page, request }) => {
@@ -122,7 +173,7 @@ test.describe("US-20 AC1 What next, in the debrief", () => {
     await page.getByRole("button", { name: "Drill these weak spots" }).click();
 
     // F-13-14: Home opens the drill plan straight away, no "What should we drill?" question, and it keeps the job.
-    await expect(page).toHaveURL(/\/\?drill=1&job=/);
+    await expect(page).toHaveURL(/\/\?drill=1&session=[^&]+&job=/);
     const chat = page.getByRole("log", { name: "Setup with Mike" });
     await expect(chat).toContainText("Here's a drill on the weak spots we found");
     await expect(chat).not.toContainText("What should we drill?");
@@ -130,6 +181,61 @@ test.describe("US-20 AC1 What next, in the debrief", () => {
     await expect(plan).toContainText("Kestrel Pay · Product Manager");
     await expect(plan).toContainText("end with the result");
     await expect(plan).toContainText("3 questions");
+  });
+});
+
+test.describe("C1 The drill from a debrief works on THAT debrief's weak spots", () => {
+  test("negative: a debrief with one weak spot starts a drill on that one, not on the shared memory (C1)", async ({
+    page,
+    request,
+  }) => {
+    // All three seeded interviews have the same two weak spots (end with the result, prepositions). Dismiss the language
+    // correction in the newest one only: its debrief now has one weak spot, while the memory (last 5 interviews) still
+    // holds both. Before C1 the drill from that debrief planned "All 2" from the memory.
+    const { sessions } = await seedReturningUser(request);
+    const id = sessions[0]!.id;
+    const socket = watchSocket(page);
+    await page.goto(`/sessions/${id}?view=debrief`);
+    await questionTab(page, 2).click();
+    const card = viewer(page).getByRole("article");
+    await expect(card).toContainText("since five years");
+    await card.getByRole("button", { name: "Dismiss" }).click();
+    await expect(card).toContainText("marked misheard by you");
+
+    await showDebrief(page);
+    const work = page.locator("[data-review-id='Debrief/Plan']");
+    await expect(work).toContainText("Focused on this weak spot");
+    await page.getByRole("button", { name: "Drill these weak spots" }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/\\?drill=1&session=${id}`));
+    const chat = page.getByRole("log", { name: "Setup with Mike" });
+    await expect(chat).toContainText("Here's a drill on the weak spots we found");
+    const plan = page.getByRole("region", { name: "Here's the plan" });
+    await expect(plan).toContainText("All 1: end with the result");
+    await expect(plan).not.toContainText("prepositions");
+    // The focus can still be changed, to the layers of THIS debrief only.
+    await plan.getByRole("button", { name: "Change focus" }).click();
+    await expect(page.getByRole("menuitemradio", { name: "Content 1" })).toBeVisible();
+    await expect(page.getByRole("menuitemradio", { name: /^Language/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // The focus reaches the session itself: its context line names the same weak spot.
+    await plan.getByRole("button", { name: "Type instead" }).click();
+    await expect(page).toHaveURL(/\/session$/);
+    // C1b: the start names exactly this debrief's weak spot, and the server echoes it back.
+    await expect.poll(() => socket.start()).toMatchObject({ drill: true, focus: [{ layer: "content", tag: "no_result" }] });
+    await expect.poll(() => socket.started()?.focus).toEqual([{ layer: "content", tag: "no_result" }]);
+    const more = page.getByRole("button", { name: "More", exact: true });
+    let context;
+    if (await more.isVisible().catch(() => false)) {
+      await more.click();
+      context = page.getByRole("menu");
+    } else {
+      await page.getByRole("timer").hover();
+      context = page.getByRole("tooltip");
+    }
+    await expect(context).toContainText("Focus: end with the result");
+    await expect(context).not.toContainText("prepositions");
   });
 });
 

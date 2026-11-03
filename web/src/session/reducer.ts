@@ -195,6 +195,37 @@ function applyFlag(record: FeedbackRecord, flag: LanguageItem, language?: Feedba
   return { ...record, layers: { ...record.layers, language: { ...base, items } } };
 }
 
+/** C2: what "Redo answer" takes back is Mike's reply to that answer too (the next question, a follow-up, the closing
+ * line). The question counter, the follow-ups and the closing flag are put back to what the remaining transcript says,
+ * the way the server puts back its own position (it restores a snapshot). */
+function threadAfterReset(state: SessionState, transcript: TranscriptItem[]):
+  Pick<SessionState, "threadOrder" | "currentThreadId" | "followUps" | "currentQuestionText" | "closing"> {
+  const closing = transcript.some((x) => x.kind === "closing");
+  let current = "";
+  for (let i = transcript.length - 1; i >= 0; i--) {
+    const x = transcript[i]!;
+    if (x.speaker === "model" && x.threadId && (x.kind === "question" || x.kind === "follow_up")) { current = x.threadId; break; }
+  }
+  const at = current ? state.threadOrder.indexOf(current) : -1;
+  if (at < 0) {
+    // English mode (no threads) or nothing asked yet: only the last coach line is the open "question".
+    const lastTurn = [...transcript].reverse().find((x) => x.speaker === "model" && x.kind === "turn");
+    return {
+      threadOrder: state.threadOrder, currentThreadId: state.currentThreadId, followUps: state.followUps, closing,
+      currentQuestionText: lastTurn ? lastTurn.text : state.currentQuestionText,
+    };
+  }
+  const main = transcript.find((x) => x.speaker === "model" && x.kind === "question" && x.threadId === current);
+  const question = state.questions.find((q) => q.id === current);
+  return {
+    threadOrder: state.threadOrder.slice(0, at + 1),
+    currentThreadId: current,
+    followUps: transcript.filter((x) => x.speaker === "model" && x.kind === "follow_up" && x.threadId === current).map((x) => x.text),
+    currentQuestionText: question?.text ?? main?.text ?? state.currentQuestionText,
+    closing,
+  };
+}
+
 export function sessionReducer(state: SessionState, action: SessionAction): SessionState {
   switch (action.type) {
     /* ---------- lifecycle ---------- */
@@ -257,6 +288,12 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
       };
       if (idx >= 0) transcript[idx] = item;
       else transcript.push(item);
+      // C2b: every Redo is answered with "Sure, go ahead."; a run of them in the live conversation is one line, the last.
+      if (kind === "ack") {
+        for (let at = transcript.indexOf(item); at > 0 && transcript[at - 1]!.speaker === "model" && transcript[at - 1]!.kind === "ack"; at -= 1) {
+          transcript.splice(at - 1, 1);
+        }
+      }
       let next: SessionState = { ...state, transcript };
       if (kind === "question" && threadId) {
         const isNew = !state.threadOrder.includes(threadId);
@@ -410,11 +447,17 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
       for (let i = state.transcript.length - 1; i >= 0; i--) {
         if (state.transcript[i]!.speaker === "user") { lastUser = i; break; }
       }
+      if (lastUser < 0) return { ...state, feedback, feedbackOrder: state.feedbackOrder.filter((id) => !removed.has(id)), awaitingReply: false };
+      const transcript = state.transcript.slice(0, lastUser);
+      const dropped = state.transcript[lastUser]!;
+      const threadOfTurn = { ...state.threadOfTurn };
+      if (dropped.turnId != null) delete threadOfTurn[dropped.turnId];
       return {
-        ...state, feedback,
+        ...state, feedback, threadOfTurn,
         feedbackOrder: state.feedbackOrder.filter((id) => !removed.has(id)),
-        transcript: lastUser >= 0 ? state.transcript.slice(0, lastUser) : state.transcript,
+        transcript,
         awaitingReply: false,
+        ...threadAfterReset(state, transcript),
       };
     }
 

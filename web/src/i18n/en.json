@@ -945,7 +945,7 @@
     "shortcuts": {
       "title": "Keyboard shortcuts",
       "close": "Close",
-      "hint": "Shortcuts work when the cursor isn't in a text field (Enter and Esc work everywhere).",
+      "hint": "Shortcuts work when the cursor isn't in a text field. While you type an answer, and for a moment after sending one, letters go into the answer instead (Enter and Esc work everywhere).",
       "space": "Interrupt Mike or talk now",
       "enter": "Send your answer now",
       "m": "Mute or unmute",
@@ -1261,6 +1261,7 @@
       "noFollowUp": "no follow-up",
       "misheard": "{n} marked misheard by you",
       "followUp": "Follow-up:",
+      "followUpN": "Follow-up {n}:",
       "yourAnswer": "Your answer",
       "yourFollowUp": "Your follow-up answer",
       "typed": "You typed",

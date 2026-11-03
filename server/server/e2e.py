@@ -5,13 +5,16 @@ without the flag these paths do not exist (404) and `config.e2e_enabled()` is Fa
   GET  /api/_e2e/engine           the scripted engine's state (status, kinds that fail, delay, calls per kind)
   POST /api/_e2e/engine           steer it: {"status": "ready|not_running|no_model|not_installed", "fail": ["p2b", ...], "delay_ms": 0}
   POST /api/_e2e/storage          {"writable": false}: GET /api/health reports storage_ok=false until reset (US-23 AC4)
-  POST /api/_e2e/seed             {"fixture": "returning"}: a returning user with a CV, a job and three past sessions
+  POST /api/_e2e/seed             {"fixture": "returning"}: a returning user with a CV, a job and three past sessions;
+                                  {"fixture": "followups"}: one finished interview of 5 questions with 2 follow-ups on question 4
 """
 from __future__ import annotations
 
 import datetime
+import json
 import secrets
 import shutil
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter
@@ -21,6 +24,7 @@ from . import config, content, feedback, planner, storage
 from .engines import scripted
 
 router = APIRouter(prefix="/api/_e2e")
+FOLLOWUPS = Path(__file__).resolve().parents[1] / "tests" / "data" / "session_followups.json"
 
 
 def wipe() -> None:
@@ -131,7 +135,12 @@ class SeedBody(BaseModel):
 
 @router.post("/seed")
 async def seed(body: SeedBody) -> dict:
-    """A returning user: a CV, one job and three past interviews (yesterday, a week ago, two weeks ago)."""
+    """A returning user: a CV, one job and three past interviews (yesterday, a week ago, two weeks ago).
+    `followups`: only the saved session of tests/data/session_followups.json (5 questions, 7 scored answers)."""
+    if body.fixture == "followups":
+        saved = storage.save_session(json.loads(FOLLOWUPS.read_text(encoding="utf-8")))
+        return {"ok": True, "vacancies": [], "sessions": [{"id": saved["id"], "title": saved["title"], "weak_spots": [
+            w["tag"] for w in saved["debrief"]["weak_spots"]]}]}
     storage.save_profile(CV, "pasted")
     vacancy = storage.save_record("vacancies", {"id": storage.new_id("v-"), "title": "Kestrel Pay · Product Manager",
                                                 "text": JOB, "source": "pasted", "created_at": storage.now_iso(),

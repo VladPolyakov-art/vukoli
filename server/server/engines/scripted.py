@@ -122,12 +122,22 @@ def kind_of(schema: dict | None) -> str:
 
 # ---------- canned answers ----------
 
+GAP_BANK_TAG = {"own_part": "YP", "result": "RN", "reflection": "WD", "tradeoff": "CT"}
+
+
 def interviewer(text: str) -> dict:
     """Follow up on the next thing the bank offers (result first) until the answer has a number."""
-    if "has_number=true" in text:
-        return {"gap": "none", "action": "next_question", "say": ""}
     bank = dict(re.findall(r"\b(YP|RN|WD|CT):\s*([^;]+?)(?:;|$)", _line(text, "FOLLOW_UP_BANK")))
     asked = _line(text, "FOLLOW_UPS_ALREADY_ASKED")
+    # A drill (FOCUS_GAPS in the prompt) checks its gaps first, as the real prompt tells the model to: "we" with no
+    # "I" -> own part, no number -> result; reflection is asked for whatever the answer.
+    shows = {"own_part": not re.search(r"we_or_passive_actions=0\b", text), "result": "has_number=true" not in text, "reflection": True}
+    for gap in [g.strip() for g in _line(text, "FOCUS_GAPS").split(",")]:
+        line = bank.get(GAP_BANK_TAG.get(gap, ""), "").strip()
+        if shows.get(gap) and line and line not in asked:
+            return {"gap": gap, "action": "follow_up", "say": line}
+    if "has_number=true" in text:
+        return {"gap": "none", "action": "next_question", "say": ""}
     for tag, gap in (("RN", "result"), ("YP", "own_part"), ("WD", "reflection"), ("CT", "tradeoff")):
         line = bank.get(tag, "").strip()
         if line and line not in asked:

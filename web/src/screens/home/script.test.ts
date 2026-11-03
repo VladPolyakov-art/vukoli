@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NO_CV, CTX_RETURNING, CV_FILE, JOB_FILE, KESTREL_PASTED, PASTED_TEXT } from "./fixtures";
+import { weakFromSession } from "./sessionFocus";
 import { attach, begin, change, pick, planFor, resolveCv, resolveJob, say, setupModel, skip, suggestionsFor } from "./script";
 
 const last = <T,>(xs: T[]) => xs[xs.length - 1]!;
@@ -111,6 +112,49 @@ describe("home setup script", () => {
     const plan = planFor(CTX_RETURNING, s);
     expect(plan).toMatchObject({ kind: "drill", questions: 3, job: { id: "v2", company: "Lumen Health" } });
     expect(plan.focus?.spots).toBe("no result, “we” instead of “I”, “I have led”, fillers");
+  });
+
+  it("C1: a drill from a debrief works on that debrief's weak spots, not on the shared memory", () => {
+    const own = weakFromSession({ debrief: { verdict: "", strength: "", next_step: "", source: "model", weak_spots: [{ layer: "content", tag: "we_not_i", text: "" }] } });
+    expect(own.map((w) => w.short)).toEqual(["say \"I\", not \"we\""]);
+    const s = begin(CTX_RETURNING, { kind: "drill", jobId: "v2", weak: own });
+    const plan = planFor(CTX_RETURNING, s);
+    expect(plan.focus?.spots).toBe("say \"I\", not \"we\"");
+    expect(plan.focus?.tags).toEqual([{ layer: "content", tag: "we_not_i" }]);
+    expect(plan.focus?.label).toBe("All 1: say \"I\", not \"we\"");
+    expect(plan.focus?.spots).not.toContain("fillers");
+    // The focus can still be changed, but only among the layers of this debrief.
+    expect(plan.focusOptions?.map((o) => o.id)).toEqual(["all", "content"]);
+    const delivery = planFor(CTX_RETURNING, change(CTX_RETURNING, s, "focus", "delivery"));
+    expect(delivery.focus?.spots).toBe("");
+    expect(delivery.focus?.tags).toEqual([]);
+    // The context itself (the shared memory, Home's chip) is not touched.
+    expect(CTX_RETURNING.weak.length).toBeGreaterThan(1);
+  });
+
+  it("C1b: the drill plan carries the tags of the chosen focus, so the start message can name them", () => {
+    const s = begin(CTX_RETURNING, { kind: "drill" });
+    expect(planFor(CTX_RETURNING, s).focus?.tags).toEqual([
+      { layer: "content", tag: "no_result" }, { layer: "content", tag: "we_not_i" },
+      { layer: "language", tag: "tense" }, { layer: "delivery", tag: "filler_high" },
+    ]);
+    expect(planFor(CTX_RETURNING, change(CTX_RETURNING, s, "focus", "content")).focus?.tags).toEqual([
+      { layer: "content", tag: "no_result" }, { layer: "content", tag: "we_not_i" },
+    ]);
+    expect(planFor(CTX_RETURNING, change(CTX_RETURNING, s, "focus", "delivery")).focus?.tags).toEqual([{ layer: "delivery", tag: "filler_high" }]);
+  });
+
+  it("C1: a drill from a debrief of a session without a job is General questions, not the remembered job", () => {
+    expect(CTX_RETURNING.last?.jobId).toBeTruthy();
+    const s = begin(CTX_RETURNING, { kind: "drill", jobId: null });
+    expect(planFor(CTX_RETURNING, s).job).toBeNull();
+    // Home's own drill (no job named at all) keeps the remembered job.
+    expect(planFor(CTX_RETURNING, begin(CTX_RETURNING, { kind: "drill" })).job).not.toBeNull();
+  });
+
+  it("C1: a debrief with no weak spots of its own falls back to the shared memory", () => {
+    const s = begin(CTX_RETURNING, { kind: "drill", jobId: "v2", weak: weakFromSession(null) });
+    expect(planFor(CTX_RETURNING, s).focus?.spots).toBe("no result, “we” instead of “I”, “I have led”, fillers");
   });
 
   it("13 (QA-04): a job with no role is named without a dangling comma", () => {

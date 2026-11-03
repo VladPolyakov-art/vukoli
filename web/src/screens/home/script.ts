@@ -8,6 +8,7 @@
  * Again / Drill / Example: their own short paths. Real work (reading a pasted job, opening a link, reading a file) is
  * a pending Mike message that the container resolves with `resolveJob` once the server answers. */
 import { t, tp } from "../../i18n";
+import { lowerFirstWord } from "./sessionFocus";
 import type { WeakSpotLayer } from "../../ds";
 import type {
   EnglishTopic, JobItem, Level, Phrase, PlanModel, PlanRow, RoundType, SetupModel, SetupReply, SetupTurn, Strictness,
@@ -54,6 +55,8 @@ interface Draft {
   topic?: string;
   usePhrases?: boolean;
   focus?: "all" | WeakSpotLayer;
+  /** A drill from a debrief works on that debrief's weak spots (C1), not on the shared memory in the context. */
+  weak?: WeakItem[];
 }
 
 export interface SetupState {
@@ -75,8 +78,10 @@ export type StartInput =
   | { kind: "text"; text: string }
   | { kind: "file"; name: string; size: string }
   | { kind: "suggestion"; id: SuggestionId }
-  /** "Drill these weak spots" in a debrief: straight to the plan, with that interview's job (F-13-8, F-13-14). */
-  | { kind: "drill"; jobId?: string | null };
+  /** "Drill these weak spots" in a debrief: straight to the plan, with that interview's job (F-13-8, F-13-14) and,
+   *  when given, that interview's own weak spots instead of the shared memory (C1). `jobId: null` = that interview had no
+   *  job: General questions, never the remembered one. */
+  | { kind: "drill"; jobId?: string | null; weak?: WeakItem[] };
 
 /* ---------- copy helpers ---------- */
 
@@ -304,7 +309,7 @@ export function begin(ctx: ScriptContext, input: StartInput): SetupState {
   if (input.kind === "suggestion") return suggestion(ctx, s, input.id);
   if (input.kind === "drill") {
     // Nothing to ask: the weak spots are known and the job comes with the link. The focus stays changeable in the plan.
-    s.draft = { ...s.draft, kind: "drill", jobId: input.jobId ?? ctx.last?.jobId ?? null, round: "mix", focus: "all" };
+    s.draft = { ...s.draft, kind: "drill", jobId: input.jobId === undefined ? ctx.last?.jobId ?? null : input.jobId, round: "mix", focus: "all", weak: input.weak?.length ? input.weak : undefined };
     return showPlan(ctx, s, t("chat.setup.drillDirect"));
   }
   if (input.kind === "file") {
@@ -363,7 +368,7 @@ function suggestion(ctx: ScriptContext, s: SetupState, id: SuggestionId): SetupS
     case "drill": {
       s = user(s, label);
       s.draft = { ...s.draft, kind: "drill", jobId: ctx.last?.jobId ?? null, round: "mix" };
-      const top = ctx.weak.slice(0, 2).map((w) => w.phrase ?? lowerFirst(w.title));
+      const top = ctx.weak.slice(0, 2).map((w) => w.phrase ?? lowerFirstWord(w.title));
       const rest = ctx.weak.length - top.length;
       const head = ctx.weakSessions > 1 ? t("chat.setup.drill", { n: ctx.weakSessions, list: listAnd(top) }) : t("chat.setup.drillOne", { list: listAnd(top) });
       const more = rest > 0 ? ` ${tp("chat.setup.drillMore", rest, { n: numberWord(rest) })}` : "";
@@ -625,7 +630,8 @@ export function planFor(ctx: ScriptContext, s: SetupState): PlanModel {
   const questions = d.kind === "drill" ? DRILL_QUESTIONS : ctx.questions;
   const basis: PlanModel["basis"] = job ? (ctx.hasCv ? "cv+job" : "job") : ctx.hasCv ? "cv" : "general";
   const first = ctx.weak[0];
-  const focusItems = d.focus && d.focus !== "all" ? ctx.weak.filter((w) => w.layer === d.focus) : ctx.weak;
+  const weak = d.weak ?? ctx.weak;
+  const focusItems = d.focus && d.focus !== "all" ? weak.filter((w) => w.layer === d.focus) : weak;
   return {
     kind: d.kind,
     job: job ? { id: job.id, company: job.company, role: job.role } : null,
@@ -642,13 +648,14 @@ export function planFor(ctx: ScriptContext, s: SetupState): PlanModel {
     focus: d.kind === "drill"
       ? {
         spots: focusItems.map((w) => w.short ?? w.title).join(", "),
+        tags: focusItems.flatMap((w) => (w.tag ? [{ layer: w.layer, tag: w.tag }] : [])),
         id: d.focus ?? "all",
         label: d.focus && d.focus !== "all"
           ? `${layerLabel(d.focus)}: ${focusItems.map((w) => w.short ?? w.title).join(", ")}`
-          : t("chat.plan.allFocus", { n: ctx.weak.length, list: ctx.weak.map((w) => w.short ?? w.title).join(", ") }),
+          : t("chat.plan.allFocus", { n: weak.length, list: weak.map((w) => w.short ?? w.title).join(", ") }),
       }
       : undefined,
-    focusOptions: d.kind === "drill" ? focusOptions(ctx.weak) : undefined,
+    focusOptions: d.kind === "drill" ? focusOptions(weak) : undefined,
     level: d.level,
     topic: d.topic,
     phrases: d.usePhrases ? ctx.phrases.map((p) => p.to) : undefined,

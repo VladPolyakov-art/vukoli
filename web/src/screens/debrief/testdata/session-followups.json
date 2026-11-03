@@ -1,0 +1,918 @@
+{
+ "data_version": 1,
+ "id": "s-20261102-155212-7b63ac",
+ "mode": "interview",
+ "round_type": "behavioural",
+ "engine": "ollama",
+ "model": "scripted-e2e",
+ "level": "B1",
+ "strictness": 2,
+ "input": "text",
+ "vacancy_id": "",
+ "vacancy_title": "",
+ "started_at": "2026-11-02T15:52:12+01:00",
+ "app_version": "0.2.2",
+ "questions": [
+  {
+   "id": "B1",
+   "competency": "B",
+   "text": "Describe the piece of work from the last two years that you are most proud of.",
+   "follow_ups": [
+    {
+     "tag": "YP",
+     "text": "Which parts did you do yourself, and which did others do?"
+    },
+    {
+     "tag": "RN",
+     "text": "What changed because of it? Give me a number or a before and after."
+    },
+    {
+     "tag": "WD",
+     "text": "With what you know now, what would you do differently?"
+    }
+   ],
+   "source": "bank",
+   "anchor": ""
+  },
+  {
+   "id": "C2",
+   "competency": "C",
+   "text": "Describe a time you had to explain a complex idea to someone non-technical.",
+   "follow_ups": [
+    {
+     "tag": "YP",
+     "text": "What exactly did you say or show to make it clear?"
+    },
+    {
+     "tag": "RN",
+     "text": "How did you check that they really understood?"
+    },
+    {
+     "tag": "WD",
+     "text": "What part of your explanation did not work at first?"
+    }
+   ],
+   "source": "bank",
+   "anchor": ""
+  },
+  {
+   "id": "D2",
+   "competency": "D",
+   "text": "Describe a time you pushed back on a stakeholder's request.",
+   "follow_ups": [
+    {
+     "tag": "YP",
+     "text": "How did you phrase the pushback?"
+    },
+    {
+     "tag": "CT",
+     "text": "What did you offer instead, and what did it cost them?"
+    },
+    {
+     "tag": "RN",
+     "text": "What was the outcome for the project and for the relationship?"
+    }
+   ],
+   "source": "bank",
+   "anchor": ""
+  },
+  {
+   "id": "E5",
+   "competency": "E",
+   "text": "Describe a time requirements changed in the middle of your work.",
+   "follow_ups": [
+    {
+     "tag": "YP",
+     "text": "What was the first thing you did when you heard?"
+    },
+    {
+     "tag": "CT",
+     "text": "What did you push back on, and what did you accept?"
+    },
+    {
+     "tag": "WD",
+     "text": "What would you ask earlier next time to avoid the surprise?"
+    }
+   ],
+   "source": "bank",
+   "anchor": ""
+  },
+  {
+   "id": "F1",
+   "competency": "F",
+   "text": "Tell me about a project that did not go as planned.",
+   "follow_ups": [
+    {
+     "tag": "YP",
+     "text": "Which part of the problem was your responsibility?"
+    },
+    {
+     "tag": "WD",
+     "text": "What would you do differently if you started again today?"
+    },
+    {
+     "tag": "RN",
+     "text": "What was the real impact of the problem?"
+    }
+   ],
+   "source": "bank",
+   "anchor": ""
+  }
+ ],
+ "title": "General questions",
+ "ended_at": "2026-11-02T15:55:51+01:00",
+ "duration_s": 219,
+ "transcript": [
+  {
+   "role": "model",
+   "text": "Hi, I'm Mike. Thanks for joining. This is a practice interview with 5 main questions. Take your time with each answer. Let's start. Describe the piece of work from the last two years that you are most proud of.",
+   "kind": "question",
+   "question_id": "B1"
+  },
+  {
+   "role": "user",
+   "text": "Second version: I built a pricing experiment that lifted revenue by ten percent.",
+   "question_id": "B1",
+   "kind": "main"
+  },
+  {
+   "role": "model",
+   "text": "Okay. Describe a time you had to explain a complex idea to someone non-technical.",
+   "kind": "question",
+   "question_id": "C2"
+  },
+  {
+   "role": "user",
+   "text": "Answer two v2: explained the data model with a simple analogy.",
+   "question_id": "C2",
+   "kind": "main"
+  },
+  {
+   "role": "model",
+   "text": "Okay. Describe a time you pushed back on a stakeholder's request.",
+   "kind": "question",
+   "question_id": "D2"
+  },
+  {
+   "role": "user",
+   "text": "Our sales lead asked me to add a custom report for one client. I pushed back because it would delay the core roadmap, showed the data on how few users needed it, and proposed an export instead. We agreed, and the client was satisfied with the export in the end.",
+   "question_id": "D2",
+   "kind": "main"
+  },
+  {
+   "role": "model",
+   "text": "Okay. Describe a time requirements changed in the middle of your work.",
+   "kind": "question",
+   "question_id": "E5"
+  },
+  {
+   "role": "user",
+   "text": "We changed the plan and it was fine.",
+   "question_id": "E5",
+   "kind": "main"
+  },
+  {
+   "role": "model",
+   "text": "What was the first thing you did when you heard?",
+   "kind": "follow_up",
+   "question_id": "E5"
+  },
+  {
+   "role": "user",
+   "text": "I called the team together and we re-ranked the backlog in an hour.",
+   "question_id": "E5",
+   "kind": "follow_up"
+  },
+  {
+   "role": "model",
+   "text": "What would you ask earlier next time to avoid the surprise?",
+   "kind": "follow_up",
+   "question_id": "E5"
+  },
+  {
+   "role": "user",
+   "text": "Next time I would ask stakeholders about open assumptions during kickoff.",
+   "question_id": "E5",
+   "kind": "follow_up"
+  },
+  {
+   "role": "model",
+   "text": "Okay. Tell me about a project that did not go as planned.",
+   "kind": "question",
+   "question_id": "F1"
+  },
+  {
+   "role": "user",
+   "text": "Our launch slipped by a month because of a vendor; I re-planned and communicated weekly.",
+   "question_id": "F1",
+   "kind": "main"
+  },
+  {
+   "role": "model",
+   "text": "What was the real impact of the problem?",
+   "kind": "follow_up",
+   "question_id": "F1"
+  }
+ ],
+ "feedback": [
+  {
+   "id": "fb-599b4184",
+   "turn_id": 2,
+   "question": "Describe the piece of work from the last two years that you are most proud of.",
+   "question_id": "B1",
+   "competency": "B",
+   "answer_kind": "main",
+   "answer": "Second version: I built a pricing experiment that lifted revenue by ten percent.",
+   "source": "text",
+   "created_at": "2026-11-02T15:52:29+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "fix",
+     "severity": 2,
+     "tag": "too_short",
+     "fix": "Short for a spoken answer. Main answers are usually 150 to 350 words.",
+     "metrics": {
+      "words": 13,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here. Strong: \"Second version: I built a pricing experiment that\"",
+     "evidence": "",
+     "praise": "Second version: I built a pricing experiment that",
+     "tips": [],
+     "missing": [],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": true,
+      "result": true,
+      "voice": "i",
+      "result_type": "number",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": false,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": ""
+  },
+  {
+   "id": "fb-b3eabb5e",
+   "turn_id": 4,
+   "question": "Describe a time you had to explain a complex idea to someone non-technical.",
+   "question_id": "C2",
+   "competency": "C",
+   "answer_kind": "main",
+   "answer": "Answer two v2: explained the data model with a simple analogy.",
+   "source": "text",
+   "created_at": "2026-11-02T15:53:16+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "fix",
+     "severity": 3,
+     "tag": "too_short",
+     "fix": "Short for a spoken answer. Main answers are usually 150 to 350 words.",
+     "metrics": {
+      "words": 11,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "fix",
+     "severity": 3,
+     "tag": "no_star_action",
+     "fix": "Say what you did, step by step, not only what the situation was.",
+     "evidence": "Answer two v2: explained the data model with",
+     "praise": "Answer two v2: explained the data model with",
+     "tips": [],
+     "missing": [
+      "no_star_action"
+     ],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": false,
+      "result": true,
+      "voice": "none",
+      "result_type": "number",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": false,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": "Likely cause: content. Fix the content first."
+  },
+  {
+   "id": "fb-0117759e",
+   "turn_id": 10,
+   "question": "Describe a time you pushed back on a stakeholder's request.",
+   "question_id": "D2",
+   "competency": "D",
+   "answer_kind": "main",
+   "answer": "Our sales lead asked me to add a custom report for one client. I pushed back because it would delay the core roadmap, showed the data on how few users needed it, and proposed an export instead. We agreed, and the client was satisfied with the export in the end.",
+   "source": "text",
+   "created_at": "2026-11-02T15:54:49+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "metrics": {
+      "words": 50,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "fix",
+     "severity": 2,
+     "tag": "we_not_i",
+     "fix": "Say which part was yours.",
+     "evidence": "Our sales lead asked me to add a",
+     "praise": "Our sales lead asked me to add a",
+     "tips": [],
+     "missing": [
+      "we_not_i"
+     ],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": true,
+      "result": true,
+      "voice": "we",
+      "result_type": "number",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": false,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": ""
+  },
+  {
+   "id": "fb-68d4d9dc",
+   "turn_id": 11,
+   "question": "Describe a time requirements changed in the middle of your work.",
+   "question_id": "E5",
+   "competency": "E",
+   "answer_kind": "main",
+   "answer": "We changed the plan and it was fine.",
+   "source": "text",
+   "created_at": "2026-11-02T15:54:58+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "fix",
+     "severity": 3,
+     "tag": "too_short",
+     "fix": "Short for a spoken answer. Main answers are usually 150 to 350 words.",
+     "metrics": {
+      "words": 8,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "fix",
+     "severity": 3,
+     "tag": "no_star_action",
+     "fix": "Say what you did, step by step, not only what the situation was.",
+     "evidence": "We changed the plan and it was fine.",
+     "praise": "We changed the plan and it was fine.",
+     "tips": [],
+     "missing": [
+      "no_star_action",
+      "no_result",
+      "we_not_i"
+     ],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": false,
+      "result": false,
+      "voice": "we",
+      "result_type": "none",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": false,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": "Likely cause: content. Fix the content first."
+  },
+  {
+   "id": "fb-0dcc9192",
+   "turn_id": 13,
+   "question": "What was the first thing you did when you heard?",
+   "question_id": "E5",
+   "competency": "E",
+   "answer_kind": "follow_up",
+   "answer": "I called the team together and we re-ranked the backlog in an hour.",
+   "source": "text",
+   "created_at": "2026-11-02T15:55:25+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "metrics": {
+      "words": 14,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "fix",
+     "severity": 3,
+     "tag": "no_result",
+     "fix": "Finish with what happened: one result, ideally a number.",
+     "evidence": "I called the team together and we re-ranked",
+     "praise": "I called the team together and we re-ranked",
+     "tips": [],
+     "missing": [
+      "no_result",
+      "we_not_i"
+     ],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": true,
+      "result": false,
+      "voice": "we",
+      "result_type": "none",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": false,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": ""
+  },
+  {
+   "id": "fb-da78363f",
+   "turn_id": 14,
+   "question": "What would you ask earlier next time to avoid the surprise?",
+   "question_id": "E5",
+   "competency": "E",
+   "answer_kind": "follow_up",
+   "answer": "Next time I would ask stakeholders about open assumptions during kickoff.",
+   "source": "text",
+   "created_at": "2026-11-02T15:55:30+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "metrics": {
+      "words": 11,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "fix",
+     "severity": 3,
+     "tag": "no_result",
+     "fix": "Finish with what happened: one result, ideally a number.",
+     "evidence": "Next time I would ask stakeholders about open",
+     "praise": "Next time I would ask stakeholders about open",
+     "tips": [],
+     "missing": [
+      "no_result"
+     ],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": true,
+      "result": false,
+      "voice": "i",
+      "result_type": "none",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": false,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": ""
+  },
+  {
+   "id": "fb-76825ca8",
+   "turn_id": 15,
+   "question": "Tell me about a project that did not go as planned.",
+   "question_id": "F1",
+   "competency": "F",
+   "answer_kind": "main",
+   "answer": "Our launch slipped by a month because of a vendor; I re-planned and communicated weekly.",
+   "source": "text",
+   "created_at": "2026-11-02T15:55:39+01:00",
+   "layers": {
+    "delivery": {
+     "layer": "delivery",
+     "status": "fix",
+     "severity": 2,
+     "tag": "too_short",
+     "fix": "Short for a spoken answer. Main answers are usually 150 to 350 words.",
+     "metrics": {
+      "words": 16,
+      "fillers": 0,
+      "fillers_per_100w": 0.0,
+      "restarts": 0,
+      "fillers_note": "Fillers may be undercounted by the recogniser.",
+      "seconds": null,
+      "wpm": null,
+      "long_pauses": null,
+      "mode": "text",
+      "not_available": [
+       "pace",
+       "fillers",
+       "pauses"
+      ]
+     }
+    },
+    "language": {
+     "layer": "language",
+     "status": "ok",
+     "severity": 0,
+     "tag": "",
+     "fix": "Nothing to fix here.",
+     "reason": "",
+     "items": [],
+     "possibly_misheard": 0
+    },
+    "content": {
+     "layer": "content",
+     "status": "fix",
+     "severity": 3,
+     "tag": "no_result",
+     "fix": "Finish with what happened: one result, ideally a number.",
+     "evidence": "Our launch slipped by a month because of",
+     "praise": "Our launch slipped by a month because of",
+     "tips": [],
+     "missing": [
+      "no_result",
+      "no_reflection"
+     ],
+     "checks": {
+      "situation": true,
+      "task": true,
+      "action": true,
+      "result": false,
+      "voice": "i",
+      "result_type": "none",
+      "relevant": true,
+      "reflection": false,
+      "invites_reflection": true,
+      "hypothetical": false
+     }
+    }
+   },
+   "complete": true,
+   "heard_as_words": [],
+   "cascade": "Likely cause: content. Fix the content first."
+  }
+ ],
+ "debrief": {
+  "verdict": "Your answers were clear. The main thing to fix: too short.",
+  "weak_spots": [
+   {
+    "layer": "content",
+    "tag": "no_result",
+    "text": "Finish with what happened: one result, ideally a number.",
+    "evidence": [
+     "q5",
+     "q6",
+     "q7"
+    ],
+    "questions": [
+     "q4",
+     "q5"
+    ],
+    "said": "I called the team together and we re-ranked",
+    "said_kind": "quote",
+    "said_from": "q4",
+    "lands_as": "The interviewer can't tell if your work changed anything, so the story ends without a point."
+   },
+   {
+    "layer": "content",
+    "tag": "no_star_action",
+    "text": "Say what you did, step by step, not only what the situation was.",
+    "evidence": [
+     "q2",
+     "q4"
+    ],
+    "questions": [
+     "q2",
+     "q4"
+    ],
+    "said": "Answer two v2: explained the data model with",
+    "said_kind": "quote",
+    "said_from": "q2",
+    "lands_as": "It's clear what happened, but not what you did, so your skills stay invisible."
+   },
+   {
+    "layer": "delivery",
+    "tag": "too_short",
+    "text": "Short answer. Main answers usually take one to two minutes out loud.",
+    "evidence": [
+     "q1",
+     "q2",
+     "q4",
+     "q7"
+    ],
+    "questions": [
+     "q1",
+     "q2",
+     "q4",
+     "q5"
+    ],
+    "said": "13 words",
+    "said_kind": "metric",
+    "said_from": "q1",
+    "lands_as": "Short answers read as little experience or little interest."
+   }
+  ],
+  "strength": "You kept each answer on the question.",
+  "next_step": "Practise one answer again, out loud, with a result at the end.",
+  "source": "model",
+  "scorecard": {
+   "rows": [
+    {
+     "key": "structure",
+     "score": 3,
+     "answers": 5,
+     "lost": [
+      "q2",
+      "q4",
+      "q5"
+     ]
+    },
+    {
+     "key": "own_part",
+     "score": 4,
+     "answers": 5,
+     "lost": [
+      "q3",
+      "q4"
+     ]
+    },
+    {
+     "key": "result",
+     "score": 3,
+     "answers": 5,
+     "lost": [
+      "q4",
+      "q5"
+     ]
+    },
+    {
+     "key": "relevance",
+     "score": 5,
+     "answers": 5,
+     "lost": []
+    },
+    {
+     "key": "reflection",
+     "score": 1,
+     "answers": 1,
+     "lost": [
+      "q5"
+     ]
+    },
+    {
+     "key": "language",
+     "score": 5,
+     "answers": 7,
+     "lost": []
+    },
+    {
+     "key": "delivery",
+     "score": 3,
+     "answers": 7,
+     "lost": [
+      "q1",
+      "q2",
+      "q4",
+      "q5"
+     ]
+    }
+   ]
+  },
+  "plan": [
+   {
+    "layer": "content",
+    "tag": "no_result",
+    "text": "Before your next session, write one number for each of your 3 main stories.",
+    "drill": true,
+    "questions": [
+     "q4",
+     "q5"
+    ]
+   },
+   {
+    "layer": "content",
+    "tag": "no_star_action",
+    "text": "Retell one story using only sentences that start with \"I\".",
+    "drill": false,
+    "questions": [
+     "q2",
+     "q4"
+    ]
+   },
+   {
+    "layer": "delivery",
+    "tag": "too_short",
+    "text": "Time one answer: aim for one to two minutes.",
+    "drill": false,
+    "questions": [
+     "q1",
+     "q2",
+     "q4",
+     "q5"
+    ]
+   }
+  ],
+  "step": {
+   "value": 1,
+   "gap": [
+    "reflection",
+    "structure",
+    "result",
+    "delivery"
+   ],
+   "target": 4
+  }
+ },
+ "stats": {
+  "answers": 7,
+  "turns": 15
+ },
+ "usage": {
+  "engine": "ollama",
+  "requests": 0
+ }
+}

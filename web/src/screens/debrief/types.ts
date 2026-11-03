@@ -61,7 +61,15 @@ export interface VerdictModel {
 export interface ScoreRowModel { key: ScoreKey; score: number | null; answers: number; lost: number[] }
 
 /** One step of "Plan for the next session" (D98, rubric §9.3). The `drill` step carries the "Drill these weak spots" action. */
-export interface PlanStepModel { id: string; layer: Layer; text: string; drill: boolean }
+export interface PlanStepModel {
+  id: string;
+  layer: Layer;
+  text: string;
+  drill: boolean;
+  /** The step's own weak spot: its title and the questions it showed in. Absent (fixtures): the first weak spot of the layer. */
+  title?: string;
+  evidence?: Evidence;
+}
 
 export interface Correction {
   id: string;
@@ -101,6 +109,9 @@ export interface StrongerModel {
   placeholders?: boolean;
 }
 
+/** One follow-up exchange: what Mike asked (absent when the saved session does not have the line) and the user's answer. */
+export interface FollowUpTurn { question?: string; answer: string }
+
 export interface QuestionModel {
   n: number;
   question: string;
@@ -116,6 +127,9 @@ export interface QuestionModel {
   edited?: boolean;
   /** Feedback never arrived: a short info line instead of the layer blocks. */
   unavailable?: boolean;
+  /** Every follow-up with its own answer, in the order they were asked (live data). */
+  followUpTurns?: FollowUpTurn[];
+  /** One follow-up and its answer (fixtures, review variants); `followUpTurns` wins when both are there. */
   followUp?: string;
   answer: Segments;
   followUpAnswer?: string;

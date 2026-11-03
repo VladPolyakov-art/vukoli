@@ -9,7 +9,7 @@
  * V2.1 (D49): the centre is the running transcript of the whole dialogue (newest at the bottom, follows unless the user
  * scrolled up → "Jump to latest"). Mike's presence is a glow along the top edge (ds/Presence), only while someone talks
  * or Mike thinks; the transcript starts in its lower part (D91). The one state text sits in the glow, top centre (D92). */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Button, Drawer, IconButton, Panel, Presence, scrollBehavior, StatusPill, usePresence, useScrollFocusable } from "../../ds";
 import { t } from "../../i18n";
 import { Banners } from "./parts/Banners";
@@ -65,9 +65,38 @@ function inTextField(el: EventTarget | null): boolean {
   return Boolean(node && (node.tagName === "TEXTAREA" || node.tagName === "INPUT" || node.tagName === "SELECT" || node.isContentEditable));
 }
 
+/** Letters that are shortcuts in text mode (R redo, F feedback, N next; "?" is the help). */
+const TEXT_SHORTCUTS = new Set(["r", "f", "n", "?"]);
+/** A key press after another typed character this soon is part of typing, never a command. */
+const TYPING_GAP_MS = 1000;
+/** C2b: for this long after an answer was sent, a shortcut letter is the next answer being typed (Send leaves the focus
+ * off the box; a lone "r" would have taken the answer back). */
+const SENT_GUARD_MS = 2000;
+
+/** C2 (text mode): is this key press, with the focus outside any text field, the user typing an answer? Inside a dialog
+ * or a menu the keys keep their own meaning. */
+function typesIntoAnswer(e: KeyboardEvent | ReactKeyboardEvent, target: HTMLElement | null, strayAt: { current: number }, sentAt: { current: number }): boolean {
+  if (e.key.length !== 1 || e.key === " ") return false;          // Enter, Tab, arrows, Esc and Space keep their jobs
+  if (target?.closest('dialog, [role="dialog"], [role="menu"], [role="listbox"]')) return false;
+  if (e.key !== e.key.toLowerCase() && e.key !== "?") return true;     // a capital: a sentence being started
+  if (!TEXT_SHORTCUTS.has(e.key)) return true;
+  const now = performance.now();
+  return now - strayAt.current < TYPING_GAP_MS || now - sentAt.current < SENT_GUARD_MS;   // a shortcut letter in the middle of typing, or right after Send
+}
+
+const focusAnswerBox = (root: HTMLElement | null) =>
+  root?.querySelector<HTMLTextAreaElement>("[data-session-composer]")?.focus({ preventScroll: true });
+
 export function SessionView(props: SessionViewProps) {
-  const { variant, input, phase, overlay, muted, data, handlers, entering } = props;
+  const { variant, input, phase, overlay, muted, data, entering } = props;
   const rootRef = useRef<HTMLDivElement>(null);
+  /* C2b: when the last answer was sent. The text composer takes the focus back after Send (the button is disabled by the
+   * time the user types), and for SENT_GUARD_MS a shortcut letter is typing, never Redo. */
+  const sentAt = useRef(-Infinity);
+  const sendText = props.handlers?.onSendText;
+  const handlers = useMemo(() => (props.handlers && sendText
+    ? { ...props.handlers, onSendText: (text: string) => { const ok = sendText(text); if (ok) sentAt.current = performance.now(); return ok; } }
+    : props.handlers), [props.handlers, sendText]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollFocus = useScrollFocusable(t("session.transcript"), scrollRef); // QA-09: reachable by keyboard when it scrolls
   const islandRef = useRef<HTMLDivElement>(null);
@@ -196,7 +225,21 @@ export function SessionView(props: SessionViewProps) {
     return () => ro.disconnect();
   }, []);
 
+  /* C2b: after "Redo answer" (the server took the answer back, the box is empty again) the next thing the user does is type:
+   * the focus goes to the box, unless they are in a dialog, the panel or a menu. */
+  const userTurns = data.transcript.reduce((n, x) => n + (x.speaker === "user" ? 1 : 0), 0);
+  const prevUserTurns = useRef(userTurns);
+  useEffect(() => {
+    const dropped = userTurns < prevUserTurns.current;
+    prevUserTurns.current = userTurns;
+    if (!dropped || voice) return;
+    const at = document.activeElement as HTMLElement | null;
+    if (at && at !== document.body && !(rootRef.current?.contains(at) && at.tagName === "BUTTON" && !at.closest('dialog, [role="dialog"], [role="menu"], aside'))) return;
+    focusAnswerBox(rootRef.current);
+  }, [userTurns, voice]);
+
   /* ---------- keyboard (V2.8) ---------- */
+  const strayAt = useRef(0);   // when the last character was typed outside a text field (typesIntoAnswer)
   const onKey = (e: KeyboardEvent | ReactKeyboardEvent) => {
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
     const target = e.target as HTMLElement | null;
@@ -205,6 +248,20 @@ export function SessionView(props: SessionViewProps) {
       return;
     }
     if (inTextField(target)) return;
+    /* C2: a held key is not a second command (holding R redid every answer back to the first). */
+    if (e.repeat) return;
+    /* C2: in text mode keys that land outside the answer box are the user's typing (after Send with the mouse, after the
+     * panel closed, the focus is on a button or on the page), not shortcuts: the box takes the focus and the character.
+     * Only a lone, lowercase press of a shortcut letter still acts as one. The cost of a stray R was the user's answer. */
+    if (!voice && typesIntoAnswer(e, target, strayAt, sentAt)) {
+      const box = rootRef.current?.querySelector<HTMLTextAreaElement>("[data-session-composer]");
+      if (box) {
+        strayAt.current = performance.now();
+        box.focus({ preventScroll: true });   // the character of this very key press goes to the box
+        return;
+      }
+    }
+    if (!voice && e.key.length === 1 && e.key !== " ") strayAt.current = performance.now();
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     const onButton = target?.tagName === "BUTTON";
     const live = !interrupted && phase !== "connecting" && phase !== "saving";

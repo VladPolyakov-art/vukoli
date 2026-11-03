@@ -523,7 +523,8 @@ def _repair_if_orphaned(session: dict) -> dict:
 def _shown_debrief(session: dict) -> dict | None:
     """The debrief as the page gets it: the saved one plus the scorecard, "what you said / how it lands" and the plan,
     built now from the saved feedback (rubric §9). The saved session never holds these."""
-    return debrief_view.enrich_debrief(session.get("debrief"), session.get("feedback") or [], session.get("mode", ""))
+    return debrief_view.enrich_debrief(session.get("debrief"), session.get("feedback") or [], session.get("mode", ""),
+                                       session.get("questions"))
 
 
 def _not_while_preparing(session_id: str) -> None:

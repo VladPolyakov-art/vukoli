@@ -28,11 +28,16 @@ export interface PlanProps {
   onJump: (n: number) => void;
 }
 
-interface Item { id: string; layer: Layer; text: string; spot?: WeakSpotModel }
+/** `spot` is what the step shows next to its advice: its own weak spot's title and questions. */
+interface Item { id: string; layer: Layer; text: string; spot?: Pick<WeakSpotModel, "title" | "evidence"> }
 
 export function Plan({ steps, spots, id, drill, showDrill, example, storageError, onDrill, onJump }: PlanProps) {
   const items: Item[] = steps.length
-    ? steps.map((p) => ({ id: p.id, layer: p.layer, text: p.text, spot: spots.find((w) => w.layer === p.layer) }))
+    ? steps.map((p) => ({
+      id: p.id, layer: p.layer, text: p.text,
+      // A step that carries its own title and questions (live data) never borrows the first weak spot of its layer (C3).
+      spot: p.title !== undefined ? { title: p.title, evidence: p.evidence } : spots.find((w) => w.layer === p.layer),
+    }))
     : spots.map((w) => ({ id: w.id, layer: w.layer, text: w.fix ?? "", spot: w }));
   if (!items.length && !showDrill) return null;
   const hint = example ? t("debrief.example.own") : drill ? drillHintText(drill) : null;
@@ -55,7 +60,7 @@ export function Plan({ steps, spots, id, drill, showDrill, example, storageError
               <li key={p.id} className={s.step}>
                 <span className={s.num} aria-hidden="true">{i + 1}</span>
                 <p className={s.text}>
-                  {p.spot ? <span className={s.title}>{p.spot.title}{p.text ? ". " : ""}</span> : null}
+                  {p.spot?.title ? <span className={s.title}>{p.spot.title}{p.text ? ". " : ""}</span> : null}
                   {p.text ? <span className={s.do}>{p.text}</span> : null}
                 </p>
                 {e ? (

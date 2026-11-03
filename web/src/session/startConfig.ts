@@ -1,7 +1,7 @@
 /* Builds the `start` message (PROTOCOL.md) from the Home choices and per-browser preferences. */
 import { browserSttSupported } from "../audio/browserStt";
 import { prefs } from "../lib/prefs";
-import type { Level, Settings, StartMessage, SttInfo } from "../lib/types";
+import type { FocusSpot, Level, Settings, StartMessage, SttInfo } from "../lib/types";
 import type { SessionConfig } from "./useSession";
 
 export interface StartChoices {
@@ -14,7 +14,12 @@ export interface StartChoices {
   vacancyId?: string;
   topic?: string;
   drill?: boolean;
+  /** The weak spots a drill works on (the plan's focus, after Change focus). */
+  focus?: FocusSpot[];
 }
+
+/** The server reads at most this many focus spots. */
+const MAX_FOCUS = 6;
 
 export function buildSessionConfig(choices: StartChoices, settings: Settings | null, stt: SttInfo | null): SessionConfig {
   let input: StartMessage["input"] = "text";
@@ -41,7 +46,10 @@ export function buildSessionConfig(choices: StartChoices, settings: Settings | n
     start.strictness = choices.strictness ?? settings?.strictness ?? 2;
     start.questions = choices.questions ?? settings?.questions_per_session ?? 5;
     if (choices.vacancyId) start.vacancy_id = choices.vacancyId;
-    if (choices.drill) start.drill = true;
+    if (choices.drill) {
+      start.drill = true;
+      if (choices.focus?.length) start.focus = choices.focus.slice(0, MAX_FOCUS);
+    }
   } else {
     start.level = choices.level ?? settings?.level ?? "B1";
     if (choices.topic) start.topic = choices.topic;

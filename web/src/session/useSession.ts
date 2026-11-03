@@ -56,6 +56,10 @@ export function useSession(config: SessionConfig) {
   }, []);
 
   const endRef = useRef<() => void>(() => {});
+  /** C2: "redo_answer" is sent and the server's `answer_reset` has not come back. Another redo in that time (a double
+   * click, a held R) would drop the answer before it as well, so it is ignored. */
+  const redoPending = useRef(false);
+  const redoTimer = useRef(0);
 
   const sendPcm = useCallback((buffer: ArrayBuffer) => {
     const socket = ws.current;
@@ -203,6 +207,7 @@ export function useSession(config: SessionConfig) {
       if (msg.type === "turn_start" && playback.current) playback.current.suppressed = false;
       if (msg.type === "interrupted") playback.current?.cutOff(msg.turn_id);
       if (msg.type === "voice_turn_dropped" || msg.type === "voice_turn_noise") playback.current?.release(msg.turn_id);
+      if (msg.type === "answer_reset") { redoPending.current = false; window.clearTimeout(redoTimer.current); }
       dispatch(msg);
     };
     socket.onclose = () => {
@@ -291,6 +296,9 @@ export function useSession(config: SessionConfig) {
       capture.current?.commit();
     },
     redo() {
+      if (redoPending.current) return;
+      redoPending.current = true;
+      redoTimer.current = window.setTimeout(() => { redoPending.current = false; }, 2000);   // the server says nothing when there is nothing to redo
       capture.current?.cancel();
       playback.current?.stop();                 // the voice turn is abandoned: nothing will say whether to resume Mike
       dispatch({ type: "local/voice_turn_dropped" });

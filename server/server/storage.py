@@ -306,7 +306,8 @@ def render_session_markdown(session: dict) -> str:
              f"# {display_title(session.get('title', '')) or 'Practice session'}", "",
              "Saved on this computer.", ""]
     from .debrief_view import STEP_NAMES, enrich_debrief, markdown_sections   # built at read time, never saved (rubric §9)
-    debrief = enrich_debrief(session.get("debrief"), session.get("feedback") or [], session.get("mode", "")) or {}
+    debrief = enrich_debrief(session.get("debrief"), session.get("feedback") or [], session.get("mode", ""),
+                             session.get("questions")) or {}
     if debrief.get("verdict"):
         extra = markdown_sections(debrief) if "scorecard" in debrief else {}
         lines += ["## Debrief", ""]

@@ -1,6 +1,6 @@
 /* One question of the interview Debrief view (layout D, 2026-10-27): the meta line and "Lost points on …", then two
- * columns. Left: what you said (follow-up, your answer, "Edit what I said", the follow-up answer, "Show a stronger answer"
- * behind a fold). Right: ONE "Feedback" list in the configured layer order, a small layer tag on each note:
+ * columns. Left: what you said (your answer, "Edit what I said", then each follow-up with its own question and answer,
+ * "Show a stronger answer" behind a fold). Right: ONE "Feedback" list in the configured layer order, a small layer tag on each note:
  *  - the weak spot whose first evidence question this is opens the list: What you said / How it lands / How to fix
  *    (a language spot skips "What you said": its correction below shows the same words);
  *  - content notes; language corrections inline as "heard → say" + why, with "Not what you said?" and "Dismiss"
@@ -9,7 +9,7 @@
 import type { ReactNode } from "react";
 import { Badge, Button, Callout, Disclosure, Icon, Skeleton, TextShimmer } from "../../../ds";
 import { t, tp } from "../../../i18n";
-import type { Layer, QuestionModel, ScoreRowModel, WeakSpotModel } from "../types";
+import type { FollowUpTurn, Layer, QuestionModel, ScoreRowModel, WeakSpotModel } from "../types";
 import { Editor } from "./Correction";
 import { LayerTag, rowLabel, rowsLostIn } from "./debriefShared";
 import type { RowContext } from "./Layers";
@@ -46,9 +46,14 @@ export interface QuestionViewProps {
   onStrongerOpenChange: (open: boolean) => void;
 }
 
+/** The follow-ups of a question in the order they were asked: live data has one entry per follow-up; a fixture has one pair. */
+const followUpTurns = (q: QuestionModel): FollowUpTurn[] =>
+  q.followUpTurns ?? (q.followUpAnswer ? [{ question: q.followUp, answer: q.followUpAnswer }] : []);
+
 export function QuestionView(p: QuestionViewProps) {
   const { q, scorecard } = p;
   const lost = rowsLostIn(scorecard, q.n);
+  const turns = followUpTurns(q);
   return (
     <article className={s.q} data-question={q.n} data-review-id="Debrief/Question">
       <header className={s.head}>
@@ -72,7 +77,6 @@ export function QuestionView(p: QuestionViewProps) {
 
       <div className={s.cols}>
         <section className={s.answerCol} aria-label={t("debrief.q.yourAnswer")}>
-          {q.followUp ? <p className={s.muted}><span className={s.lead}>{t("debrief.q.followUp")}</span> {q.followUp}</p> : null}
           <div className={s.part} data-review-id="Debrief/Answer">
             <h4 className={s.partLabel}>
               {t("debrief.q.yourAnswer")}
@@ -89,12 +93,13 @@ export function QuestionView(p: QuestionViewProps) {
               </>
             )}
           </div>
-          {q.followUpAnswer ? (
-            <div className={s.part}>
+          {turns.map((f, i) => (
+            <div key={i} className={s.part} data-review-id="Debrief/FollowUp">
+              {f.question ? <p className={s.muted}><span className={s.lead}>{turns.length > 1 ? t("debrief.q.followUpN", { n: i + 1 }) : t("debrief.q.followUp")}</span> {f.question}</p> : null}
               <h4 className={s.partLabel}>{t("debrief.q.yourFollowUp")}</h4>
-              <p className={s.answer}>{q.followUpAnswer}</p>
+              <p className={s.answer}>{f.answer}</p>
             </div>
-          ) : null}
+          ))}
           {!q.unavailable && !p.rechecking ? <Stronger q={q} open={p.strongerOpen} onOpenChange={p.onStrongerOpenChange} /> : null}
         </section>
 

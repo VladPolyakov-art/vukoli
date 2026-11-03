@@ -37,7 +37,7 @@ describe("mapRecord", () => {
   it("groups feedback per question and numbers it by the question list", () => {
     const m = mapRecord(rec(), opts);
     expect(m.questions.map((q) => q.n)).toEqual([1, 2, 3]);
-    expect(m.questions[0]!.followUp).toBe("What was the result?");
+    expect(m.questions[0]!.followUpTurns).toBeUndefined();   // no follow-up answer for it
     expect(m.questions[0]!.layers.language?.corrections).toHaveLength(1);
   });
 

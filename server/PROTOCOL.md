@@ -66,7 +66,8 @@ Source of truth: `server/ws.py` (socket loop), `server/session.py` (local interv
 | `voice` | Kokoro voice id from `GET /api/voices` | settings, else `am_michael` |
 | `speak` | `false` for text-only replies | `true` (ignored when Kokoro is not installed) |
 | `suggest` | turn the answer suggester on (only if settings `answer_suggester` is true) | `false` |
-| `drill` | `true` marks a weak-spot drill (interview only): the saved session is named "Drill · Company · Role" (or "Drill · General questions"); nothing else changes | `false` |
+| `drill` | `true` marks a weak-spot drill (interview only): the saved session is named "Drill · Company · Role" (or "Drill · General questions") | `false` |
+| `focus` | with `drill`: up to 6 weak spots to work on, `[{"layer": "content", "tag": "we_not_i"}]` (layer `content`/`language`/`delivery`, tag as in the debrief). Anything else is `bad_start`. Content tags (`we_not_i`, `no_star_action`, `no_result`, `vague_result`, `too_vague`, `no_reflection`) choose the questions (competencies where the gap shows, with the matching follow-up ready, one tag after another; questions from the job join when they fit) and tell the interviewer to check that gap first (`FOCUS_GAPS` in the turn prompt; the live interviewer gets one line in its system prompt). Language and delivery tags change neither; they are only saved. Echoed in `session_started` and saved in the record (`focus`); a resumed session keeps it | none |
 | `topic` | English mode: conversation topic, up to 80 characters | none |
 | `engine` | override the selected engine for this session | settings `engine` |
 | `resume_session_id` | continue a saved session after a dropped connection (US-13 AC5): same record, transcript and feedback kept; Mike says sorry and asks again (or replies to the last answer). `mode`, `round_type`, `level`, `strictness`, `vacancy_id` come from the record. Not for Gemini Live | none |

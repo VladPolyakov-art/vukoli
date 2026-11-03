@@ -124,6 +124,57 @@ describe("sessionReducer", () => {
     expect(s.transcript.some((t) => t.speaker === "user")).toBe(false);
   });
 
+  const ack: SessionAction[] = [
+    { type: "turn_start", speaker: "model" },
+    { type: "turn_complete", speaker: "model", full_text: "Sure, go ahead.", kind: "ack" },
+    { type: "response_complete" },
+  ];
+  const answer = (turnId: number, text: string): SessionAction[] => [
+    { type: "local/user_turn", turnId, text },
+    { type: "turn_complete", speaker: "user", full_text: text, turn_id: turnId },
+  ];
+
+  it("C2: redo puts the question counter, the follow-ups and the closing flag back to the redone answer's question", () => {
+    // Q1 answered, Mike moved on to Q2: redo takes Q2 back.
+    let s = run([started, ...askQ("A1"), ...answer(1, "first answer here ok"), ...askQ("B1"),
+      { type: "answer_reset", question: "Why?", removed_feedback_ids: [] }, ...ack]);
+    expect(s.threadOrder).toEqual(["A1"]);
+    expect(s.currentThreadId).toBe("A1");
+    expect(s.currentQuestionText).toBe("Why are you interested in this role?");
+    expect(s.followUps).toEqual([]);
+    expect(s.threadOfTurn[1]).toBeUndefined();
+    // The next question comes again: it is question 2, not 3.
+    s = run([...answer(2, "second try at the answer"), ...askQ("B1")], s);
+    expect(s.threadOrder).toEqual(["A1", "B1"]);
+
+    // Redo of the answer to a follow-up: the question and its first follow-up stay.
+    s = run([started, ...askQ("A1"), ...answer(1, "no number in this one"),
+      { type: "turn_complete", speaker: "model", full_text: "What was the result?", kind: "follow_up", question_id: "A1", thread_id: "A1" },
+      ...answer(2, "twelve percent more"), ...askQ("B1"),
+      { type: "answer_reset", question: "What was the result?", removed_feedback_ids: [] }]);
+    expect(s.currentThreadId).toBe("A1");
+    expect(s.threadOrder).toEqual(["A1"]);
+    expect(s.followUps).toEqual(["What was the result?"]);
+
+    // Redo of the answer to the last question: the closing line goes, the round is open again.
+    s = run([started, ...askQ("A1"), ...answer(1, "only answer to it"),
+      { type: "turn_complete", speaker: "model", full_text: "Thanks, that's all.", kind: "closing" },
+      { type: "answer_reset", question: "Why?", removed_feedback_ids: [] }]);
+    expect(s.closing).toBe(false);
+    expect(s.currentThreadId).toBe("A1");
+  });
+
+  it("C2b: a run of Redo acknowledgements is one line in the live conversation", () => {
+    let s = run([started, ...askQ("A1")]);
+    for (let i = 1; i <= 3; i += 1) {
+      s = run([...answer(i, `answer number ${i} is here`), { type: "answer_reset", question: "Why?", removed_feedback_ids: [] }, ...ack], s);
+    }
+    expect(s.transcript.filter((x) => x.kind === "ack")).toHaveLength(1);
+    expect(s.transcript.at(-1)?.kind).toBe("ack");
+    // Mike's question stays before it; an ack separated by an answer is not merged away with the question.
+    expect(s.transcript.filter((x) => x.kind === "question")).toHaveLength(1);
+  });
+
   it("treats engine errors at start as fatal and turn errors as non-fatal", () => {
     const fatal = run([{ type: "error", code: "not_running", message: "Ollama is installed but not running." }]);
     expect(fatal.phase).toBe("failed");

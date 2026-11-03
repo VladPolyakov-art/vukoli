@@ -245,7 +245,7 @@ function LiveDebrief() {
     }
   };
   const practise = () => navigate(record.mode === "english" ? "/?track=english" : "/");
-  const drill = () => navigate(record.mode === "english" ? "/?track=english" : `/?drill=1${record.vacancy_id ? `&job=${encodeURIComponent(record.vacancy_id)}` : ""}`);
+  const drill = () => navigate(record.mode === "english" ? "/?track=english" : `/?drill=1&session=${encodeURIComponent(record.id)}${record.vacancy_id ? `&job=${encodeURIComponent(record.vacancy_id)}` : ""}`);
 
   return (
     <DebriefView

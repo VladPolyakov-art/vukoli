@@ -15,4 +15,4 @@ Rules:
 <plan>
 {{plan}}
 </plan>
-{{context}}
+{{context}}{{focus}}

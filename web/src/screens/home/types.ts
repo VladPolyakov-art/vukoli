@@ -4,7 +4,7 @@
  * runs the script (`script.ts`). Nothing here knows about the network. */
 import type { ReactNode } from "react";
 import type { IconName, WeakSpotLayer } from "../../ds";
-import type { Level } from "../../lib/types";
+import type { FocusSpot, Level } from "../../lib/types";
 
 export type Track = "interview" | "english";
 /** Round types (US-12 AC1: four). */
@@ -28,6 +28,8 @@ export interface JobItem {
 
 export interface WeakItem {
   id: string;
+  /** The server's tag ("we_not_i"): what the interviewer is told to work on. Fixtures have none. */
+  tag?: string;
   layer: WeakSpotLayer;
   title: string;
   /** Short form for lists ("No result"). */
@@ -106,7 +108,7 @@ export interface PlanModel {
   hasCv: boolean;
   /** Drill: what the questions aim at. */
   /** `spots`: the weak spots being drilled, as one line ("no result, we instead of I"): the session shows it as its focus. */
-  focus?: { id: "all" | WeakSpotLayer; label: string; spots: string };
+  focus?: { id: "all" | WeakSpotLayer; label: string; spots: string; tags?: FocusSpot[] };
   /** Drill: the Change focus menu ("All 4", "Content 2", …). */
   focusOptions?: { id: "all" | WeakSpotLayer; label: string }[];
   /** English. */

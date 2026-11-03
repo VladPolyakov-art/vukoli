@@ -30,6 +30,7 @@ import {
   attach, begin, change, pick, planFor, removeNote, resolveCv, resolveJob, say, setupModel, skip, suggestionsFor, updateJob,
   type ScriptContext, type SetupState,
 } from "./script";
+import { lowerFirstWord, weakFromSession } from "./sessionFocus";
 import type { EnglishTopic, JobItem, PlanModel, Track, WeakItem } from "./types";
 
 let browserBannerDismissed = false;
@@ -66,6 +67,9 @@ export function HomeScreen() {
   const sessions = useLoad(() => api.sessions());
   const memory = useLoad(() => api.memory());
   const stt = useLoad(() => api.stt());
+  /* "Drill these weak spots" in a debrief names its session (C1): the drill works on that debrief's weak spots. */
+  const drillSession = params.get("drill") === "1" ? params.get("session") : null;
+  const drillRecord = useLoad(() => (drillSession ? api.session(drillSession) : Promise.resolve(null)), [drillSession]);
 
   // Build-up (docs/motion.md 3.1, N3): first visit and return from a session only, never on a re-render.
   const [buildUp] = useState(() => shouldBuildUp(motionMemory));
@@ -109,7 +113,8 @@ export function HomeScreen() {
     const weak: WeakItem[] = (memoryData?.weak_spots ?? []).slice(0, 6).map((w) => {
       const title = tMaybe(`feedback.tag.${w.tag}`, w.text || w.tag.replace(/_/g, " "));
       const count = tp("home.workOn.count", w.sessions);
-      return { id: `${w.layer}-${w.tag}`, layer: w.layer, title, short: title.toLowerCase(), phrase: `${title.toLowerCase()} (${count})`, count };
+      const short = lowerFirstWord(title);
+      return { id: `${w.layer}-${w.tag}`, tag: w.tag, layer: w.layer, title, short, phrase: `${short} (${count})`, count };
     });
     return {
       track,
@@ -133,15 +138,17 @@ export function HomeScreen() {
     };
   }, [list, prep, sessionList, memoryData, hasCv, settings, track]);
 
-  /* "Drill these weak spots" in a debrief arrives as /?drill=1: start the same drill as the suggestion chip,
-     once, after the weak spots and jobs have loaded. The param stays in the URL so the reset above is not re-run. */
+  /* "Drill these weak spots" in a debrief arrives as /?drill=1&session=<id>&job=<id>: open the drill plan with that
+     debrief's own weak spots (C1), once, after the data has loaded. Without a session (or when it cannot be read, or has
+     no weak spots) the plan falls back to the shared memory, as the suggestion chip does. The params stay in the URL
+     so the reset above is not re-run. */
   const drillAsked = useRef(false);
-  const dataReady = !memory.loading && !sessions.loading && !vacancies.loading;
+  const dataReady = !memory.loading && !sessions.loading && !vacancies.loading && !drillRecord.loading;
   useEffect(() => {
     if (drillAsked.current || params.get("drill") !== "1" || !dataReady) return;
     drillAsked.current = true;
-    setSetup(begin(ctx, { kind: "drill", jobId: params.get("job") || undefined }));
-  }, [params, dataReady, ctx]);
+    setSetup(begin(ctx, { kind: "drill", jobId: params.get("job") || (drillSession ? null : undefined), weak: weakFromSession(drillRecord.data) }));
+  }, [params, drillSession, dataReady, ctx, drillRecord.data]);
 
   /* Questions from a job: the plan's Job row shows "Preparing questions…" and Start waits until the call returns
    * (QA-02: a session started meanwhile would ask a general question). A failure or the timeout says that general
@@ -254,7 +261,7 @@ export function HomeScreen() {
     const roundType = plan.kind === "drill" || plan.round === "technical" ? "mix" : plan.round;
     const config = buildSessionConfig({
       mode: "interview", answer, roundType, strictness: plan.strictness, questions: plan.questions, vacancyId: plan.job?.id,
-      drill: plan.kind === "drill",
+      drill: plan.kind === "drill", focus: plan.kind === "drill" ? plan.focus?.tags : undefined,
     }, settings, stt.data);
     const title = sessionName(list.find((v) => v.id === plan.job?.id)?.title ?? "", plan.kind === "drill");
     const focus = plan.kind === "drill" ? plan.focus?.spots : undefined;

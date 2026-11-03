@@ -313,7 +313,10 @@ export interface WeakSpot {
   layer: LayerName;
   tag: string;
   text: string;
+  /** Answer positions as saved ("q6" = the sixth scored answer, a follow-up counts): not question numbers; the page uses `questions`. */
   evidence?: string[];
+  /** The questions this spot showed in ("q4"), the numbers on the debrief's tabs; built by the server at read time. */
+  questions?: string[];
   said?: string;
   said_kind?: "quote" | "metric";
   lands_as?: string;
@@ -325,11 +328,11 @@ export interface ScoreRow {
   /** 1–5; null = nothing to judge ("Not asked this time"). */
   score: number | null;
   answers: number;
-  /** Question ids that lost points ("q2", the same ids as `WeakSpot.evidence`). */
+  /** The questions that lost points ("q2" = question 2, as in `WeakSpot.questions`), each once. */
   lost: string[];
 }
 /** D98 (rubric §9.3): one step per weak spot, up to three; the first has the drill. */
-export interface PlanStep { layer: LayerName; tag: string; text: string; drill: boolean }
+export interface PlanStep { layer: LayerName; tag: string; text: string; drill: boolean; /** The questions of this step's own weak spot ("q4"). */ questions?: string[] }
 /** D99 (rubric §9.4): the step of the verdict scale, computed by the server from the scorecard at read time. */
 export interface VerdictStepData {
   value: 0 | 1 | 2;
@@ -356,6 +359,11 @@ export interface Debrief {
 
 export type InputMode = "voice" | "browser_stt" | "text";
 
+export interface FocusSpot {
+  layer: "content" | "language" | "delivery";
+  tag: string;
+}
+
 export interface StartMessage {
   type: "start";
   mode: "interview" | "english";
@@ -371,6 +379,8 @@ export interface StartMessage {
   topic?: string;
   /** A weak-spot drill (interview only): the saved session is named "Drill · …". */
   drill?: boolean;
+  /** A drill's focus: the weak spots (layer + tag, as in the debrief) the questions and the interviewer work on. */
+  focus?: FocusSpot[];
   engine?: EngineId;
   /** US-13 AC5: continue this saved session (after a dropped connection) instead of starting a new one. */
   resume_session_id?: string;

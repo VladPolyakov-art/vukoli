@@ -5,11 +5,11 @@ import { percent, windowName } from "../../components/engine/PlanLimit";
 import { diffMarks, paceVerdict } from "../../components/Feedback";
 import { t, tMaybe, tp } from "../../i18n";
 import { formatClock, formatDateTime, formatDuration } from "../../lib/format";
-import type { FeedbackRecord, LanguageItem, LayerName, LowConfWord, ScoreKey, SessionRecord } from "../../lib/types";
+import type { FeedbackRecord, LanguageItem, LayerName, LowConfWord, ScoreKey, SessionRecord, WeakSpot } from "../../lib/types";
 import { languageCounts, type StrongerState, type Thread } from "../../session/reducer";
 import { verdictModel } from "./verdictStep";
 import type {
-  ContentBlock, ConversationTurn, Correction, DebriefModel, DeliveryBlock, EnglishModel, LanguageBlock, MetaItem, QuestionModel, Segments,
+  ContentBlock, ConversationTurn, Correction, DebriefModel, DeliveryBlock, EnglishModel, FollowUpTurn, LanguageBlock, MetaItem, QuestionModel, Segments,
   PlanStepModel, ScoreRowModel, StrongerModel, VerdictModel, WeakSpotModel,
 } from "./types";
 
@@ -146,23 +146,35 @@ function deliveryBlock(record: FeedbackRecord | undefined): DeliveryBlock | unde
   };
 }
 
-/** "q2" → 2: the same ids in weak-spot evidence and in scorecard `lost`. Anything else is dropped; a number listed
- * twice (one id per item on the server) is shown once, in order. */
+/** "q2" → 2: the question numbers of a weak spot (`questions`), of a plan step and of a scorecard row (`lost`): the numbers
+ * on the tabs, built by the server at read time. Anything else is dropped; a number listed twice is shown once, in order. */
 export function questionRefs(ids?: string[]): number[] {
   const refs = (ids ?? []).map((e) => /^q(\d+)$/i.exec(e)).filter((m): m is RegExpExecArray => Boolean(m)).map((m) => Number(m[1]));
   return [...new Set(refs)];
 }
+
+/** The question numbers of a weak spot. `evidence` holds the positions of the answers as saved (a follow-up is a position
+ * too), so it is read only when the server did not send `questions` (an older server, a fixture). */
+const spotQuestions = (w: WeakSpot) => questionRefs(w.questions ?? w.evidence);
+
+/** The title of a weak spot: with "What you said" / "How it lands" a short label and the server's `text` becomes "How to fix";
+ * an older debrief keeps its sentence as the title (D98). */
+function spotTitle(w: WeakSpot, rich: boolean): string {
+  const label = tMaybe(`feedback.tag.${w.tag}`, w.tag.replace(/_/g, " "));
+  return rich ? label : w.text || label;
+}
+
+const isRich = (list: WeakSpot[]) => list.some((w) => w.said || w.lands_as);
 
 function weakSpots(record: SessionRecord): WeakSpotModel[] {
   const out: WeakSpotModel[] = [];
   const list = record.debrief?.weak_spots ?? [];
   // D98: with "What you said" / "How it lands" the card needs a short heading and the server's `text` becomes "How to fix";
   // an older debrief keeps its sentence as the heading.
-  const rich = list.some((w) => w.said || w.lands_as);
+  const rich = isRich(list);
   for (const w of list) {
-    const label = tMaybe(`feedback.tag.${w.tag}`, w.tag.replace(/_/g, " "));
-    const title = rich ? label : w.text || label;
-    const ids = questionRefs(w.evidence);
+    const title = spotTitle(w, rich);
+    const ids = spotQuestions(w);
     const first = out.find((o) => o.layer === w.layer);
     if (first) {
       if (w.layer === "content" && !first.also) first.also = { text: title, ids };
@@ -211,11 +223,23 @@ function verdict(record: SessionRecord): VerdictModel | undefined {
   return verdictModel({ value, gap, target: target ?? null }, d.verdict, strength);
 }
 
+/** A step shows the title and the questions of ITS weak spot (layer and tag): the weak-spot cards are one per layer, so the
+ * card of the layer is the wrong source for a second step of the same layer (C3). */
 function plan(record: SessionRecord): PlanStepModel[] | undefined {
   const steps = (record.debrief?.plan ?? []).filter((p) => p.text?.trim()).slice(0, 3);
   if (!steps.length) return undefined;
+  const list = record.debrief?.weak_spots ?? [];
+  const rich = isRich(list);
   // Only the first step carries the drill (US-20 AC8).
-  return steps.map((p, i) => ({ id: `${i}-${p.layer}-${p.tag}`, layer: p.layer, text: p.text.trim(), drill: i === 0 && p.drill }));
+  return steps.map((p, i) => {
+    const w = list.find((x) => x.layer === p.layer && x.tag === p.tag);
+    const ids = p.questions ? questionRefs(p.questions) : w ? spotQuestions(w) : [];
+    return {
+      id: `${i}-${p.layer}-${p.tag}`, layer: p.layer, text: p.text.trim(), drill: i === 0 && p.drill,
+      title: w ? spotTitle(w, rich) : "",
+      evidence: ids.length ? { kind: "questions" as const, ids } : undefined,
+    };
+  });
 }
 
 export interface MapOptions {
@@ -227,8 +251,16 @@ export interface MapOptions {
   waiting: boolean;
 }
 
-function followUpText(record: SessionRecord, key: string): string | undefined {
-  return record.transcript.find((x) => x.role === "model" && x.kind === "follow_up" && x.question_id === key)?.text;
+/** Every follow-up of a question with its own answer: the question Mike asked (the record's `question`; older records: the
+ * n-th follow-up line of the transcript) and what the user said to it. Several answers to one follow-up are one answer. */
+function followUpTurns(record: SessionRecord, key: string, follow: FeedbackRecord[]): FollowUpTurn[] | undefined {
+  if (!follow.length) return undefined;
+  const asked = record.transcript.filter((x) => x.role === "model" && x.kind === "follow_up" && x.question_id === key).map((x) => x.text);
+  const main = record.feedback.find((f) => f.answer_kind === "main" && (f.question_id || "general") === key)?.question;
+  return follow.map((r, i) => {
+    const question = r.question && r.question !== main ? r.question : asked[i];
+    return { question: question?.trim() || undefined, answer: r.answer };
+  });
 }
 
 function questionModel(record: SessionRecord, th: Thread, opts: MapOptions): QuestionModel {
@@ -256,9 +288,8 @@ function questionModel(record: SessionRecord, th: Thread, opts: MapOptions): Que
     misheard: dismissed || undefined,
     edited: main?.edited || undefined,
     unavailable,
-    followUp: followUpText(record, th.key),
+    followUpTurns: followUpTurns(record, th.key, follow),
     answer: main ? answerSegments(main.answer, main.heard_as_words) : [],
-    followUpAnswer: follow.length ? follow.map((r) => r.answer).join(" ") : undefined,
     layers: { content, language: lang, delivery },
     stronger: record.mode === "english" ? undefined : stronger(main, main ? opts.stronger[main.id] : undefined),
   };

@@ -76,14 +76,15 @@ def parse_start(data: dict, settings: dict) -> dict:
     if vacancy_id and not storage.RECORD_ID.fullmatch(str(vacancy_id)):
         raise ValueError("vacancy_id")
     topic = str(data.get("topic") or "")[:80]
-    drill = data.get("drill") is True and mode == "interview"      # a weak-spot drill: only its name differs (13)
+    drill = data.get("drill") is True and mode == "interview"      # a weak-spot drill: its name, and its focus (C1b)
+    focus = planner.parse_focus(data.get("focus")) if drill else []
     resume_id = str(data.get("resume_session_id") or "")
     if resume_id and not storage.RECORD_ID.fullmatch(resume_id):
         raise ValueError("resume_session_id")
     voice = str(data.get("voice") or settings.get("voice") or "")
     return {"mode": mode, "round_type": round_type, "engine": engine, "questions": questions,
             "strictness": strictness, "input": input_mode, "vacancy_id": vacancy_id, "topic": topic,
-            "drill": drill, "level": config.normalize_level(data.get("level") or settings["level"]),
+            "drill": drill, "focus": focus, "level": config.normalize_level(data.get("level") or settings["level"]),
             "voice": voice, "speak": data.get("speak", True) is not False,
             "suggest": bool(data.get("suggest", False)), "resume": resume_id}
 
@@ -507,7 +508,8 @@ async def session_socket(websocket: WebSocket) -> None:
             opts.update(mode=resume_saved.get("mode", opts["mode"]), round_type=resume_saved.get("round_type", "mix"),
                         level=resume_saved.get("level", opts["level"]),
                         strictness=resume_saved.get("strictness", opts["strictness"]),
-                        vacancy_id=resume_saved.get("vacancy_id", ""))
+                        vacancy_id=resume_saved.get("vacancy_id", ""),
+                        focus=resume_saved.get("focus") or opts["focus"])      # a drill continues on its focus
         llm = get_llm(settings, engine_id, voice)
         usage.start_session(engine_id)              # D88: this session's requests, and the plan's limit around it
         if engine_id == "gemini_live":
@@ -533,7 +535,7 @@ async def session_socket(websocket: WebSocket) -> None:
         if resume_saved:
             plan, resume_info = resume_state(resume_saved)
         else:
-            plan = planner.plan_questions(opts["round_type"], opts["questions"], extra=extra) \
+            plan = planner.plan_questions(opts["round_type"], opts["questions"], extra=extra, focus=opts["focus"]) \
                 if opts["mode"] == "interview" else []
         state["suggest"] = opts["suggest"] and settings["answer_suggester"]
         callbacks = dict(
@@ -552,7 +554,8 @@ async def session_socket(websocket: WebSocket) -> None:
                 plan_text = "\n".join(f"{i}. {q.text}" for i, q in enumerate(plan, 1))
                 context = (f"<cv>{profile[:6000]}</cv>\n" if profile else "") + (f"<jd>{jd[:4000]}</jd>" if jd else "")
                 system = content.system("live_interviewer", max_follow_ups=planner.max_follow_ups(opts["strictness"]),
-                                        strictness=opts["strictness"], plan=plan_text, context=context)
+                                        strictness=opts["strictness"], plan=plan_text, context=context,
+                                        focus=planner.focus_line(opts["focus"]))
             else:
                 preset = content.level_presets().get(opts["level"], "")
                 system = content.system("p5a_tutor", level=opts["level"], level_preset=preset)
@@ -566,7 +569,7 @@ async def session_socket(websocket: WebSocket) -> None:
             driver = TextDriver(
                 llm, mode=opts["mode"], plan=plan, strictness=opts["strictness"], level=opts["level"],
                 voice=opts["voice"], speed=settings["kokoro_speed"], speak=opts["speak"], stt=recogniser,
-                settings=settings, topic=opts["topic"],
+                settings=settings, topic=opts["topic"], focus_gaps=planner.focus_gaps(opts["focus"]),
                 on_notice=lambda code, text: emit("notice", code=code, message=text),
                 on_preview=lambda text: emit("speech_preview", turn_id=state["voice_turn"], text=text),
                 on_error=lambda code, message, hint, retryable: error(code, message, hint, retryable),
@@ -580,14 +583,17 @@ async def session_socket(websocket: WebSocket) -> None:
                    "vacancy_title": vacancy_title, "started_at": started_at, "app_version": __version__,
                    "questions": [q.public() for q in plan],
                    "title": storage.session_title(opts["mode"], vacancy_title, opts["drill"])}
+        if opts["focus"]:
+            session["focus"] = opts["focus"]            # what this drill worked on (a resumed session keeps it)
         if resume_saved:                                # continue the saved record: same id, same start, time adds up
             session.update({k: resume_saved[k] for k in ("id", "started_at", "title", "questions", "vacancy_title",
-                                                         "archived") if k in resume_saved})
+                                                         "archived", "focus") if k in resume_saved})
             t_start = time.perf_counter() - float(resume_saved.get("duration_s") or 0)
         SAVED[session["id"]] = saved_event
         OWNER[session["id"]] = state["owner"]
         emit("session_started", session_id=session["id"], mode=opts["mode"], engine=engine_id,
              model=session["model"], questions=session["questions"], speaks=bool(driver.produces_audio),
+             **({"focus": opts["focus"]} if opts["focus"] else {}),
              audio={"sample_rate_out": tts.SAMPLE_RATE, "sample_rate_in": stt.SAMPLE_RATE},
              stt=stt_info, suggester_available=settings["answer_suggester"], suggest=state["suggest"],
              warnings=status.warnings)

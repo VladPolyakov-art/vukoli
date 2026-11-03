@@ -9,7 +9,7 @@
  * - D62 `tools`: "open" (default) = nothing behind More on wide: the sample-answer toggle, Feedback and a help button
  *   (shortcuts + mic help) are icons, the context is the status tooltip; "menu" = the same icons, but shortcuts, mic
  *   help and the context stay in More. Phones (stacked) always keep More. */
-import { useState, type Ref } from "react";
+import { useRef, useState, type Ref } from "react";
 import { Badge, Button, Composer, Dots, Island, IconButton, Menu, MicButton, Tooltip, type IconName, type IslandGroup, type MenuEntry } from "../../../ds";
 import { t } from "../../../i18n";
 import { clock } from "../clock";
@@ -187,14 +187,21 @@ function MenuHeader({ data, variant }: Pick<SessionIslandProps, "data" | "varian
 
 function TextComposer({ phase, handlers: h, sendLocked, autoFocus }: Pick<SessionIslandProps, "phase" | "handlers" | "sendLocked" | "autoFocus">) {
   const [draft, setDraft] = useState("");
+  const field = useRef<HTMLTextAreaElement>(null);
   const busy = phase === "mike-speaking" || phase === "thinking" || phase === "connecting";
   const canSend = !busy && !sendLocked && draft.trim().length > 0;
   const send = () => {
-    if (canSend && h?.onSendText?.(draft)) setDraft("");
+    if (canSend && h?.onSendText?.(draft)) {
+      setDraft("");
+      // C2b: Send with the mouse leaves the focus on a button that is disabled at once; the next answer is typed in the box.
+      field.current?.focus({ preventScroll: true });
+    }
   };
   return (
     <Composer
+      ref={field}
       surface="none"
+      data-session-composer
       label={t("session.input.label")}
       placeholder={t("session.input.placeholder")}
       value={draft}

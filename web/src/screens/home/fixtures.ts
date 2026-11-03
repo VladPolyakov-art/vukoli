@@ -33,10 +33,10 @@ export const FIELDNOTE: JobItem = {
 export const JOBS: JobItem[] = [KESTREL, LUMEN, FIELDNOTE];
 
 export const WEAK: WeakItem[] = [
-  { id: "w1", layer: "content", title: "No result in your answers", short: "no result", phrase: "no result in 4 answers", tip: "End each story with what changed.", count: "4 answers in 2 sessions" },
-  { id: "w2", layer: "content", title: "“we” instead of “I”", short: "“we” instead of “I”", phrase: "“we” instead of “I” in 3", tip: "Say what you did yourself.", count: "3 answers" },
-  { id: "w3", layer: "language", title: "“I have led” for finished projects", short: "“I have led”", count: "2 times" },
-  { id: "w4", layer: "delivery", title: "About 9 fillers per answer", short: "fillers", count: "5 answers" },
+  { id: "w1", tag: "no_result", layer: "content", title: "No result in your answers", short: "no result", phrase: "no result in 4 answers", tip: "End each story with what changed.", count: "4 answers in 2 sessions" },
+  { id: "w2", tag: "we_not_i", layer: "content", title: "“we” instead of “I”", short: "“we” instead of “I”", phrase: "“we” instead of “I” in 3", tip: "Say what you did yourself.", count: "3 answers" },
+  { id: "w3", tag: "tense", layer: "language", title: "“I have led” for finished projects", short: "“I have led”", count: "2 times" },
+  { id: "w4", tag: "filler_high", layer: "delivery", title: "About 9 fillers per answer", short: "fillers", count: "5 answers" },
 ];
 
 export const PHRASES: Phrase[] = [

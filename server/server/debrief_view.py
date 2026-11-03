@@ -11,9 +11,9 @@ from __future__ import annotations
 from . import feedback
 from .feedback import CONTENT_FIX, counted_tags, hints, is_quote, norm
 
-# Keys this module adds. `scorecard` is on the debrief, `said`/`said_kind`/`said_from`/`lands_as` on each weak spot.
+# Keys this module adds. `scorecard` is on the debrief, `questions`/`said`/`said_kind`/`said_from`/`lands_as` on each weak spot.
 ENRICHED_KEYS = ("scorecard", "plan", "step")
-ENRICHED_SPOT_KEYS = ("said", "said_kind", "said_from", "lands_as")
+ENRICHED_SPOT_KEYS = ("questions", "said", "said_kind", "said_from", "lands_as")
 
 ROWS = ("structure", "own_part", "result", "relevance", "reflection", "language", "delivery")
 CONTENT_ROWS = ROWS[:4]            # structure, own_part, result, relevance: the rows that can make a verdict "Not ready yet"
@@ -65,12 +65,40 @@ PLAN_STEPS = {
 }
 
 
-# ---------- Scorecard ----------
+# ---------- Which question an answer belongs to ----------
 
 def scored_records(feedback_records: list[dict]) -> list[dict]:
-    """The records the debrief counts, in the order its "q<n>" ids use: the same filter as `feedback.debrief`."""
+    """The records the debrief counts, in the order its "q<n>" ids use: the same filter as `feedback.debrief`.
+    The saved debrief (the model's evidence, `refresh_weak_spots`) names an answer by its position in this list, and a
+    follow-up answer is a position like any other: "q6" can be the second follow-up of question 4."""
     return [f for f in feedback_records or []
             if (f.get("layers") or {}).get("content") or (f.get("layers") or {}).get("language")]
+
+
+def question_numbers(feedback_records: list[dict], questions: list[dict] | None = None) -> list[int]:
+    """For each record of `scored_records`, the number of its QUESTION: the number on the page's tabs, so a follow-up
+    answer has the number of its main question. The page numbers a question by its place in the session's question
+    list, and by the order the questions were answered for one the list does not have (`threadsFromRecord` in
+    mapRecord.ts does the same; keep them equal)."""
+    ids = [str(q.get("id")) for q in questions or [] if isinstance(q, dict)]
+    order: list[str] = []
+    for record in feedback_records or []:
+        key = str(record.get("question_id") or "general")
+        if key not in order:
+            order.append(key)
+
+    def number(record: dict) -> int:
+        key = str(record.get("question_id") or "general")
+        return ids.index(key) + 1 if key in ids else order.index(key) + 1
+
+    return [number(r) for r in scored_records(feedback_records)]
+
+
+def _ref(number: int) -> str:
+    return f"q{number}"
+
+
+# ---------- Scorecard ----------
 
 
 def _real(layer: dict | None) -> bool:
@@ -155,10 +183,13 @@ def _delivery_points(layer: dict | None) -> int | None:
     return 2 if layer.get("dismissed") else _sev_points(layer.get("severity", 0))
 
 
-def build_scorecard(feedback_records: list[dict]) -> dict:
+def build_scorecard(feedback_records: list[dict], questions: list[dict] | None = None) -> dict:
+    """`lost` lists the numbers of the questions ("q4"), each once, however many of its answers (the main one and its
+    follow-ups) lost points; `answers` counts answers."""
     points: dict[str, list[tuple[str, int]]] = {k: [] for k in ROWS}
-    for i, record in enumerate(scored_records(feedback_records), 1):
-        qid, layers = f"q{i}", record.get("layers") or {}
+    numbers = question_numbers(feedback_records, questions)
+    for number, record in zip(numbers, scored_records(feedback_records)):
+        qid, layers = _ref(number), record.get("layers") or {}
         content = layers.get("content")
         if record.get("answer_kind") == "main" and _real(content):
             for row, value in _content_points(record, content).items():
@@ -172,7 +203,7 @@ def build_scorecard(feedback_records: list[dict]) -> dict:
     for key in ROWS:
         items = points[key]
         score = round_score(sum(p for _q, p in items), len(items)) if items else None
-        lost = [q for q, p in items if p < 2] if score != 5 else []
+        lost = list(dict.fromkeys(q for q, p in items if p < 2)) if score != 5 else []
         rows.append({"key": key, "score": score, "answers": len(items), "lost": lost})
     return {"rows": rows}
 
@@ -251,17 +282,25 @@ def _said(record: dict, layer: str, tag: str) -> tuple[str, str] | None:
     return None
 
 
-def _enrich_spot(spot: dict, records: list[dict]) -> dict:
+def _enrich_spot(spot: dict, records: list[dict], numbers: list[int] | None = None) -> dict:
+    """`records` are the scored ones and `numbers` the question number of each. The spot's `evidence` stays the saved
+    positions ("q5" = the fifth scored answer); `questions` is what the page shows, the numbers of the questions."""
+    numbers = numbers if numbers is not None else list(range(1, len(records) + 1))
     out = {k: v for k, v in spot.items() if k not in ENRICHED_SPOT_KEYS}
     if isinstance(spot.get("evidence"), list):
-        out["evidence"] = list(dict.fromkeys(spot["evidence"]))   # one id per question, in order
+        out["evidence"] = list(dict.fromkeys(spot["evidence"]))   # one id per answer, in order
+    positions: list[int] = []
     for qid in dict.fromkeys(spot.get("evidence") or []):
         digits = str(qid)[1:]
-        if not (str(qid).startswith("q") and digits.isdigit() and 1 <= int(digits) <= len(records)):
-            continue
-        found = _said(records[int(digits) - 1], str(spot.get("layer")), str(spot.get("tag")))
+        if str(qid).startswith("q") and digits.isdigit() and 1 <= int(digits) <= len(records):
+            positions.append(int(digits))
+    shown = sorted({numbers[p - 1] for p in positions})
+    if isinstance(spot.get("evidence"), list):
+        out["questions"] = [_ref(n) for n in shown]
+    for p in positions:
+        found = _said(records[p - 1], str(spot.get("layer")), str(spot.get("tag")))
         if found:
-            out.update({"said": found[0], "said_kind": found[1], "said_from": str(qid)})
+            out.update({"said": found[0], "said_kind": found[1], "said_from": _ref(numbers[p - 1])})
             break
     if spot.get("tag") in LANDS_AS:
         out["lands_as"] = LANDS_AS[spot["tag"]]
@@ -274,24 +313,31 @@ def _enrich_spot(spot: dict, records: list[dict]) -> dict:
 
 
 def build_plan(spots: list[dict]) -> list[dict]:
+    """One step per weak spot (three at most, in the spots' order) with the questions of that spot, so a step never
+    borrows the title or the questions of another spot of its layer."""
     steps = []
     for spot in spots[:3]:
         text = PLAN_STEPS.get(spot.get("tag"))
         if text:
-            steps.append({"layer": spot.get("layer"), "tag": spot.get("tag"), "text": text, "drill": not steps})
+            steps.append({"layer": spot.get("layer"), "tag": spot.get("tag"), "text": text, "drill": not steps,
+                          "questions": list(spot.get("questions") or [])})
     return steps
 
 
-def enrich_debrief(debrief: dict | None, feedback_records: list[dict], mode: str) -> dict | None:
+def enrich_debrief(debrief: dict | None, feedback_records: list[dict], mode: str,
+                   questions: list[dict] | None = None) -> dict | None:
     """A copy of the debrief with the scorecard, the verdict step, "what you said / how it lands" on each weak spot and the plan.
-    Interview mode only; no debrief or a too-short one is returned as it is. The saved debrief is never changed."""
+    `questions` is the session's question list (the page numbers a question by its place in it); without it the
+    numbers follow the order the questions were answered. Interview mode only; no debrief or a too-short one is
+    returned as it is. The saved debrief is never changed."""
     if not debrief or debrief.get("too_short") or mode != "interview":
         return debrief
     records = scored_records(feedback_records)
-    spots = [_enrich_spot(s, records) for s in debrief.get("weak_spots") or [] if isinstance(s, dict)]
+    numbers = question_numbers(feedback_records, questions)
+    spots = [_enrich_spot(s, records, numbers) for s in debrief.get("weak_spots") or [] if isinstance(s, dict)]
     out = {k: v for k, v in debrief.items() if k not in ENRICHED_KEYS}
     out["weak_spots"] = spots
-    out["scorecard"] = build_scorecard(feedback_records)
+    out["scorecard"] = build_scorecard(feedback_records, questions)
     out["plan"] = build_plan(spots)
     if (step := verdict_step(out["scorecard"])) is not None:
         out["step"] = step                                  # D99: from the scorecard just built, so it follows the same edits

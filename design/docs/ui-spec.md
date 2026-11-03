@@ -576,7 +576,9 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 
 ### 4.4 Keyboard (V2.8)
 
-Ignored in text fields and with modifier keys.
+Ignored in text fields and with modifier keys, and a held key counts once (a held R redid every answer, C2).
+
+**Text mode (C2, 2026-11-02):** a character typed with the focus outside the answer box (after Send with the mouse, after the panel closed, on a toolbar button) is the user's typing: the box takes the focus and the character. A shortcut letter (R, F, N, ?) acts only when it is pressed alone, in lowercase, with no other character typed in the last second and no answer sent in the last 2 seconds (C2b: Send with the mouse used to leave the focus on a disabled button, and the first letter of the next answer, "r", took the sent answer back); a capital letter (the start of a sentence) never does. After Send (mouse or Enter) and after "Redo answer" the focus is in the answer box, so typing needs no click and no shortcut fires; a shortcut letter acts only when the user has moved the focus away himself (clicked the page or a toolbar button) and waited. The dialog hint says the same ("Shortcuts work when the cursor isn't in a text field. While you type an answer, and for a moment after sending one, letters go into the answer instead"). In the live conversation a run of Redo acknowledgements ("Sure, go ahead.") shows once, the last; the Debrief never had them. In dialogs and menus the keys keep their own meaning. Redo (button or R) ignores a second request until the server has answered the first, so a double click takes back one answer, not two. "Redo answer" puts the question counter, the follow-ups and the closing state back to the question the removed answer belonged to.
 
 | Key | Action |
 |---|---|

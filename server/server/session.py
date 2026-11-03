@@ -72,7 +72,8 @@ class TextDriver:
                  on_preview: Optional[Callable] = None, on_error: Optional[Callable] = None,
                  on_user_transcript: Optional[Callable] = None, on_metrics: Optional[Callable] = None,
                  on_voice_dropped: Optional[Callable] = None, on_voice_noise: Optional[Callable] = None,
-                 gate: ModelGate | None = None, resume: dict | None = None, **_ignored) -> None:
+                 gate: ModelGate | None = None, resume: dict | None = None,
+                 focus_gaps: list[str] | None = None, **_ignored) -> None:
         self.llm = llm
         self.mode = mode
         self.plan = list(plan or [])
@@ -88,6 +89,7 @@ class TextDriver:
         self.produces_audio = self.speak
         self.stt = stt
         self.topic = topic
+        self.focus_gaps = list(focus_gaps or [])     # a drill: the gaps the interviewer checks first (planner.focus_gaps)
         self.on_turn_start = on_turn_start
         self.on_transcript_delta = on_transcript_delta
         self.on_turn_complete = on_turn_complete
@@ -417,6 +419,7 @@ class TextDriver:
                             next_question=nxt.text if nxt else "(This was the last question. Say: Okay.)",
                             follow_up_bank="; ".join(f"{tag}: {text}" for tag, text in question.follow_ups.items()),
                             follow_ups_already_asked="; ".join(self.follow_ups) or "none",
+                            focus_gaps=", ".join(self.focus_gaps) or "none",
                             transcript=marked, **hints(answer))
         messages = [{"role": "system", "content": self._p1_system()}, {"role": "user", "content": user}]
         self._decision = ""

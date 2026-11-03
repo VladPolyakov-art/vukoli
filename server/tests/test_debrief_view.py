@@ -204,7 +204,7 @@ def test_a_dismissed_content_layer_takes_no_points():
 
 
 def test_q_ids_follow_the_debrief_numbering_which_skips_records_without_layers():
-    empty = {"id": "fb-0", "answer_kind": "main", "answer": "x", "layers": {}}
+    empty = {"id": "fb-0", "question_id": "q1", "answer_kind": "main", "answer": "x", "layers": {}}
     card = debrief_view.build_scorecard([empty, record(1, data={"result": False, "result_type": "none"})])
     assert row(card, "result")["lost"] == ["q1"]
 
