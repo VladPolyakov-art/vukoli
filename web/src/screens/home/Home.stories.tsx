@@ -25,7 +25,6 @@ export const AfterEndSaving = desktop("afterEndSaving");
 export const AfterEndSaved = desktop("afterEndSaved");
 export const StartNoName = desktop("noName");
 export const StartEnglish = desktop("english");
-export const StartModeMenu = desktop("modeMenu");
 export const StartTyped = desktop("typed");
 export const StartPasted = desktop("pasted");
 export const StartFileAttached = desktop("fileAttached");

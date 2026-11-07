@@ -25,7 +25,7 @@ Home becomes what the owner uses every day in ChatGPT, Gemini and Ollama (P3, R2
 **Principle 1 check** (PRD §5.5: "a step added before the first question must remove one"). v1 returning user: 1 click (Start). v2: "Kestrel Pay again" → plan → Start = **2 clicks**. New job: v1 paste → editor → Save → round chip → Start = 5 actions; v2 paste → round reply → "Nothing else" → Start = **4**. "Skip questions" jumps to the plan from any turn. The returning path costs one click more than v1: the price of an empty start screen, sent to the owner as [Q1].
 
 ## 1. The flow in five steps
-1. **Start** (`step: "start"`): greeting + composer (mode chip inside: Interview / English practice) + up to 3 suggestion chips. Nothing else in the column.
+1. **Start** (`step: "start"`): greeting + composer + up to 3 suggestion chips. Nothing else in the column.
 2. **First input** → the greeting leaves, the user's input becomes the first message of the setup chat, the composer drops to the bottom of the page (chat layout, R2).
 3. **Mike asks what he still needs**, one question per turn, each with quick replies + free text: T1 job (skipped when a job was given) → T2 round type → T3 anything else (note; gentle / tough). 2–3 turns; never more than 4 Mike messages including the plan.
 4. **"Here's the plan"**: job, round, how strict Mike is, length, what questions are based on, your note, what to watch for. Each row has "Change". Primary **Start interview** + "Type instead".
@@ -40,7 +40,7 @@ English practice: same five steps, turns E1 level → E2 topic (+ phrases to rev
 | Shell, rail, Recent, engine status | AppShell (unchanged, incl. D47d tighter rows) | exists |
 | Banners (engine down, browser, storage) | Callout `warning` / `warning` / `error` + CopyField + Button `secondary sm` | exists |
 | Greeting | Page `Layout: start` header (h1, centred) | exists |
-| Composer | **Composer** G1: `toolbarStart` = mode chip (Button `secondary sm` + `chevronDown`, Menu `menu` radio items) + IconButton `sm` `plus` "Add a job file"; `attachment` = ComposerAttachment; `send` `action` inline; `submitOnEnter` | exists; Home switches to `send.variant="action"` |
+| Composer | **Composer** G1: `toolbarStart` = IconButton `sm` `plus` "Add a job file"; `attachment` = ComposerAttachment; `send` `action` inline; `submitOnEnter` | exists; Home switches to `send.variant="action"` |
 | Mode menu | Menu `Kind: menu`, radio items with `description` | exists |
 | Suggestion chips | ChipGroup `role="group"` `align="center"` + Chip used as an action (never selected) with icon | exists (checked in code: `Chip` with `selected` undefined renders no `aria-pressed`) |
 | Setup chat log | **ChatMessage** `Speaker: mike \| user` · `State: final \| pending \| error` in a `role="log"` list | **new DS** (`_index.md` §4.1) |
@@ -66,7 +66,7 @@ English practice: same five steps, turns E1 level → E2 topic (+ phrases to rev
 - Composer G1, `--radius-lg`, `--color-raised`, 1px `--color-border-control`, `--shadow-raised`. Field: hidden label "Message Mike", `minRows 1`, `maxRows 8`, `submitOnEnter` (Shift+Enter = new line; pasted text keeps its line breaks).
 - Placeholder: Interview "Paste a job or a link, or say what you want to practise" · English "Say a topic, or pick one below" · 375 Interview "Paste a job or say what you want".
 - `toolbarStart`:
-  - **Mode chip** (R4 "Flash-Lite ▾", R6 model chip; the owner liked "приятный выбор модели"): Button `secondary sm`, icon `briefcase` "Interview" / `chat` "English practice", `chevronDown`; accessible name "Practice type: Interview". Menu `menu`, radio items: `briefcase` "Interview" + "Mike asks interview questions, with feedback after each answer." · `chat` "English practice" + "Just talk at your level. Corrections after each of your turns." Opens on Interview every time (US-25 AC2); `/?track=english` opens English.
+  - **No practice-type dropdown (D112, 2026-11-07).** The mode chip with its radio menu is removed: English is reached by the "Practise English" chip under the field, and back to Interview by "New practice" in the sidebar. `/?track=english` still opens English.
   - IconButton `sm` `plus` "Add a job file" (Interview only): native file picker (PDF, DOCX, TXT, MD, HTML · up to 5 MB 🟡); the file shows in `attachment` (ComposerAttachment: Icon `file` · "kestrel-pay-senior-pd.pdf" · "184 KB" · IconButton `x` "Remove file"); while a file is attached, a line under the composer: Icon `lock` sm "The file stays on this computer." (GR7, US-09 AC5).
 - `send`: `action`, Icon `arrowRight`, label "Send", inline at the end of the field, visible only with text or a file (`rise-in` `base`, §3.3 D6).
 - Text ≥ 80 characters or a URL = a job (§4.2–4.3); anything shorter = a message (§4.4). Client-side, deterministic 🟡.
@@ -78,7 +78,7 @@ English practice: same five steps, turns E1 level → E2 topic (+ phrases to rev
 - Disabled while loading and while the engine is not ready (the banner says why; typing and Send still work). States `returning`, `firstVisit`, `typed`, `fileAttached`, `quickTextMode`, `quickStarting`, `engineDown`, `loading`; review `start-returning`, `start-first`, `start-typed`, `start-quick-text`, `start-quick-engine-down`.
 
 ### 3.2b "Quick start" button (D111, 2026-11-07, owner: «кнопка быстрый старт, где ты сразу залетаешь с майком на разговор, он тебя сам спрашивает о чём говорить будем»)
-- `toolbarStart` = "+", the mode chip, then `Button secondary sm` icon `play` "Quick start" (`data-track="quick-call"`; tooltip "Start a call right away: Mike asks whether you want an interview or English."). Existing DS Button, no new component. Both tracks. On 375 the toolbar keeps one row (the mode chip is the compact one).
+- `toolbarStart` = "+", then `Button secondary sm` icon `play` "Quick start" (`data-track="quick-call"`; tooltip "Start a call right away: Mike asks whether you want an interview or English."). Existing DS Button, no new component. Both tracks. On 375 the toolbar keeps one row (the mode chip is the compact one).
 - Click: soft-out like Start, then `/session` with `start.mode = "quick"` (`buildSessionConfig({mode: "quick"})`): a call straight away, no plan, no settings. Voice unless the text-mode pref is on / the browser cannot listen (then typed). Mike asks "interview or English?" and runs the choice (session map §4, `app/server/PROTOCOL.md` → Quick start).
 - Disabled while loading, while the engine is down and while starting. No new states in the review harness beyond `start-*` (the button is visible in all of them).
 
@@ -192,8 +192,7 @@ Inside Mike's last message, full column width. Card `subtle`, `Padding: md`, `--
 | `Home/Start/Returning` | §3, Interview, returning chips |
 | `Home/Start/FirstVisit` | first-visit chips; rail Recent "Your sessions will appear here." |
 | `Home/Start/NoName` | h1 without the name |
-| `Home/Start/English` | mode chip "English practice", English h1, placeholder, chips, footer |
-| `Home/Start/ModeMenu` | mode Menu open (inline) |
+| `Home/Start/English` | English h1, placeholder, chips, footer |
 | `Home/Start/Typed` · `/Pasted` · `/FileAttached` | composer with a sentence / 6 lines of Kestrel Pay text / attached file + privacy line; send visible |
 | `Home/Start/Loading` | h1 and composer render at once; the chips area keeps its height with one Skeleton `lines` `Lines: 1` until jobs and memory load; `aria-busy` on the group; no spinner |
 | `Home/Start/EngineNotRunning` | Callout `warning` above the h1: "Mike can't start yet" / "The AI model (Ollama) isn't running. Open the Ollama app, or paste this into Terminal:" + CopyField `ollama serve` + "We check again every 5 seconds." + Button `secondary sm` `refresh` "Try again now" · Button `link sm` "Engine settings". The composer and the setup chat still work (no engine needed, B1); only Start in the plan is disabled. Check passes → banner leaves, no toast |
@@ -221,7 +220,7 @@ Inside Mike's last message, full column width. Card `subtle`, `Padding: md`, `--
 **Props of the pure `HomeView`:** `step: "start" | "setup"` · `track` · `name?` · `loading?` · `engineReady`, `engineBanner?`, `browserBanner?`, `storageError?`, `textMode?` · `suggestions: { id, icon, label }[]` · `composer: { text, file?: { name, size } }` · `setup: { turns: SetupTurn[], step?: { n, of }, canSkip, plan?: PlanModel }` · `starting?` · `overlay?` (VacancyEditor) · `initialOverlay?: "mode" | "change-job" | "change-round" | "change-strictness"`.
 `SetupTurn = { id, speaker: "mike" | "user", state: "final" | "pending" | "error", text, pendingLabel?, attachment?: { kind: "job" | "link" | "file", label, meta }, replies?: { id, label, icon? }[], example?: boolean, plan?: boolean }`.
 `PlanModel = { kind: "interview" | "drill" | "english", job: JobItem | null, jobStatus: "ready" | "preparing" | "error", round, strictness, questions, minutes, basis: "cv+job" | "job" | "cv" | "general", note?, watch?, hasCv, focus?, level?, topic?, phrases? }`.
-Handlers: `onSend`, `onSuggestion`, `onReply(turnId, replyId)`, `onSkip`, `onChange(row, value)`, `onRemoveNote`, `onEditJob`, `onRetryPrep`, `onStart`, `onTypeInstead`, `onModeChange`, `onStartOver` + v1 banner handlers.
+Handlers: `onSend`, `onSuggestion`, `onReply(turnId, replyId)`, `onSkip`, `onChange(row, value)`, `onRemoveNote`, `onEditJob`, `onRetryPrep`, `onStart`, `onTypeInstead`, `onStartOver` + v1 banner handlers.
 
 ## 6. Layout 1440 · 375 (container queries)
 - `shell` (AppShell) unchanged: ≥ 1024 rail 240 + main · 640–1023 top bar + drawer · < 640 top bar (menu, name, engine badge).

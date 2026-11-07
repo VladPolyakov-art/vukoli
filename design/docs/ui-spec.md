@@ -394,16 +394,16 @@ PRD conflict: US-03 AC3 says Ollama is preselected when ready. D82 overrides thi
 
 **Track.**
 - `?track=english` switches to English. No param means Interview.
-- The ModeMenu ("Practice type": "Interview" / "English practice") changes the param with `replace`.
+- D112 (2026-11-07): no practice-type dropdown in the composer; English is reached by the "Practise English" chip, Interview by "New practice" in the sidebar.
 
 ### 3.1 Start step
 
 **Layout, top to bottom.**
 1. Banners.
 2. Greeting H1.
-3. Composer: "+" file, ModeMenu, text field, Send.
+3. Composer: "+" file, Quick start, text field, Send.
 4. Quick start button with a quiet detail line.
-   *(D111, 2026-11-07)* Next to it, inside the composer's left toolbar after the mode chip: a labelled **Quick start** button (`Button secondary sm`, icon `play`, tooltip "Start a call right away: Mike asks whether you want an interview or English."). One click opens the session (same soft-out as Start) with `start.mode = "quick"`: no plan card, no settings, no job choice. Voice unless typed answers are on or the browser cannot listen (then typed, as the mic start). Shown on both tracks; disabled while loading, while the engine is not ready and while starting. Not the round mic at the field's end (that one is "Start now" with the last settings).
+   *(D111, 2026-11-07)* Next to it, inside the composer's left toolbar after "+": a labelled **Quick start** button (`Button secondary sm`, icon `play`, tooltip "Start a call right away: Mike asks whether you want an interview or English."). One click opens the session (same soft-out as Start) with `start.mode = "quick"`: no plan card, no settings, no job choice. Voice unless typed answers are on or the browser cannot listen (then typed, as the mic start). Shown on both tracks; disabled while loading, while the engine is not ready and while starting. Not the round mic at the field's end (that one is "Start now" with the last settings).
 5. Suggestions: max 3 chips.
 6. Footer.
 
@@ -422,7 +422,6 @@ PRD conflict: US-03 AC3 says Ollama is preselected when ready. D82 overrides thi
 | First visit | no sessions | quick start = general questions, unseen mix; suggestion "Show me an example" | — | `start-first-visit` | `start-first` |
 | No name | name not set | greeting without name | — | `start-no-name` | — |
 | English | `?track=english` | English greeting; topic chips "Free talk" / "Talk about your work" / "Small talk"; no quick start | pick a topic | `start-english` | `setup-english` (chat) |
-| Mode menu open | — | two options with descriptions | switch | `start-mode-menu` | `start-mode` |
 | Typed | text in the field | Send enabled | Enter / Send | `start-typed` | `start-typed` |
 | Pasted job | ≥80 chars or a URL | — | Send → setup chat reads the job | `start-pasted` | `start-pasted` |
 | File attached | "+" or drop | chip (name clamped at 28 chars) + "The file stays on this computer." + "Remove file" | Send | `start-file-attached` | — |

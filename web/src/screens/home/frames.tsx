@@ -103,7 +103,7 @@ const PREP_MS = 2400;
 /** A scene, playable: the script runs on every send / reply / change; pending reads resolve after a pause. */
 export function HomeHarness({ scene }: { scene: HomeScene }) {
   const p = scene.props ?? {};
-  const [track, setTrack] = useState(scene.ctx.track);
+  const track = scene.ctx.track;
   const ctx = useMemo<ScriptContext>(() => ({ ...scene.ctx, track }), [scene.ctx, track]);
   const [setup, setSetup] = useState<SetupState | null>(() => (scene.inputs ? replay(scene.ctx, scene.inputs) : null));
   const [composer, setComposer] = useState(p.composer ?? { text: "" });
@@ -207,7 +207,6 @@ export function HomeHarness({ scene }: { scene: HomeScene }) {
       onStart={() => { setStarting(true); later(() => setStarting(false), PREP_MS); }}
       onTypeInstead={() => setTextMode(true)}
       onUseTextMode={() => setTextMode(true)}
-      onModeChange={setTrack}
       overlay={<EditorHarness key={editor.n} seed={editor.seed} open={editor.open} onClose={() => setEditor((e) => ({ ...e, open: false }))} />}
     />
   );

@@ -56,7 +56,7 @@ function sessionName(vacancyTitle: string, drill: boolean): string {
 interface EditorState { open: boolean; editId: string | null }
 
 export function HomeScreen() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const track: Track = params.get("track") === "english" ? "english" : "interview";
@@ -354,7 +354,6 @@ export function HomeScreen() {
         onAddCv={() => navigate("/settings/profile")}
         onStart={() => { if (plan) start(plan, textMode ? "text" : "voice"); }}
         onTypeInstead={() => { if (plan) start(plan, "text"); }}
-        onModeChange={(next) => setParams(next === "english" ? { track: "english" } : {}, { replace: true })}
         onUseTextMode={() => { prefs.setInput("text"); setTextMode(true); }}
         onDismissBrowser={() => { browserBannerDismissed = true; setBrowserDismissed(true); }}
         onRetryEngine={() => { void refreshEngines(); }}

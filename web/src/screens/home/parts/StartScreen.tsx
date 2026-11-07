@@ -1,13 +1,12 @@
 /* Start screen (home.md v2 §3, D47a/b): a text greeting (no orb), one composer, up to three suggestions
  * (the footer line is pinned to the bottom of <main> by HomeView).
- * Calm like a chat start page: nothing else on screen. The composer carries the practice type (mode chip with a
- * radio menu) and a "+" for a job file. The composer carries the fast path like the Gemini input (D52, chosen in D53):
- * "+" then the mode chip on the left, a round unlabelled mic on the right (= Start now, D51 item 1; a keyboard icon when
+ * Calm like a chat start page: nothing else on screen. The composer carries a "+" for a job file (D112: no practice-type dropdown; English is the chip under the field). The composer carries the fast path like the Gemini input (D52, chosen in D53):
+ * "+" then Quick start on the left, a round unlabelled mic on the right (= Start now, D51 item 1; a keyboard icon when
  * answers are typed). Text or a file turns the mic into the Send arrow (motion D6), and Send opens the setup chat.
  * Under the composer: the suggestions only. */
 import type { KeyboardEvent, Ref } from "react";
 import type { ComposerSend } from "../../../ds";
-import { Button, Chip, ChipGroup, Composer, ComposerAttachment, Icon, IconButton, Menu, Skeleton } from "../../../ds";
+import { Button, Chip, ChipGroup, Composer, ComposerAttachment, Icon, IconButton, Skeleton } from "../../../ds";
 import { t } from "../../../i18n";
 import type { HomeViewProps, Track } from "../types";
 import s from "./parts.module.css";
@@ -16,25 +15,6 @@ export function Footer({ track }: { track: Track }) {
   // D108: no free/Premium wording; the English track has no footer, the interview track keeps the practice-only line.
   if (track === "english") return null;
   return <p className={s.footer} data-review-id="Home/Footer">{t("home.disclaimer")}</p>;
-}
-
-function ModeMenu({ track, open, onChange }: { track: Track; open?: boolean; onChange?: (track: Track) => void }) {
-  const label = track === "english" ? t("chat.start.mode.english") : t("chat.start.mode.interview");
-  return (
-    <Menu
-      label={t("chat.start.mode.menu")}
-      defaultOpen={open}
-      items={[
-        { id: "interview", track: "mode-interview", label: t("chat.start.mode.interview"), description: t("chat.start.mode.interviewDesc"), icon: "briefcase", checked: track === "interview", onSelect: () => onChange?.("interview") },
-        { id: "english", track: "mode-english", label: t("chat.start.mode.english"), description: t("chat.start.mode.englishDesc"), icon: "chat", checked: track === "english", onSelect: () => onChange?.("english") },
-      ]}
-      trigger={(p) => (
-        <Button {...p} variant="secondary" size="sm" icon={track === "english" ? "chat" : "briefcase"} iconRight="chevronDown" data-track="mode-menu" aria-label={t("chat.start.mode.aria", { mode: label })}>
-          {label}
-        </Button>
-      )}
-    />
-  );
 }
 
 /** Longer chip labels ("Kestrel Payments Internati… again") are clamped by CSS; the full text goes to `title`. */
@@ -81,7 +61,6 @@ export function StartScreen(props: StartScreenProps) {
       {t("chat.quick.call")}
     </Button>
   );
-  const modeMenu = <ModeMenu track={track} open={props.initialOverlay === "mode"} onChange={props.onModeChange} />;
 
   return (
     <div className={`${s.start} ${buildUp ? "motion-stagger" : ""}`} data-review-id="Home/Start-screen">
@@ -106,7 +85,7 @@ export function StartScreen(props: StartScreenProps) {
             />
           ) : undefined}
           onKeyDown={holdEnter}
-          toolbarStart={<>{addFile}{modeMenu}{props.onQuickCall ? quickCall : null}</>}
+          toolbarStart={<>{addFile}{props.onQuickCall ? quickCall : null}</>}
           send={send}
         />
       </div>

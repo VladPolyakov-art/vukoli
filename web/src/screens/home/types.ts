@@ -162,7 +162,7 @@ export interface HomeViewProps {
   /** Settings: the order of the three layers in the example (GR8). */
   layerOrder?: "content-first" | "delivery-first";
   /** Review states: a menu open on first render. */
-  initialOverlay?: "mode" | "change-job" | "change-round" | "change-strictness";
+  initialOverlay?: "change-job" | "change-round" | "change-strictness";
   /** Rendered after the column (VacancyEditor dialog). */
   overlay?: ReactNode;
   onComposerChange?: (text: string) => void;
@@ -187,7 +187,6 @@ export interface HomeViewProps {
   onAddCv?: () => void;
   onStart?: () => void;
   onTypeInstead?: () => void;
-  onModeChange?: (track: Track) => void;
   onRetryEngine?: () => void;
   onUseTextMode?: () => void;
   onDismissBrowser?: () => void;

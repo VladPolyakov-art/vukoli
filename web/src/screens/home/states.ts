@@ -99,7 +99,6 @@ export const SCENES = {
   english: { ...ret, ctx: CTX_ENGLISH, label: "English practice" },
   afterEndSaving: { ...ret, label: "After End: saving", recent: RECENT_SAVING },
   afterEndSaved: { ...ret, label: "After End: saved", toast: "saved" },
-  modeMenu: { ...ret, label: "Practice type menu open", props: { name: "Alex", initialOverlay: "mode" } },
   typed: { ...ret, label: "Typed a message", props: { name: "Alex", composer: { text: "I have an HR screen with Lumen tomorrow" } } },
   pasted: { ...ret, label: "Pasted a job", props: { name: "Alex", composer: { text: PASTED_TEXT } } },
   fileAttached: { ...ret, label: "Job file attached", props: { name: "Alex", composer: { text: "", file: JOB_FILE } } },
