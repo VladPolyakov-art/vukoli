@@ -19,7 +19,9 @@ npx playwright test e2e/history.spec.ts   # one file (use the e2e/ prefix, a bar
 npm run test:e2e:ui                       # Playwright UI mode, for debugging
 ```
 
-`webServer` (`app/web/scripts/e2e-server.mjs`) does the rest: builds the web app into `.e2e-dist` (never `dist`), starts the backend on **port 8010** with `IC_E2E=1`, a fresh `IC_DATA_DIR` under `.e2e-data/`, serving `.e2e-dist`. Backend log: `.e2e-data/server.log`. With `reuseExistingServer` (off in CI) a server already on 8010 is reused: after a Python change, stop it first, because Python is cached per process. Nothing touches ports 8000, 8001, 8002, 11434, 11435.
+**Fast run (project root, 2026-11-07):** `python3 execution/run_tests.py` runs typecheck, lint, vitest and pytest in parallel and the e2e suite in 6 shards, each against its own server (ports 8011–8019, data in `.e2e-data/<port>`, one shared `.e2e-dist` build). It prints a short summary (failures as file:line, first error line, screenshot) and writes `.tmp/tests/last.md`. `--quick` = desktop only and only the tests touched by uncommitted changes; `--e2e-only`, `--unit-only`, `--shards N`, `--project desktop|mobile`, file arguments as above. It takes the shared `/tmp/vukoli-e2e.lock` with its pid inside and clears a lock whose holder is gone.
+
+`webServer` (`app/web/scripts/e2e-server.mjs`) does the rest: builds the web app into `.e2e-dist` (never `dist`), starts the backend on **port 8010** with `IC_E2E=1`, a fresh `IC_DATA_DIR` under `.e2e-data/<port>/`, serving `.e2e-dist`. Backend log: `.e2e-data/<port>/server.log`. `E2E_PORT`, `E2E_OUTPUT` and `E2E_FRESH=1` (never reuse a server) pick the port, the results folder and a fresh server for a shard. With `reuseExistingServer` (off in CI) a server already on 8010 is reused: after a Python change, stop it first, because Python is cached per process. Nothing touches ports 8000, 8001, 8002, 11434, 11435.
 
 ### The scripted engine (test mode)
 
