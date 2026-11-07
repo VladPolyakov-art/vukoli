@@ -45,7 +45,7 @@ test.describe("US-21 One history", () => {
     await expect(
       page.getByRole("heading", { name: "Northwind Logistics · Product Owner", level: 1 }),
     ).toBeVisible();
-    await expect(page.getByRole("region", { name: /^Verdict/ })).toBeVisible(); // D101: it opens on the debrief
+    await expect(page.getByRole("region", { name: /^Your level/ })).toBeVisible(); // D101: it opens on the debrief
     await expect(page.getByRole("log", { name: "Conversation with Mike" })).toHaveCount(0);
     await showDebrief(page);
   });
@@ -127,7 +127,7 @@ test.describe("US-21 One history", () => {
   test("negative: a session that does not exist says so instead of showing an empty page", async ({ page }) => {
     await page.goto("/sessions/s-19990101-000000-000000");
     await expect(page.getByRole("heading", { level: 1 }).or(page.getByRole("heading", { level: 2 })).first()).toBeVisible();
-    await expect(page.getByRole("region", { name: /^Verdict/ })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: /^Your level/ })).toHaveCount(0);
     await expect(page.getByText(/couldn't find|not found|doesn't exist|no longer/i).first()).toBeVisible();
   });
 });

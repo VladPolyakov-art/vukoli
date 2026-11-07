@@ -63,7 +63,7 @@
     "rowActions": "Actions for {title}",
     "rowOpen": "Open",
     "engineWarning": "AI engine",
-    "help": "Help & what's free",
+    "help": "Help",
     "local": "Local",
     "archive": "Archive",
     "rowRename": "Rename",
@@ -614,8 +614,7 @@
       "loading": "Loading your jobs…",
       "level": "Pick your level to start."
     },
-    "disclaimer": "Practice only: no help during real interviews.",
-    "free": "What's free"
+    "disclaimer": "Practice only: no help during real interviews."
   },
   "english": {
     "level": "Your level",
@@ -640,7 +639,6 @@
     },
     "start": "Start talking",
     "after": "After the call you'll see your corrections with a reason. Nothing appears while you speak.",
-    "free": "Free forever: no limits on English practice.",
     "levelPick": "Pick one. You can change it any time.",
     "lastChoice": "{level}: your last choice. Change it any time.",
     "startReason": "Pick your level to start.",
@@ -709,6 +707,7 @@
   "session": {
     "title": "Interview session",
     "titleGeneral": "General questions",
+    "titleQuick": "Quick start",
     "titleDrill": "Drill · {name}",
     "focus": "Focus: {spots}",
     "progress": "Question {n} of {total}",
@@ -745,9 +744,7 @@
       "muted": "Muted",
       "ended": "Ended",
       "between": "Round complete",
-      "paused": "Paused",
-      "preparingFeedback": "Preparing your feedback",
-      "saved": "Your answer is saved"
+      "paused": "Paused"
     },
     "heard": "What we heard. A wrong word? You can fix it in the debrief.",
     "firstTime": {
@@ -878,29 +875,11 @@
     },
     "connectingPill": "Connecting to Mike…",
     "panel": {
-      "feedbackFor": "Feedback for question {n}",
-      "feedbackForTurn": "Feedback for turn {n}",
-      "hide": "Hide feedback",
       "nextQuestion": "Next question",
-      "seeDebrief": "See your debrief",
-      "rechecking": "Checking question {n} again…",
-      "more": "Feedback for question {n}"
+      "seeDebrief": "See your debrief"
     },
     "edit": {
-      "title": "Question {n} · Edit what I said",
-      "titleTyped": "Question {n} · Edit my answer",
-      "hint": "Change any word we misheard. Only this answer is checked again.",
-      "hintTyped": "Only this answer is checked again.",
-      "answer": "Your answer",
-      "followUp": "Your follow-up",
-      "underlined": "Words we weren't sure about are underlined.",
-      "save": "Save and check again",
-      "failedTitle": "Couldn't check this answer again",
-      "failed": "Your answer was not changed. Try again in a moment.",
-      "err": {
-        "too_short": "That is too short to check. Write a few words more.",
-        "connection_lost": "The connection to Mike was lost. Your answer was not changed."
-      }
+      "failed": "Your answer was not changed. Try again in a moment."
     },
     "banner": {
       "browserTitle": "This browser can't recognise speech",
@@ -960,7 +939,6 @@
       "toVoice": "Switch to voice (T)",
       "switchToVoice": "Switch to voice",
       "feedbackShow": "Show feedback (F)",
-      "feedbackShowNew": "Show feedback (F), new feedback is ready",
       "feedbackHide": "Hide feedback (F)",
       "suggestShow": "Show a sample answer",
       "suggestHide": "Hide the sample answer",
@@ -970,7 +948,6 @@
       "help": "Shortcuts and microphone help (?)",
       "micHelp": "Microphone help",
       "voiceUnavailable": "Voice isn't available in this browser",
-      "preparing": "Preparing feedback",
       "micDisabled": "The microphone is paused while the session is interrupted"
     },
     "shortcuts": {
@@ -998,11 +975,6 @@
   },
   "feedback": {
     "panel": "Feedback",
-    "later": {
-      "title": "Feedback comes after the call",
-      "body": "So Mike stays fast while you talk. When you end the session you get content, language and delivery for every answer.",
-      "bodyEnglish": "So Mike stays fast while you talk. When you end the session you get the corrections for every turn."
-    },
     "p2": "Preparing feedback for question {n}…",
     "p2English": "Checking your last turn…",
     "p4": "Feedback isn't available for this answer. Your answer is saved.",
@@ -1335,6 +1307,7 @@
     "backHome": "Back to home",
     "actions": "What next",
     "qSection": "Question by question",
+    "qFrame": "Questions",
     "view": {
       "label": "View",
       "conversation": "Conversation",
@@ -1592,7 +1565,7 @@
       "voice": "Voice and speech",
       "practice": "Practice",
       "privacy": "Privacy and data",
-      "about": "About and what's free"
+      "about": "About"
     },
     "voice": {
       "title": "Mike's voice",
@@ -1678,34 +1651,6 @@
     },
     "saveError": "Couldn't save: {message}",
     "about": {
-      "freeTitle": "What's free",
-      "freeIntro": "Everything you need to practise is free forever, with no account and no key. The free core is never a demo.",
-      "tableCaption": "What's free forever and what Premium will add",
-      "feature": "Feature",
-      "free": "Free forever",
-      "premium": "Premium",
-      "later": "Coming later",
-      "included": "Included",
-      "notIncluded": "Not included",
-      "premiumNote": "Premium isn't available yet and has no price. When it comes, it adds to the free core and takes nothing away.",
-      "row": {
-        "practice": "Interview practice with Mike",
-        "english": "English practice",
-        "prep": "Prep from your CV and the job description",
-        "bank": "Question bank",
-        "debrief": "Debrief after every session",
-        "memory": "Mistake memory",
-        "drill": "Weak-spot drill",
-        "setup": "Zero setup",
-        "voice": "Best live voice",
-        "trends": "Trends across sessions",
-        "devices": "History on all your devices"
-      },
-      "cell": {
-        "setup": "Set up a local engine once",
-        "voice": "Voice on this computer",
-        "devices": "This computer only"
-      },
       "practiceTitle": "Practice only",
       "setupTitle": "Setup",
       "setupRun": "Run setup again",
@@ -1752,6 +1697,8 @@
       }
     },
     "quick": {
+      "call": "Quick start",
+      "callHint": "Start a call right away: Mike asks whether you want an interview or English.",
       "voiceButton": "Start now — voice practice",
       "textButton": "Start now — typed practice",
       "questions_one": "{n} question",

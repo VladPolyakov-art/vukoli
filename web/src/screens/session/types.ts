@@ -1,20 +1,15 @@
 /* Props of the pure Session view (ds/screens/session.md §0). The view renders from these only: no audio, no store,
  * no network. The live container (screens/Session.tsx) maps the reducer to them; the review page and the stories use
  * fixtures.ts. Handlers are all optional: an action is drawn only when its handler exists, so the live app never shows
- * a button the backend can't honour (e.g. "Edit what I said"). */
+ * a button the backend can't honour. */
 import type { CaptionTurn, IconName } from "../../ds";
-import type { EngineId, LayerOrder } from "../../lib/types";
-import type { StrongerState, Thread } from "../../session/reducer";
+import type { EngineId } from "../../lib/types";
 
 export type SessionVariant = "interview" | "drill" | "english";
 export type SessionInput = "voice" | "text";
 export type SessionPhase =
-  | "connecting" | "mike-speaking" | "your-turn" | "listening" | "thinking" | "between" | "preparing" | "feedback"
-  | "unavailable" | "editing" | "rechecking" | "interrupted" | "saving";
+  | "connecting" | "mike-speaking" | "your-turn" | "listening" | "thinking" | "between" | "feedback" | "interrupted" | "saving";
 export type SessionOverlay = "none" | "browser" | "storage" | "mic-help" | "interrupted-engine" | "interrupted-voice";
-/** What the feedback panel shows. "auto" derives it from the phase (spec P0..P4). */
-export type PanelMode = "auto" | "p0" | "p1" | "p2" | "p3" | "p4" | "edit" | "recheck";
-
 /** One turn of the running transcript (session.md V2.1, D49): the whole dialogue, oldest first, newest last. */
 export interface TranscriptTurn extends CaptionTurn {
   /** Mike's turn that opens question N: a "Question N" heading before it (interview, drill). */
@@ -53,20 +48,13 @@ export interface SessionData {
   /** The running transcript of the whole session (D49), newest last. The user's answer being recorded is the last turn,
    * with `interim` words. */
   transcript: TranscriptTurn[];
-  /** The user has already answered at least once (panel P1 instead of P0). */
+  /** The user has already answered at least once (Redo is possible). */
   answered: boolean;
-  /** Feedback of the current thread (null before the first answer). */
-  thread: Thread | null;
-  /** Earlier threads, newest first. */
-  earlier: Thread[];
   /** Question number the next press of "Next question" starts; null = this was the last one. */
   nextNumber: number | null;
-  /** Edit what I said: texts to prefill. */
-  edit?: { answer: string; followUp?: string; /** The last check-again failed: shown above the fields, the texts stay. */ error?: string };
   suggestion?: SessionSuggestion;
   /** The suggester toggle starts on (default true). */
   suggestOn?: boolean;
-  stronger?: Record<string, StrongerState>;
   /** Seconds of quiet that end a voice answer; 0 = manual. */
   pauseSec: number;
   /** Notices from the app that don't change the layout (live container only). */
@@ -100,12 +88,6 @@ export interface SessionHandlers {
   onSendText?: (text: string) => boolean;
   onNext?: () => void;
   onSeeDebrief?: () => void;
-  onFlag?: (feedbackId: string, flagId: string, action: "confirm" | "dismiss" | "restore") => void;
-  onSaveHeard?: (feedbackId: string, flagId: string, said: string) => void;
-  onStronger?: (feedbackId: string) => void;
-  onEdit?: () => void;
-  onSaveEdit?: (answer: string, followUp: string) => void;
-  onCancelEdit?: () => void;
   onSetSuggest?: (on: boolean) => void;
   onDismissBanner?: () => void;
   onUseText?: () => void;
@@ -128,9 +110,6 @@ export interface SessionViewProps {
   /** Static playback level 0..1 of Mike's voice for the Presence glow. Omitted (and no `getVoiceLevel`) = a
    * speech-like envelope while Mike speaks (the live app until the playback level is wired, stage 12d). */
   voiceLevel?: number;
-  layerOrder: LayerOrder;
-  /** The recogniser gave word confidence: checks and the "words we weren't sure about" line exist. */
-  withChecks: boolean;
   suggester: "off" | "on";
   data: SessionData;
   /** Live: banners that can show together (the single `overlay` enum shows one). Storage: US-23 AC4; browser: US-06 AC1. */
@@ -138,23 +117,10 @@ export interface SessionViewProps {
   /** Live: why the mic help dialog is open ("blocked" in the browser, or "none": no input device). */
   micHelpReason?: "blocked" | "none";
   handlers?: SessionHandlers;
-  /** Override the panel mode (the live container keeps showing the latest feedback while Mike speaks). */
-  panel?: PanelMode;
-  /** Stories and the review page: show the "feedback is ready" dot on the toggle. The live view works it out itself
-   * from the thread (screens/session/feedbackWatch.ts). */
-  feedbackUnread?: boolean;
   getMicLevel?: () => number;
   getVoiceLevel?: () => number;
   /** Play the session entrance (the island docks in). Live only. */
   entering?: boolean;
-  /** Review states: which flag starts with its "What did you say?" field open. */
-  initialOpenHeard?: string;
-  /** Review states: answers / stronger answer start open. */
-  defaultShowAnswer?: boolean;
-  defaultStrongerOpen?: boolean;
-  /** The feedback panel (wide: floating panel; mid / narrow: drawer / sheet). Undefined = automatic: it opens on its
-   * own when feedback is ready and closes when Mike asks the next question (session.md §V2.4). The user's toggle wins. */
-  panelOpen?: boolean;
   /** Review states: an overlay of the island starts open. */
   initialOverlay?: "more" | "shortcuts";
   /** Review states: the transcript starts scrolled up to the beginning ("reading": "Jump to latest" shows). */

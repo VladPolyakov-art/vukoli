@@ -380,7 +380,8 @@ export interface FocusSpot {
 
 export interface StartMessage {
   type: "start";
-  mode: "interview" | "english";
+  /** `quick` (D111): Mike asks "interview or English?" first; the answer sets the practice (`mode_selected`). */
+  mode: "interview" | "english" | "quick";
   round_type?: "hr" | "behavioural" | "mix";
   questions?: number;
   strictness?: number;
@@ -420,7 +421,8 @@ export type ClientMessage =
 
 /* ---------- WebSocket: server -> client ---------- */
 
-export type TurnKind = "question" | "follow_up" | "wait" | "repeat" | "closing" | "ack" | "turn";
+/** `quick_choice`: only on a user turn, the answer to a quick start's "interview or English?" (not an answer to coach). */
+export type TurnKind = "question" | "follow_up" | "wait" | "repeat" | "closing" | "ack" | "turn" | "quick_choice";
 
 export interface ServerError {
   type: "error";
@@ -438,6 +440,8 @@ export type ServerMessage =
       type: "session_started";
       session_id: string;
       mode: "interview" | "english";
+      /** A quick start: `mode` and `questions` are decided by the user's answer (`mode_selected`). */
+      quick?: boolean;
       engine: string;
       model: string;
       speaks: boolean;
@@ -449,6 +453,8 @@ export type ServerMessage =
       warnings: string[];
     }
   | { type: "ready" }
+  /** Quick start (D111): the user chose; the session is, from here on, this practice (and is saved under this title). */
+  | { type: "mode_selected"; mode: "interview" | "english"; questions: Question[]; title: string }
   | { type: "turn_start"; speaker: "model" }
   | { type: "transcript_delta"; speaker: "model" | "user"; delta: string; full_text: string }
   | {

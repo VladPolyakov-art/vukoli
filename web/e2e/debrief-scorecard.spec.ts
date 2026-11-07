@@ -9,7 +9,7 @@ test.beforeEach(async ({ page, request }) => {
   await resetApp(request);
   await skipSetup(page);
   await page.goto("/sessions/example");
-  await expect(page.getByRole("region", { name: "Verdict" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your level" })).toBeVisible();
 });
 
 const plan = (page: Page) => page.getByRole("region", { name: "Your plan for the next session" });
@@ -81,7 +81,7 @@ test.describe("US-20 AC6 The skills behind the one score", () => {
   test("no horizontal scroll, and the page is as wide as the header", async ({ page }) => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBe(0);
-    const [box, head] = await Promise.all([page.getByRole("region", { name: "Verdict" }).boundingBox(), page.getByRole("heading", { level: 1 }).first().boundingBox()]);
+    const [box, head] = await Promise.all([page.getByRole("region", { name: "Your level" }).boundingBox(), page.getByRole("heading", { level: 1 }).first().boundingBox()]);
     const view = page.viewportSize()!;
     expect(box!.x + box!.width).toBeLessThanOrEqual(view.width);
     expect(head).not.toBeNull();
@@ -143,7 +143,7 @@ test.describe("US-20 AC8 Plan for the next session, and the one Drill button", (
   });
 
   test("the page order is verdict, plan, then the question by question; no separate weak-spot or scorecard block", async ({ page }) => {
-    const names = ["Verdict", "Your plan for the next session", "Question by question"];
+    const names = ["Your level", "Your plan for the next session", "Questions"];
     const tops: number[] = [];
     for (const name of names) tops.push((await page.getByRole("heading", { name, exact: true, level: 2 }).boundingBox())?.y ?? (await page.getByRole("region", { name }).boundingBox())!.y);
     expect([...tops].sort((a, b) => a - b)).toEqual(tops);
@@ -165,7 +165,7 @@ test.describe("US-20 AC8 Plan for the next session, and the one Drill button", (
 
 test.describe("What moves the verdict (D99): the level", () => {
   test("happy path: the level shows the computed step, one cell per skill, and one line states the rule", async ({ page }) => {
-    const verdict = page.getByRole("region", { name: "Verdict" });
+    const verdict = page.getByRole("region", { name: "Your level" });
     // The example's skills: no answer skill at 1-2 (not "Not ready yet"), one below 4 (not "Ready"): "Getting there".
     const level = verdict.getByRole("img", { name: /^Your level: Getting there, step 2 of 3/ });
     await expect(level).toBeVisible();

@@ -29,7 +29,7 @@ export function socketUrl(): string {
 }
 
 export function useSession(config: SessionConfig) {
-  const [state, dispatch] = useReducer(sessionReducer, undefined, () => initialState(config.start.input, config.start.mode));
+  const [state, dispatch] = useReducer(sessionReducer, undefined, () => initialState(config.start.input, config.start.mode === "english" ? "english" : "interview"));
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [micError, setMicError] = useState<CaptureError | "stt_unsupported" | "stt_denied" | null>(null);

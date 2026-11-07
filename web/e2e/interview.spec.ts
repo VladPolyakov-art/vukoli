@@ -14,7 +14,7 @@ import {
   debriefCard,
   showDebrief,
   viewer,
-  showFeedbackLater,
+  expectNoFeedbackPanel,
   skipSetup,
   startTextInterview,
   openMenu,
@@ -47,10 +47,9 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
     await expect(questionCounter(page, 2, 5)).toBeVisible();
 
-    // D96: Mike goes on at once and makes no feedback during the call; the panel says it comes after.
-    const panel = await showFeedbackLater(page);
-    await expect(panel).toContainText("Feedback comes after the call");
-    await expect(panel.getByRole("list", { name: "Summary" })).toHaveCount(0);
+    // D96/D107: Mike goes on at once and makes no feedback during the call, and there is no feedback panel to open.
+    await expectNoFeedbackPanel(page);
+    await expect(page.getByRole("list", { name: "Summary" })).toHaveCount(0);
 
     // Two more questions answered with a result, then the session ends.
     await sendAnswer(page, ANSWER_WITH_RESULT);
@@ -65,7 +64,7 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     await expect(page).toHaveURL(/\/sessions\/s-/);
     await expect(page.getByRole("heading", { name: /^Kestrel Pay · Product Manager$/, level: 1 })).toBeVisible();
     await showDebrief(page); // the page opens on the debrief (D101); the call only makes sure
-    await expect(page.getByRole("region", { name: /^Verdict/ })).toBeVisible(); // AC1: the verdict is on top of the debrief
+    await expect(page.getByRole("region", { name: /^Your level/ })).toBeVisible(); // AC1: the verdict is on top of the debrief
     await expect(page.getByRole("list", { name: "Session details" })).toContainText("1 follow-up");
     await expect(page.getByRole("link", { name: "Saved on this computer" })).toBeVisible(); // AC5
     // AC3: a question card shows the question, the user's answer and the layer results.
@@ -180,7 +179,7 @@ test.describe("US-14 / US-15 / US-20 A text interview", () => {
     // D96: nothing is made during the call, so the failure cannot reach the session: Mike moves on at once.
     await sendAnswer(page, ANSWER_WITH_RESULT);
     await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-    await expect(await showFeedbackLater(page)).toContainText("Feedback comes after the call");
+    await expectNoFeedbackPanel(page);
 
     // The session is not stuck: the next answer is accepted, and the first answer is still in the conversation.
     await sendAnswer(page, ANSWER_WITH_RESULT);

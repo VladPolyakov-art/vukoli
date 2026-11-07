@@ -186,18 +186,17 @@ test.describe("C2 (b) Answers sent quickly, keys outside the answer box", () => 
     await expect(card).toContainText(FOLLOW_UP_ANSWER);
   });
 
-  test("an answer typed with the focus outside the box (after Send with the mouse) lands in the box, it never fires Redo or Feedback", async ({ page }) => {
+  test("an answer typed with the focus outside the box (after Send with the mouse) lands in the box, it never fires Redo", async ({ page }) => {
     await startTextInterview(page);
     await sendAnswer(page, ANSWER_WITH_RESULT); // Send with the mouse: the focus leaves the box
     await expect(questionCounter(page, 2, 5)).toBeVisible();
     await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /^Show feedback/ })).toBeVisible();
     await page.mouse.click(5, 5); // anywhere outside the box
 
     const second = "Conversion went from 41 to 58 percent in two months, nothing to redo here.";
     await page.keyboard.type(second);
     await expect(page.getByRole("textbox", { name: "Your answer" })).toHaveValue(second);
-    await expect(page.getByRole("complementary", { name: "Feedback" })).toHaveCount(0); // "f" did not open the panel
+    await expect(page.getByRole("complementary", { name: "Feedback" })).toHaveCount(0); // "f" opens nothing (D107: no panel)
     await expect(conversation(page)).toContainText(ANSWER_WITH_RESULT);                  // "r" did not redo the answer
     await expect(questionCounter(page, 2, 5)).toBeVisible();
     await page.keyboard.press("Enter");

@@ -56,7 +56,7 @@ Source of truth: `server/ws.py` (socket loop), `server/session.py` (local interv
 
 | Field | Values | Default |
 |---|---|---|
-| `mode` | `interview`, `english` | `interview` |
+| `mode` | `interview`, `english`, `quick` (see below) | `interview` |
 | `round_type` | `hr`, `behavioural`, `mix` (interview only) | `mix` |
 | `questions` | 1 to 10 main questions | settings `questions_per_session` |
 | `strictness` | 1 gentle, 2, 3 demanding (follow-ups per question: 1, 2, 2) | settings |
@@ -71,6 +71,18 @@ Source of truth: `server/ws.py` (socket loop), `server/session.py` (local interv
 | `topic` | English mode: conversation topic, up to 80 characters | none |
 | `engine` | override the selected engine for this session | settings `engine` |
 | `resume_session_id` | continue a saved session after a dropped connection (US-13 AC5): same record, transcript and feedback kept; Mike says sorry and asks again (or replies to the last answer). `mode`, `round_type`, `level`, `strictness`, `vacancy_id` come from the record. Not for Gemini Live | none |
+
+#### Quick start (`mode: "quick"`, D111)
+
+One call where Mike asks first: "Do you want to practise an interview or English today?". Nothing is planned in advance by the client; `round_type`, `questions`, `strictness`, `input`, `speak`, `voice` are read as for an interview, `vacancy_id` / `level` / `topic` are optional.
+
+1. `session_started` has `"quick": true`, `"mode": "interview"` (a placeholder) and `"questions": []`. Mike's opening is the fixed line above (no model call); it is not saved in the transcript.
+2. The user's next turn (typed, browser-recognised or spoken) is the **choice**. It comes back as `turn_complete` `speaker: "user"` with `kind: "quick_choice"`; it gets no feedback record, is not in the saved transcript, and a session with nothing after it is not saved (`session_ended` `saved: false`, `reason: "no_answers"`).
+3. The first words decide (`session.classify_choice`, no model): `english` / `speaking` / "free talk" / the Russian stem for "English" → English; `interview` / `job` / `behavioural` / `HR` / the Russian words for "interview" → interview; both words → whichever comes first ("English interview" is English, "interview in English" an interview). Neither → Mike asks once more ("Sorry, I didn't catch that. Interview or English?"); an unclear second answer is an interview.
+4. The server sends `{"type": "mode_selected", "mode": "interview" | "english", "questions": [...], "title": "General questions"}` and then Mike's line for that practice: interview = a short intro with the first question (`kind: "question"`, the same bank / job questions as an ordinary start); English = "What would you like to talk about today?" (`kind: "turn"`). From here the session behaves exactly as an ordinary interview or English one, and its record, title, debrief and Recents row are those of the chosen mode.
+5. Interview plan: `vacancy_id` from the message, else the **newest saved job that has questions**, else the general bank. (Only the job's title and questions are used; the CV is read as before by engines that take it.) English drops the plan and the job.
+6. **Gemini Live** has no mode switch: its system prompt gets a quick-start instruction (ask, then run the interview or just talk), no `mode_selected` is sent and the session is saved as an interview.
+7. `resume_session_id` wins over `quick` (the saved record already has its mode). A start without `mode: "quick"` is unchanged.
 
 ### Voice answer (`input: "voice"`)
 
@@ -338,7 +350,7 @@ asked the next question (see Turns). Times are measured from the moment the serv
 
 **Interview, voice, local engine**
 
-1. `start` -> `session_started` -> `ready` -> Mike's opening (fixed copy with the first question, no model call).
+1. `start` -> `session_started` -> `ready` -> Mike's opening (fixed copy with the first question, no model call). (Quick start: the opening is "interview or English?", then `turn_complete` user `quick_choice`, `mode_selected`, and the opening of the chosen practice.)
 2. `activity_start` + PCM + `audio_stream_end` -> `user_transcript` -> `turn_complete` (user). No feedback yet.
 3. Mike replies: a follow-up (streamed sentence by sentence, with audio) or "Okay." plus the next question (the
    code speaks it verbatim as soon as the model chooses `next_question`) -> `turn_metrics`.

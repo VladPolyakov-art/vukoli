@@ -123,26 +123,9 @@
   .back:hover { color: var(--color-text-primary); }
   .back:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus); outline-offset: var(--focus-ring-offset); border-radius: var(--radius-sm); }
 }
-/* About and what's free (D58): the US-30 table. Rows are hairline-separated; the feature column takes the slack. */
+/* About (D108): practice-only line and anchors. */
 .anchor { scroll-margin-top: var(--space-6); }
 .lead { margin: 0; font-size: var(--text-md); color: var(--color-text-primary); }
-.tableWrap { overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
-.table th, .table td { padding: var(--space-3) var(--space-4); text-align: left; vertical-align: middle; border-bottom: 1px solid var(--color-border-subtle); }
-.table tbody tr:last-child th, .table tbody tr:last-child td { border-bottom: 0; }
-.table thead th { color: var(--color-text-secondary); font-weight: var(--weight-medium); white-space: nowrap; }
-.table tbody th { font-weight: var(--weight-regular); color: var(--color-text-primary); }
-.table td { width: 11rem; }
-.premiumHead { display: inline-flex; align-items: center; gap: var(--space-2); }
-.yes { display: inline-flex; color: var(--color-text-success); }
-.no { color: var(--color-text-tertiary); }
-.cellText { color: var(--color-text-secondary); }
-@media (max-width: 559px) {
-  .table th, .table td { padding: var(--space-3) var(--space-2); }
-  .table th:first-child { padding-left: var(--space-3); }
-  .table td { width: auto; }
-  .premiumHead { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
-}
 
 /* D80: the name field sits on the right of its row, about a first and last name wide. */
 .nameInput { width: min(16rem, 100%); }

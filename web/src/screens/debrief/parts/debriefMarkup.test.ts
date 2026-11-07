@@ -101,10 +101,10 @@ describe("the summary", () => {
   const withStep: VerdictModel = { step: 0, gap: ["result"], target: 3, headline: "Not ready yet", line: "Answers need a result." };
   const render = (verdict: VerdictModel, r: ScoreRowModel[] | null = rows) => renderToStaticMarkup(createElement(Summary, { verdict, rows: r ?? undefined, id: "v", uid: "u", onJump: noop }));
 
-  it("is a region named Verdict (the heading is visually hidden) with the headline, the sentence and the rule's line", () => {
+  it("is a framed region named Your level (D109) with the headline, the sentence and the rule's line", () => {
     const h = render(withStep);
     expect(h).toContain('aria-labelledby="v"');
-    expect(h).toContain('<h2 id="v" class="visually-hidden">Verdict</h2>');
+    expect(h).toContain('>Your level</h2>');
     expect(text(h)).toContain("Not ready yet");
     expect(text(h)).toContain("Answers need a result.");
     expect(text(h)).toContain("To reach “Getting there”: get Result to 3 of 5 or more.");

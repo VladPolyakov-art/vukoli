@@ -1,6 +1,6 @@
 /* One correction row (debrief.md §3.5): Heard as / Say / Why on the raised surface, with "Not what you said?" and
  * Dismiss. DS candidate: this and the Feedback item are the same row in two contexts. The fixed fragment is marked
- * inside the user's own sentence (InlineMark); never red / green / struck through (P8). */
+ * inside the user's own sentence (InlineMark); wrong words red, the fix green, rectangles behind the text (D110). */
 import { useState } from "react";
 import { Button, Textarea } from "../../../ds";
 import { t } from "../../../i18n";

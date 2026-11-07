@@ -1,19 +1,18 @@
 /* Marks inherit the sentence's size; they never shrink text (minimum 14px stays the parent's). */
-.fix {
-  background: var(--color-mark-fix);
-  color: inherit;
-  font-weight: var(--weight-semibold);
+.fix,
+.heard {
+  color: var(--color-text-primary);
   border-radius: var(--radius-sm);
   padding: 0 calc(var(--space-1) / 2);
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
+.fix {
+  background: var(--color-bg-mark-right);
+  font-weight: var(--weight-semibold);
+}
 .heard {
-  text-decoration-line: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: var(--color-mark-heard);
-  text-decoration-thickness: var(--border-width-strong);
-  text-underline-offset: calc(var(--space-1) / 1.25);
+  background: var(--color-bg-mark-wrong);
 }
 .unsure {
   text-decoration-line: underline;

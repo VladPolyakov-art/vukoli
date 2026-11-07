@@ -1,12 +1,12 @@
-/* D96: the feedback panel during the call. Feedback is made after the call (so Mike stays fast and nothing competes
- * with him for the machine): the panel never opens by itself, no dot lights up, and when the user opens it by hand it
- * says one calm thing, with no spinner and no per-answer waiting. After End the debrief carries all of it.
- * US-15 AC1 / AC2, US-24 AC3. */
-import { expect, test, type Page } from "@playwright/test";
+/* D107 (2026-11-07): there is no feedback panel in the call. Feedback comes only after the session, in the debrief
+ * (D96 made none during the call; D107 removed the button, the F key and the panel). On every layout the session has no
+ * "Show feedback" button, no panel, drawer or sheet, F opens nothing, and the shortcuts list no longer mentions it. */
+import { expect, test } from "@playwright/test";
 import {
   ANSWER_NO_RESULT,
   ANSWER_WITH_RESULT,
   ENGLISH_TURN,
+  expectNoFeedbackPanel,
   resetApp,
   sendAnswer,
   skipSetup,
@@ -22,66 +22,34 @@ const WIDE = { width: 1440, height: 900 };
 const MID = { width: 900, height: 900 };
 const NARROW = { width: 375, height: 812 };
 
-/** The toggle in the island: with no feedback made during the call it never says "new feedback is ready". */
-const toggle = (page: Page, state: "unread" | "plain" | "open") =>
-  state === "unread"
-    ? page.getByRole("button", { name: /new feedback is ready/ })
-    : state === "plain"
-      ? page.getByRole("button", { name: "Show feedback (F)", exact: true })
-      : // The panel has its own hide button with the same name: look at the island's.
-        page.getByRole("group", { name: "Tools" }).getByRole("button", { name: "Hide feedback (F)", exact: true });
-
-/** Wide: the floating panel; mid: a drawer; narrow: a sheet (both are a dialog). */
-const panelOf = (page: Page) =>
-  page.getByRole("complementary", { name: "Feedback" }).or(page.getByRole("dialog", { name: "Feedback" }));
-
-/** One finished question thread: an answer with no result, Mike's follow-up, an answer with a number, Question 2. */
-async function finishThreadOne(page: Page) {
-  await sendAnswer(page, ANSWER_NO_RESULT);
-  await expect(page.getByText("Follow-up", { exact: true })).toBeVisible();
-  await sendAnswer(page, ANSWER_WITH_RESULT);
-  await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
-}
-
-test.describe("US-15 D96 Feedback comes after the call", () => {
+test.describe("D107 No feedback panel in the call", () => {
   for (const [layout, size] of [["wide", WIDE], ["mid", MID], ["narrow", NARROW]] as const) {
-    test(`${layout}: nothing opens by itself and no dot lights up after a question`, async ({ page }) => {
+    test(`${layout}: no Show feedback button, no panel, F opens nothing, before and after an answer`, async ({ page }) => {
       await page.setViewportSize(size);
       await startTextInterview(page);
-      await expect(toggle(page, "plain")).toBeVisible();
-      await expect(panelOf(page)).toHaveCount(0);
+      await expectNoFeedbackPanel(page);
 
-      await finishThreadOne(page);
+      await sendAnswer(page, ANSWER_NO_RESULT);
+      await expect(page.getByText("Follow-up", { exact: true })).toBeVisible();
+      await sendAnswer(page, ANSWER_WITH_RESULT);
+      await expect(page.getByRole("heading", { name: "Question 2", level: 2 })).toBeVisible();
 
-      // Mike went on at once; the panel did not open and the button has no cue.
-      await expect(panelOf(page)).toHaveCount(0);
-      await expect(toggle(page, "unread")).toHaveCount(0);
-      await expect(toggle(page, "plain")).toBeVisible();
+      // Mike went on at once; nothing about feedback appeared on the stage.
+      await expectNoFeedbackPanel(page);
       await expect(page.getByRole("textbox", { name: "Your answer" })).toBeVisible();
-    });
-
-    test(`${layout}: opened by hand, the panel says feedback comes after the call, with no spinner`, async ({ page }) => {
-      await page.setViewportSize(size);
-      await startTextInterview(page);
-      await finishThreadOne(page);
-
-      await toggle(page, "plain").click();
-      const panel = panelOf(page);
-      await expect(panel).toBeVisible();
-      await expect(panel).toContainText("Feedback comes after the call");
-      await expect(panel).toContainText("Mike stays fast");
-      await expect(panel.getByRole("list", { name: "Summary" })).toHaveCount(0);
-      await expect(panel.getByRole("status")).toHaveCount(0);
-      await expect(panel.getByRole("heading", { name: /^Question 1/ })).toHaveCount(0);
-
-      // It closes like any panel.
-      await panel.getByRole("button", { name: "Hide feedback (F)" }).click();
-      await expect(panelOf(page)).toHaveCount(0);
-      await expect(toggle(page, "plain")).toBeVisible();
     });
   }
 
-  test("English talk, wide: no corrections during the call, the panel waits for the debrief", async ({ page }) => {
+  test("the keyboard shortcuts list has no F row", async ({ page }) => {
+    await page.setViewportSize(WIDE);
+    await startTextInterview(page);
+    await page.getByRole("button", { name: "Shortcuts and microphone help (?)" }).click();
+    const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).not.toContainText("feedback");
+  });
+
+  test("English talk, wide: no corrections and no panel during the call", async ({ page }) => {
     await page.setViewportSize(WIDE);
     await page.goto("/");
     await page.getByRole("button", { name: "Practise English" }).click();
@@ -94,9 +62,6 @@ test.describe("US-15 D96 Feedback comes after the call", () => {
     await sendAnswer(page, ENGLISH_TURN);
     await expect(page.getByText("Turn 2")).toBeVisible();
 
-    await expect(panelOf(page)).toHaveCount(0);
-    await toggle(page, "plain").click();
-    await expect(panelOf(page)).toContainText("Feedback comes after the call");
-    await expect(panelOf(page)).not.toContainText("since five years");
+    await expectNoFeedbackPanel(page);
   });
 });

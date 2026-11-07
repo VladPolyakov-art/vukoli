@@ -10,7 +10,7 @@ test.beforeEach(async ({ page, request }) => {
 });
 
 const log = (page: Page) => page.getByRole("log", { name: "Conversation with Mike" });
-const verdict = (page: Page) => page.getByRole("region", { name: /^Verdict/ });
+const verdict = (page: Page) => page.getByRole("region", { name: /^Your level/ });
 const radio = (page: Page, name: "Conversation" | "Debrief") => page.getByRole("radio", { name, exact: true });
 
 /** The newest seeded session's id. */

@@ -4,7 +4,7 @@
   top: 0;
   z-index: var(--z-sticky);
   padding-block: var(--space-2) 0;
-  background: var(--color-canvas);
+  background: var(--color-surface-card);
   border-bottom: var(--border-width) solid var(--color-border-subtle);
 }
 /* --tab-min: the least width a labelled tab gets before the switcher drops to numbers only (VariantD useSwitcherLayout). */

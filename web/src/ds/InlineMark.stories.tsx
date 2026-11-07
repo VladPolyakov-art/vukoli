@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { InlineMark } from "./InlineMark";
 
-/** Inline marks (G20). `fix` = grey fill + semibold (never red / green); `heard` = what speech recognition heard,
- * grey dotted underline, no strikethrough; `unsure` = low-confidence word, dashed underline + optional hint. */
+/** Inline marks (G20, D110). `heard` = the wrong words, red rectangle behind the text; `fix` = the right words, green
+ * rectangle + semibold; no underline or strikethrough. `unsure` = low-confidence word, neutral dashed underline + optional hint. */
 const meta: Meta<typeof InlineMark> = { title: "DS/InlineMark", component: InlineMark, tags: ["autodocs"] };
 export default meta;
 type Story = StoryObj<typeof InlineMark>;
@@ -37,4 +37,18 @@ export const Overflow: Story = {
       “We made it <InlineMark kind="heard">more easier for merchants because the consent is now inline</InlineMark> with the pay button.”
     </p>
   ),
+};
+
+const both = (
+  <p style={p}>
+    “I <InlineMark kind="heard" srLabel="Heard as:">have led</InlineMark> the redesign last spring” → “I <InlineMark kind="fix" srLabel="Say:">led</InlineMark> the redesign last spring.”
+  </p>
+);
+/** Both marks side by side, light theme. */
+export const WrongAndRightLight: Story = {
+  render: () => <div data-theme="light" style={{ background: "var(--color-bg-primary)", color: "var(--color-text-primary)", padding: "var(--space-6)" }}>{both}</div>,
+};
+/** Both marks side by side, dark theme. */
+export const WrongAndRightDark: Story = {
+  render: () => <div data-theme="dark" style={{ background: "var(--color-bg-primary)", color: "var(--color-text-primary)", padding: "var(--space-6)" }}>{both}</div>,
 };

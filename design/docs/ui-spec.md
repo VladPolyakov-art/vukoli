@@ -57,7 +57,7 @@ Prefix: `patterns-appshell--`. Review: `#sidebar-<state>`.
 | Recents | heading "Recents"; ChatRow per non-archived session | reloads on every route change and on the `ic:sessions-changed` event |
 | Row "…" menu ("Actions for {title}") | "Rename" · "Download as Markdown" · "Archive" · separator · "Delete" | Rename = InlineRename in the row (max 80) |
 | Engine not ready | row "AI engine" + "Not ready" → `/settings/engine`; collapsed: alert icon with a tooltip | only when the engine in use is not ready |
-| Account menu ("Account menu") | header: name (or "You") + "Saved on this computer"; items: Settings → `/settings`, Privacy → `/settings/privacy`, "Help & what's free" → `/settings/about#free`, "Send feedback" (icon `chat`) → opens the feedback dialog (§1.9) | placement right-end |
+| Account menu ("Account menu") | header: name (or "You") + "Saved on this computer"; items: Settings → `/settings`, Privacy → `/settings/privacy`, "Help" → `/settings/about` (D108, 2026-11-07: mentions of paid features removed until they exist.), "Send feedback" (icon `chat`) → opens the feedback dialog (§1.9) | placement right-end |
 | Top bar (`shell` < 1024) | "Open menu" button · wordmark · engine badge link (only when not ready) | the menu opens the rail in a left Drawer |
 
 | State | When | Sees | Story | Review |
@@ -106,7 +106,7 @@ Viewport media queries are used only for `pointer: coarse`, `prefers-reduced-mot
 |---|---|---|
 | `shell` | AppShell root | ≥1024 rail · <1024 top bar + Drawer |
 | `page` | `<main>` | wide ≥840 · medium 560–839 (padding `space-8`) · narrow <560 (gap `space-8`, gutter, title `text-2xl`) |
-| `session` | Session root | wide ≥1024 (floating feedback panel on the right) · mid 768–1023 (right Drawer) · narrow <768 (bottom sheet). Island stacks <560. JS mirror: `useSessionLayout` (1024 / 768 / 560) |
+| `session` | Session root | wide ≥1024 · mid 768–1023 · narrow <768 (D107: no feedback panel; the layouts differ in the island and gutters only). Island stacks <560. JS mirror: `useSessionLayout` (1024 / 768 / 560) |
 | `setup` | Setup frame | <768 single column |
 | `dialog` | Dialog | <480 actions stack, primary on top; Settings <640 → phone list (D82) |
 | `chat` | setup chat log | <560, <480 (ChatMessage) |
@@ -172,7 +172,7 @@ Everything floating (Dialog, Drawer, Menu, Tooltip, Toast) renders through `Over
 | "Saved on this computer" | account menu, Debrief meta |
 | "The file stays on this computer." | every file drop: Home, chat, VacancyEditor |
 | "Practice only: no help during real interviews." | Home footer |
-| "Free forever: no limits on English practice." | English footer and plan |
+| ~~"Free forever: no limits on English practice."~~ | removed (D108) |
 | "Practice only: this app is for rehearsal, never for help during a real interview." | Settings → About |
 
 - Telemetry: one unticked checkbox on Setup's "It works" (US-44, US-02 AC7) and a toggle in Settings → Privacy.
@@ -187,7 +187,7 @@ Everything floating (Dialog, Drawer, Menu, Tooltip, Toast) renders through `Over
 
 **Where to open "Send feedback".**
 - Account menu: "Send feedback" (icon `chat`), last item.
-- Settings → About and what's free: group "Feedback", one `secondary` button "Send feedback". It opens over Settings and closes back to it.
+- Settings → About: group "Feedback", one `secondary` button "Send feedback". It opens over Settings and closes back to it.
 
 **Send feedback dialog.**
 
@@ -403,6 +403,7 @@ PRD conflict: US-03 AC3 says Ollama is preselected when ready. D82 overrides thi
 2. Greeting H1.
 3. Composer: "+" file, ModeMenu, text field, Send.
 4. Quick start button with a quiet detail line.
+   *(D111, 2026-11-07)* Next to it, inside the composer's left toolbar after the mode chip: a labelled **Quick start** button (`Button secondary sm`, icon `play`, tooltip "Start a call right away: Mike asks whether you want an interview or English."). One click opens the session (same soft-out as Start) with `start.mode = "quick"`: no plan card, no settings, no job choice. Voice unless typed answers are on or the browser cannot listen (then typed, as the mic start). Shown on both tracks; disabled while loading, while the engine is not ready and while starting. Not the round mic at the field's end (that one is "Start now" with the last settings).
 5. Suggestions: max 3 chips.
 6. Footer.
 
@@ -413,7 +414,7 @@ PRD conflict: US-03 AC3 says Ollama is preselected when ready. D82 overrides thi
 | Greeting | "What are we practising today?" / English "What shall we talk about?" (the `…, {name}?` variants exist but are not wired live, see §10) |
 | Placeholder | "Paste a job or a link, or say what you want to practise" · narrow "Paste a job or say what you want" · English "Say a topic, or pick one below" |
 | Quick start | "Start now — voice practice" / "Start now — typed practice"; detail e.g. "Kestrel Pay · Behavioural · 5 questions · voice" |
-| Footer | "Practice only: no help during real interviews." (English: "Free forever: no limits on English practice.") + link "What's free" → `/settings/about#free` |
+| Footer | "Practice only: no help during real interviews." (English track: no footer; D108, 2026-11-07: no free/Premium wording, no "What's free" link) |
 
 | State | When | Sees | Can do | Story | Review |
 |---|---|---|---|---|---|
@@ -609,6 +610,8 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 2. Else `browser_stt`: the pref is "browser", or the server has no STT and the browser supports it.
 3. Else text.
 
+**Quick start (D111).** The session opens with Mike's first line "Do you want to practise an interview or English today?" and no plan (no question counter yet; the tab title is "Quick start"). The user's answer, spoken or typed (Type instead works as in any session), is the choice: it is shown in the conversation but is not an answer (no feedback, not in the saved transcript, not counted, End before any real answer saves nothing). Interview: Mike says "Great, let's do an interview…" and asks question 1 of the plan (the newest saved job's questions, else general questions); the screen becomes an ordinary interview session. English: "Great, English practice. What would you like to talk about today?" and the screen becomes the English session ("End practice", turn counter). An unclear answer is asked once more, then it is an interview. The saved session, its title, debrief and Recents row are those of the chosen practice. Protocol: `app/server/PROTOCOL.md` → Quick start.
+
 ### 4.1 Layout
 
 - **Presence glow** along the top (listening = mic level, thinking = sweep, speaking = Mike's voice).
@@ -620,13 +623,11 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 |---|---|
 | Status | "Q{n} of {of}", timer (aria "Elapsed time {m} minutes {s} seconds") |
 | Voice | mic + main button |
-| Tools | "Redo answer (R)", "Type instead (T)" / "Switch to voice (T)", sample answer, "Show feedback (F)" / "Hide feedback (F)" |
+| Tools | "Redo answer (R)", "Type instead (T)" / "Switch to voice (T)", sample answer |
 | Exit | "Shortcuts and microphone help (?)" or "More", "End" |
 
 - **Stacked island** (<560): two rows; Redo moves into More.
-- **Feedback panel:** wide = floating on the right · mid = right Drawer · narrow = bottom sheet.
-  - It opens by itself in p2/p3/p4/edit/recheck, but never in quiet phases. (13, QA-01) In the live app every phase is quiet, so what opens it is the feedback itself: on **wide** it opens by itself when feedback for a finished thread arrives (not while the user is listening-talking; then it opens when they stop). On **mid and narrow** it never covers the stage on its own: a dot on the "Show feedback (F)" toggle (accessible name "Show feedback (F), new feedback is ready") says it is ready; the dot clears when the panel opens. The first-time hint says so.
-  - The user's own toggle wins. 🟡 (13, QA-01) A close the user made keeps the panel shut until they open it again; new feedback then only lights the dot. Feedback already there when the screen appears (a resumed session) counts as seen.
+- **No feedback panel (D107, 2026-11-07):** the "Show feedback (F)" / "Hide feedback (F)" button, the F key and the side panel / drawer / sheet "Feedback" ("Feedback comes after the call…") are gone, in interview, drill and English, voice and text, on every layout. Feedback exists only in the debrief after the session. "Edit what I said" and "That's not what I said" live in the debrief only. The first-time tip "Feedback comes after the call, so Mike stays fast." stays.
 
 ### 4.2 States
 
@@ -638,7 +639,6 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 | Listening | "Send now" |
 | Your turn (voice) | "Talk now" (disabled while muted) |
 | Thinking | "Sent" (disabled) |
-| Preparing / rechecking | dots "Preparing feedback" |
 | After the last answer | "See your debrief" |
 
 | State | When | Sees | Can do | Story | Review | Live? |
@@ -649,11 +649,6 @@ The "Show me an example" suggestion and the History empty state link "See an exa
 | Your turn | Mike done, mic not open yet | "Your turn" / "Answer when you're ready" (text: "Type your answer below") | Talk now | `s-2-your-turn-waiting` | `s2-turn` | yes |
 | Listening | recording | "Listening" / "Take your time. Mike waits for {sec} s of quiet." (manual: "Press Send now when you're done."); loops paused (`data-motion-quiet`) | Send now (Enter), mute | `s-3-listening`, `s-3-b-listening-hint-gone` | `s3`, `s3b` | yes |
 | Thinking | answer sent | "Thinking"; "Sent" disabled | — | `s-4-thinking` | `s4` | yes |
-| Feedback ready | thread feedback in | panel p2/p3/p4 with layers in the configured order | read, toggle F | `s-5-a-feedback-content-first`, `s-5-b-feedback-delivery-first`, `s-5-panel-hidden`, `narrow-feedback`, `mid-feedback` | `s5a`, `s5b`, `s5-hidden` | yes |
-| "That's not what I said" | heard-as row | marks a misheard phrase | — | `s-5-c-thats-not-what-i-said` | `s5c` | partly 🟡 |
-| Edit what I said | — | editor "Question {n} · Edit what I said", "Save and check again" | — | `s-5-d-edit-what-i-said` | `s5d` | **no** (§10) |
-| Preparing feedback | — | dots "Preparing feedback" | — | `s-14-a-preparing` | `s14a` | yes |
-| Feedback unavailable | engine gave none | — | — | `s-14-b-unavailable` | `s14b` | yes |
 | Muted | M | "Muted" / "Press M to unmute" | M | `s-14-c-muted` | `s14c` | yes |
 | Muted while talking | voice detected while muted | tooltip "You're talking, but the microphone is muted. Press M to unmute." (6 s, also in the polite live region) | M | `s-14-c-2-muted-talking` | `s14c2` | yes |
 | Sample answer | toggle | "Sample answer" panel | hide | `s-14-d-suggester`, `s-14-d-2-suggester-listening` | `s14d` | yes, when `answer_suggester` is on |
@@ -703,10 +698,9 @@ Ignored in text fields and with modifier keys, and a held key counts once (a hel
 | M | mute / unmute |
 | R | redo answer ("Nothing to redo yet" / "Redo is available after Mike finishes" when unavailable) |
 | T | type ↔ voice |
-| F | feedback panel |
 | N | next question / debrief (only where the handler exists; not live) |
 | ? | shortcuts |
-| Esc | closes the wide panel, dialogs |
+| Esc | closes dialogs and menus |
 
 ### 4.5 Notices in the dock
 
@@ -755,13 +749,15 @@ Notices are withheld while recording.
 | View switch | DS `Segmented` "View" (label hidden): "Debrief" · "Conversation" (Debrief first; arrow keys and Tab follow this order). Only when the session has a debrief to show (`!model.empty`); without one the page is the conversation alone and has no switch. The view lives in the URL: no param (or any other value) is the debrief, `?view=conversation` is the chat, `?view=debrief` (old links, the toast) is still the debrief. Switching replaces the history entry, scrolls `<main>` to the top and drops `?q`. The example (`/sessions/example`) works the same way |
 | Practise again | One button next to the switch, in both views (`data-track="practise-again"`). Label: "Practise again" (interview) or "Practise these phrases" (English with phrases to review). Primary only for English / partial without a storage error, else secondary. The hint "Same job and round, new questions" is a Tooltip and the button's `aria-description`. The example has none |
 | Conversation view (second) | Full main-area width. Mike's messages cap at `--layout-narrow`, the user's at `--layout-content`, right-aligned. With 2+ asked questions a sticky bar "Question" (Segmented "Jump to question") scrolls the chat to that question. Then the "Questions {from}–{to} weren't asked" line |
-| Debrief view, interview and example (layout D) | **One content width** (the same right edge as the header row), top to bottom: notice / partial banner · **Summary** (region "Verdict": the step's name or the model's sentence, the model's line, "Your level" blocks, "To reach “Ready”: …"; on the right the one score "3.3/5 · Average of 7 skills") · **"Your plan for the next session"** (up to 3 one-line steps with their weak spot and question links, and the page's only primary button "Drill these weak spots") · example's "Start your first interview" link · **"Question by question"**: a sticky switcher (one tab per question), exactly one question, "Previous" / "Next: question n" |
-| Debrief view, English | The reading column (max `--layout-content`): Summary, Corrections, Phrases to review, as before |
+| Debrief view, interview and example (layout D) | **One content width** (the same right edge as the header row), top to bottom: notice / partial banner · **"Your level" frame** (the step's name or the model's sentence, the model's line, "Your level" blocks, "To reach “Ready”: …"; on the right the one score "3.3/5 · Average of 7 skills") · **"Your plan for the next session"** (up to 3 one-line steps with their weak spot and question links, and the page's only primary button "Drill these weak spots") · example's "Start your first interview" link · **"Questions" frame**: a sticky switcher (one tab per question), exactly one question, "Previous" / "Next: question n" |
+| Debrief view, English | Frames (D109): Summary, then Corrections beside Phrases to review (stacked below 840px) |
 | Skills card | Behind the score: opens to the left on mouse hover or keyboard focus, as a full-width sheet on tap under 640px. The seven skills weakest first with "3/5" and links to the questions that lost points; "Not asked this time"; the misheard note. No Scorecard block on the page |
 | Question switcher | `?q=n` in the URL (a reload or a shared link keeps the question; a number the session does not have is ignored). Tabs show the number and the question's text (2 lines) while each gets 8rem; otherwise numbers only with ‹ ›; then horizontal scroll with an edge fade; the selected tab stays in view; always one row. ←/→/Home/End move between tabs |
 | Question | Meta line ("Question 2 of 5 · 2:20 · at 03:35 · 1 follow-up"), the question as heading, "Lost points on: …"; left: your answer, "Edit what I said", the follow-up answer, "Show a stronger answer" fold; right: one "Feedback" list with small layer tags (the weak spot with "What you said / How it lands / How to fix" on its first evidence question, content notes, language corrections inline with "Not what you said?" and "Dismiss", delivery numbers and tip, misheard notes) |
 
 **No nested scrollers.** The old sticky, height-capped breakdown panel (own `overflow-y`) is gone, and so is the folded verdict bar. The only scroller is `<main>`; the page root clips sideways overflow (`overflow-x: clip`), so a trackpad swipe moves nothing.
+
+**Frames (D109, 2026-11-07, owner: «всё в фреймы со своим названием … компактнее»).** Every meaning block of the Debrief view is one white island (`Card`, local part `parts/Frame.tsx`: card + visible `h2` title in `--text-md` semibold + optional one-line hint + optional aside) on the grey canvas, with `--space-4` between frames: **Your level** (verdict headline and line, rule line; on the right the one score and the level blocks, whose own "Your level" label is dropped as a repeat) · **Your plan for the next session** (drill hint and button on the title row) · **Questions** (switcher, one question, Previous / Next; the switcher's sticky bar takes the card fill). English: **Summary** (full width; with no corrections it also holds the "No corrections this time." line, no empty frame) · **Corrections** and **Phrases to review** side by side from 840px of `page` (stacked below). The verdict notice states ("Verdict") are framed too. Rows inside a frame (corrections, phrases, the inline editor) read the card's `--note-fill` / `--note-shadow` fallback (D101): grey plaques, no frame in a frame. The page title, meta, the view switch and "Practise again" stay above the frames. The English debrief now uses the full width like the interview one. Narrow: frames full width (16px gutter), inner padding 16px.
 
 **Narrow** (`page` <560): the same, with tighter gaps; the toolbar wraps.
 
@@ -983,7 +979,7 @@ When the debrief has `said` / `lands_as`, the card heading is the short tag name
 | Voice | voice Select + sample (disabled without TTS: "Mike's voice isn't installed. He'll show his questions as text.") · speed 0.8–1.2 · "Mike speaks aloud" toggle ("Off: Mike only writes. Useful in a quiet office.") · recognition Server / Browser (disabled options with "Local recognition isn't installed. Use the browser or the keyboard." / "This browser has no speech recognition.") · pause 2 / 3 / 5 s / manual |
 | Practice | sample-answer toggle (US-58) · layer order content-first / delivery-first (US-16) · strictness · questions per session · English level |
 | Privacy | telemetry toggle + clear (US-44) · "Ask how a session went" toggle (US-60; default on; "After your first session, and then every fifth, Vukoli asks how it went. Nothing is sent unless you press Send.") · data folder CopyField · "Markdown export folder · optional" + "Save folder" (US-23 AC3) · Trash link "Trash ({n})" |
-| About | free-vs-premium table (`#free`, US-30) · practice-only statement (US-31) · "Run setup again" → `/setup` ("AI engine, voice check, your name and CV. Sessions and settings stay as they are.") · group "Feedback": button "Send feedback" → §1.9 (US-60) · licence |
+| About | practice-only statement (US-31) · "Run setup again" → `/setup` ("AI engine, voice check, your name and CV. Sessions and settings stay as they are.") · group "Feedback": button "Send feedback" → §1.9 (US-60) · licence |
 
 | State | Story | Review |
 |---|---|---|

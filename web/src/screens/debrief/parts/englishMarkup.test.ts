@@ -13,11 +13,10 @@ const model = (corrections: Correction[]): EnglishModel => ({ corrections, visib
 const render = (m: EnglishModel) => renderToStaticMarkup(createElement(EnglishBody, { english: m, ctx, ids }));
 
 describe("English debrief Corrections (13, F-13-7, QA-14)", () => {
-  it("F-13-7: with no corrections there is no Corrections heading and no empty list, just an empty-state line", () => {
+  it("F-13-7 (D109): with no corrections there is no Corrections frame and no empty list, just an empty-state line in the Summary frame", () => {
     const html = render(model([]));
     expect(html).not.toMatch(/<h2[^>]*>Corrections<\/h2>/);
     expect(html).toContain("No corrections this time.");
-    expect(html).toContain('aria-label="Corrections"'); // the region keeps its name for screen readers
   });
   it("with corrections the heading is there and the empty-state line is not", () => {
     const html = render(model([row("a", true)]));

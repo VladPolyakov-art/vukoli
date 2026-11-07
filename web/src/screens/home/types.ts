@@ -176,6 +176,8 @@ export interface HomeViewProps {
   onSend?: () => void;
   onSuggestion?: (id: SuggestionId) => void;
   onQuickStart?: () => void;
+  /** D111: the "Quick start" button next to the composer: a call right away, Mike asks "interview or English?". */
+  onQuickCall?: () => void;
   onReply?: (turnId: string, replyId: string) => void;
   onTurnAction?: (turnId: string, actionId: TurnActionId) => void;
   onSkip?: () => void;

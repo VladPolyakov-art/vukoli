@@ -6,6 +6,7 @@ import { Button, Callout, Skeleton, TextShimmer, Tooltip } from "../../../ds";
 import { t, tp } from "../../../i18n";
 import type { DebriefModel, DebriefVariant, EnglishModel, Layer, SaidModel } from "../types";
 import { drillHintText } from "./drillHint";
+import { Frame } from "./Frame";
 import s from "./sections.module.css";
 
 export function SectionHead({ id, title, sub, note, action }: { id: string; title: ReactNode; sub?: ReactNode; note?: ReactNode; action?: ReactNode }) {
@@ -35,8 +36,7 @@ export function VerdictNotice({ kind, id, rerunning, onRerun }: { kind: "pending
     <Button size="sm" variant="secondary" icon="refresh" data-track="debrief-rerun" loading={rerunning} onClick={onRerun}>{rerunning ? t("debrief.rerunning") : t("debrief.rerun")}</Button>
   ) : null;
   return (
-    <section className={s.verdict} aria-labelledby={id} data-review-id="Debrief/VerdictNotice" data-review-section="Debrief · Verdict" data-comment-target="">
-      <SectionHead id={id} title={t("debrief.verdict")} />
+    <Frame id={id} title={t("debrief.level.label")} data-review-id="Debrief/VerdictNotice" data-review-section="Debrief · Verdict" data-comment-target="">
       {kind === "pending" ? (
         <>
           <TextShimmer as="p" status size="md">{t("debrief.pending")}</TextShimmer>
@@ -45,7 +45,7 @@ export function VerdictNotice({ kind, id, rerunning, onRerun }: { kind: "pending
       ) : (
         rerun ?? <p className={s.line}>{t("debrief.noFeedback")}</p>
       )}
-    </section>
+    </Frame>
   );
 }
 

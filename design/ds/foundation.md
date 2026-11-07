@@ -266,6 +266,8 @@
 | `color-bg-layer-language` | `{color.neutral.50}` | `#F3F3F3` |
 | `color-bg-layer-delivery` | `{color.neutral.100}` | `#EBEBEB` |
 | `color-bg-mark-fix` | `{color.neutral.100}` | `#EBEBEB` |
+| `color-bg-mark-wrong` | `{color.red.100}` | `#F6D4D0` |
+| `color-bg-mark-right` | `{color.green.100}` | `#D0E7D9` |
 | `color-bg-card` | `{color.white}` | `#FFFFFF` |
 | `color-bg-card_hover` | `{color.neutral.50}` | `#F3F3F3` |
 | `color-bg-chip` | `{color.neutral.100}` | `#EBEBEB` |
@@ -438,6 +440,8 @@
 | `color-bg-layer-language` | `{color.neutral.850}` | `#222222` |
 | `color-bg-layer-delivery` | `{color.neutral.800}` | `#2A2A2A` |
 | `color-bg-mark-fix` | `{color.neutral.800}` | `#2A2A2A` |
+| `color-bg-mark-wrong` | `{color.red.700}` | `#87291F` |
+| `color-bg-mark-right` | `{color.green.700}` | `#27583C` |
 | `color-bg-card` | `{color.neutral.875}` | `#1C1C1C` |
 | `color-bg-card_hover` | `{color.neutral.850}` | `#222222` |
 | `color-bg-chip` | `{color.neutral.800}` | `#2A2A2A` |
@@ -530,6 +534,8 @@
 | semantic | `color-text-primary` | `color-bg-warning-primary` | 16.26:1 | 4.5:1 | ✓ |
 | semantic | `color-text-primary` | `color-bg-success-primary` | 16.27:1 | 4.5:1 | ✓ |
 | semantic | `color-text-primary` | `color-bg-mark-fix` | 15.45:1 | 4.5:1 | ✓ |
+| semantic | `color-text-primary` | `color-bg-mark-wrong` | 13.38:1 | 4.5:1 | ✓ |
+| semantic | `color-text-primary` | `color-bg-mark-right` | 14.14:1 | 4.5:1 | ✓ |
 | semantic | `color-text-primary` | `color-bg-card` | 18.42:1 | 4.5:1 | ✓ |
 | semantic | `color-text-primary` | `color-bg-card_hover` | 16.60:1 | 4.5:1 | ✓ |
 | semantic | `color-text-primary` | `color-bg-chip` | 15.45:1 | 4.5:1 | ✓ |
@@ -648,6 +654,8 @@
 | semantic-dark | `color-text-primary` | `color-bg-warning-primary` | 13.16:1 | 4.5:1 | ✓ |
 | semantic-dark | `color-text-primary` | `color-bg-success-primary` | 13.53:1 | 4.5:1 | ✓ |
 | semantic-dark | `color-text-primary` | `color-bg-mark-fix` | 12.04:1 | 4.5:1 | ✓ |
+| semantic-dark | `color-text-primary` | `color-bg-mark-wrong` | 7.44:1 | 4.5:1 | ✓ |
+| semantic-dark | `color-text-primary` | `color-bg-mark-right` | 6.92:1 | 4.5:1 | ✓ |
 | semantic-dark | `color-text-primary` | `color-bg-card` | 14.30:1 | 4.5:1 | ✓ |
 | semantic-dark | `color-text-primary` | `color-bg-card_hover` | 13.35:1 | 4.5:1 | ✓ |
 | semantic-dark | `color-text-primary` | `color-bg-chip` | 12.04:1 | 4.5:1 | ✓ |

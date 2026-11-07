@@ -128,9 +128,6 @@ export function questionCounter(page: Page, n: number, total: number) {
 }
 
 export async function sendAnswer(page: Page, text: string) {
-  // On a phone the feedback panel is a sheet over the session; close it before typing.
-  const feedbackDialog = page.getByRole("dialog", { name: "Feedback" });
-  if (await feedbackDialog.isVisible()) await feedbackDialog.getByRole("button", { name: "Hide feedback (F)" }).click();
   await page.getByRole("textbox", { name: "Your answer" }).fill(text);
   await page.getByRole("button", { name: "Send", exact: true }).click();
 }
@@ -140,15 +137,16 @@ export function conversation(page: Page) {
   return page.getByRole("log", { name: /^(Conversation|Transcript)$/ });
 }
 
-/** D96: during the call the panel holds no feedback, only a calm note that it comes after the call. Opens it if it is
- * closed (F) and returns it. */
-export async function showFeedbackLater(page: Page) {
-  const show = page.getByRole("button", { name: "Show feedback (F)" });
-  if (await show.isVisible()) await show.click();
-  // Desktop: a side panel (complementary). Phone: the same panel as a dialog over the session.
+/** D107: there is no feedback panel in the call: no "Show feedback" button, no panel or sheet, and the F key opens
+ * nothing (the key goes to the answer box in text mode, nowhere in voice mode). Feedback is only in the debrief. */
+export async function expectNoFeedbackPanel(page: Page) {
   const panel = page.getByRole("complementary", { name: "Feedback" }).or(page.getByRole("dialog", { name: "Feedback" }));
-  await expect(panel).toBeVisible();
-  return panel;
+  await expect(page.getByRole("button", { name: /feedback \(F\)/i })).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
+  await page.mouse.click(5, 5);   // the focus is outside any field, the way a shortcut is pressed
+  await page.keyboard.press("f");
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /feedback \(F\)/i })).toHaveCount(0);
 }
 
 /** A saved session opens on its debrief (D101); "Debrief | Conversation" under the title switches (`?view=conversation`).
@@ -169,7 +167,7 @@ export async function showConversation(page: Page) {
 }
 
 /** The viewer of the Debrief view (layout D): the sticky switcher, one question at a time and Previous / Next. */
-export const viewer = (page: Page) => page.getByRole("region", { name: "Question by question" });
+export const viewer = (page: Page) => page.getByRole("region", { name: "Questions" });
 
 /** The switcher's tab for question `n` (its name is the number and the question's text, or only the number when the labels are hidden). */
 export const questionTab = (page: Page, n: number) => page.getByRole("tab", { name: new RegExp(`^${n}(?!\\d)`) });
@@ -193,9 +191,6 @@ export async function openSkills(page: Page) {
 /** End the session (D73: it goes Home at once, no full-screen "Saving…" and no "Saving" toast; the session loads in
  * Recents) and wait for the "ready" toast; returns its "Open debrief" button. */
 export async function endSession(page: Page, label: "End" | "End practice" = "End") {
-  // On a phone the feedback panel is a dialog over the session; close it before reaching the End button.
-  const feedbackDialog = page.getByRole("dialog", { name: "Feedback" });
-  if (await feedbackDialog.isVisible()) await feedbackDialog.getByRole("button", { name: "Hide feedback (F)" }).click();
   await page.getByRole("button", { name: label, exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText(/Saving your session|Writing your debrief/)).toHaveCount(0);

@@ -20,3 +20,18 @@ describe("buildSessionConfig: a drill's focus (C1b)", () => {
     expect(buildSessionConfig({ mode: "interview", answer: "text", drill: true, focus: many }, null, null).start.focus).toHaveLength(6);
   });
 });
+
+describe("buildSessionConfig: quick start (D111)", () => {
+  it("sends mode quick with the interview defaults and leaves the job and the plan to the server", () => {
+    const { start } = buildSessionConfig({ mode: "quick", answer: "text" }, null, null);
+    expect(start).toMatchObject({ type: "start", mode: "quick", input: "text", speak: false, round_type: "mix", strictness: 2, questions: 5 });
+    expect(start.vacancy_id).toBeUndefined();
+    expect(start.drill).toBeUndefined();
+    expect(start.level).toBeUndefined();
+  });
+
+  it("an ordinary start still names its mode", () => {
+    expect(buildSessionConfig({ mode: "interview", answer: "text" }, null, null).start.mode).toBe("interview");
+    expect(buildSessionConfig({ mode: "english", answer: "text" }, null, null).start.mode).toBe("english");
+  });
+});

@@ -289,6 +289,14 @@ export function HomeScreen() {
     leave(() => navigate("/session", { state: { config, title, roundType: config.start.round_type } }));
   };
 
+  /* D111: "Quick start" next to the composer: a call at once, no plan; Mike asks "interview or English?" and the
+   * server picks the newest saved job for an interview. Voice unless typed answers are on or the browser cannot listen. */
+  const quickCall = () => {
+    if (!engineReady || leaving) return;
+    const config = buildSessionConfig({ mode: "quick", answer: textMode || unsupportedSpeech ? "text" : "voice" }, settings, stt.data);
+    leave(() => navigate("/session", { state: { config, title: t("session.titleQuick") } }));
+  };
+
   return (
     <>
       <HomeView
@@ -311,6 +319,7 @@ export function HomeScreen() {
         suggestions={loading ? [] : suggestionsFor(ctx)}
         quickStart={quick ? { detail: quick.detail, answer: quick.answer, wait: quickWaits } : loading && track === "interview" ? { detail: "" } : null}
         onQuickStart={quickStart}
+        onQuickCall={quickCall}
         composer={composer}
         setup={shown}
         jobs={setup ? [...setup.jobs, ...ctx.jobs.filter((j) => !setup.jobs.some((x) => x.id === j.id))] : ctx.jobs}

@@ -4,10 +4,11 @@
  * weak spots are folded into the steps; what was said / how it lands / how to fix sits on the first evidence question.
  * An older debrief with no plan lists its weak spots in the same shape under "What to work on". The example's button is
  * off and says why. */
-import { Button, Card } from "../../../ds";
+import { Button } from "../../../ds";
 import { t, tp } from "../../../i18n";
 import type { DebriefModel, Layer, PlanStepModel, WeakSpotModel } from "../types";
 import { drillHintText } from "./drillHint";
+import { Frame } from "./Frame";
 import { QuestionLinks } from "./QuestionLinks";
 import s from "./plan.module.css";
 
@@ -42,16 +43,19 @@ export function Plan({ steps, spots, id, drill, showDrill, example, storageError
   if (!items.length && !showDrill) return null;
   const hint = example ? t("debrief.example.own") : drill ? drillHintText(drill) : null;
   return (
-    <Card as="section" padding="md" className={s.plan} aria-labelledby={id} data-review-id="Debrief/Plan" data-review-section="Debrief · Plan" data-comment-target="">
-      <div className={s.head}>
-        <h2 id={id} className={s.label}>{steps.length ? t("debrief.plan.card") : t("debrief.workOn")}</h2>
-        {showDrill ? (
-          <div className={s.drill}>
-            {hint ? <p className={s.hint}>{hint}</p> : null}
-            <Button variant={storageError ? "secondary" : "primary"} icon="play" data-track="drill-start" disabled={example} onClick={onDrill}>{t("debrief.drill")}</Button>
-          </div>
-        ) : null}
-      </div>
+    <Frame
+      id={id}
+      title={steps.length ? t("debrief.plan.card") : t("debrief.workOn")}
+      aside={showDrill ? (
+        <div className={s.drill}>
+          {hint ? <p className={s.hint}>{hint}</p> : null}
+          <Button variant={storageError ? "secondary" : "primary"} icon="play" data-track="drill-start" disabled={example} onClick={onDrill}>{t("debrief.drill")}</Button>
+        </div>
+      ) : null}
+      data-review-id="Debrief/Plan"
+      data-review-section="Debrief · Plan"
+      data-comment-target=""
+    >
       {items.length ? (
         <ol className={s.steps}>
           {items.map((p, i) => {
@@ -74,6 +78,6 @@ export function Plan({ steps, spots, id, drill, showDrill, example, storageError
           })}
         </ol>
       ) : null}
-    </Card>
+    </Frame>
   );
 }

@@ -255,6 +255,8 @@
   --color-bg-layer-language: var(--color-neutral-50);
   --color-bg-layer-delivery: var(--color-neutral-100);
   --color-bg-mark-fix: var(--color-neutral-100);
+  --color-bg-mark-wrong: var(--color-red-100);
+  --color-bg-mark-right: var(--color-green-100);
   --color-bg-card: var(--color-white);
   --color-bg-card_hover: var(--color-neutral-50);
   --color-bg-chip: var(--color-neutral-100);
@@ -424,6 +426,8 @@
   --color-bg-layer-language: var(--color-neutral-850);
   --color-bg-layer-delivery: var(--color-neutral-800);
   --color-bg-mark-fix: var(--color-neutral-800);
+  --color-bg-mark-wrong: var(--color-red-700);
+  --color-bg-mark-right: var(--color-green-700);
   --color-bg-card: var(--color-neutral-875);
   --color-bg-card_hover: var(--color-neutral-850);
   --color-bg-chip: var(--color-neutral-800);
@@ -594,6 +598,8 @@
     --color-bg-layer-language: var(--color-neutral-850);
     --color-bg-layer-delivery: var(--color-neutral-800);
     --color-bg-mark-fix: var(--color-neutral-800);
+    --color-bg-mark-wrong: var(--color-red-700);
+    --color-bg-mark-right: var(--color-green-700);
     --color-bg-card: var(--color-neutral-875);
     --color-bg-card_hover: var(--color-neutral-850);
     --color-bg-chip: var(--color-neutral-800);

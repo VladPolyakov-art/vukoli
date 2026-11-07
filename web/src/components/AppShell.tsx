@@ -428,7 +428,7 @@ function Account({ collapsed, defaultOpen, onNavigate, name, engine }: {
     { id: "settings", track: "nav-settings", label: t("settings.title"), icon: "settings", onSelect: go("/settings") },
     { id: "sep", separator: true },
     { id: "privacy", track: "nav-privacy", label: t("settings.section.privacy"), icon: "lock", onSelect: go("/settings/privacy") },
-    { id: "help", track: "nav-help", label: t("rail.help"), icon: "info", onSelect: go("/settings/about#free") },
+    { id: "help", track: "nav-help", label: t("rail.help"), icon: "info", onSelect: go("/settings/about") },
     { id: "feedback", track: "nav-feedback", label: t("support.menu"), icon: "chat", onSelect: () => { feedbackUi.openSupport(); onNavigate?.(); } },
   ];
   return (

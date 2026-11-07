@@ -44,7 +44,6 @@ export function LevelProgress({ data }: { data: LevelProgressData }) {
   return (
     <div className={s.level} role="img" aria-label={sr} data-review-id="Debrief/Level">
       <div className={s.head} aria-hidden="true">
-        <span className={s.label}>{t("debrief.level.label")}</span>
         <ol className={s.crumbs}>
           {LEVELS.map((key, i) => (
             <li key={key} className={`${s.stop} ${i < data.step ? s.passed : ""} ${i === data.step ? s.here : ""}`}>{t(key)}</li>

@@ -7,6 +7,7 @@ import { Button, Swap, scrollBehavior } from "../../../ds";
 import { t } from "../../../i18n";
 import type { QuestionModel } from "../types";
 import { questionHeadingId } from "./debriefShared";
+import { Frame } from "./Frame";
 import { QuestionTabs } from "./QuestionTabs";
 import { QuestionView, type QuestionViewProps } from "./QuestionView";
 import s from "./questionViewer.module.css";
@@ -43,8 +44,7 @@ export function QuestionViewer({ questions: qs, current, onSelect, uid, id, sect
   };
 
   return (
-    <section ref={sectionRef} className={s.viewer} aria-labelledby={id} data-review-id="Debrief/Questions" data-review-section="Debrief · Question by question" data-comment-target="">
-      <h2 id={id} className="visually-hidden">{t("debrief.qSection")}</h2>
+    <Frame ref={sectionRef} id={id} title={t("debrief.qFrame")} className={s.viewer} data-review-id="Debrief/Questions" data-review-section="Debrief · Questions" data-comment-target="">
       {many ? <QuestionTabs questions={qs} index={index} base={base} onSelect={select} /> : null}
       <div role={many ? "tabpanel" : undefined} id={`${base}-panel`} aria-labelledby={many ? `${base}-tab-${q.n}` : undefined} className={s.panel}>
         <Swap swapKey={String(q.n)} focusTarget={() => document.getElementById(questionHeadingId(uid, q.n))}>
@@ -59,6 +59,6 @@ export function QuestionViewer({ questions: qs, current, onSelect, uid, id, sect
           </div>
         ) : null}
       </div>
-    </section>
+    </Frame>
   );
 }

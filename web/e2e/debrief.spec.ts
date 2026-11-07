@@ -92,7 +92,7 @@ test.describe("US-20 QA-07 The verdict follows the weak spots after a recheck", 
     const id = sessions[0]!.id;
     await page.goto(`/sessions/${id}?view=debrief`);
     // D99: the headline is the step's name; the model's sentence is under it.
-    const verdict = page.getByRole("region", { name: "Verdict", exact: true });
+    const verdict = page.getByRole("region", { name: "Your level", exact: true });
     // Premise: the verdict names the Language weak spot ("preposition") that the edit below removes.
     await expect(verdict).toContainText("preposition");
 
@@ -114,7 +114,7 @@ test.describe("US-20 QA-07 The verdict follows the weak spots after a recheck", 
     await expect(verdict).not.toContainText("preposition");
     // Saved on this computer, not only on screen.
     await page.reload();
-    await expect(page.getByRole("region", { name: "Verdict", exact: true })).not.toContainText("preposition");
+    await expect(page.getByRole("region", { name: "Your level", exact: true })).not.toContainText("preposition");
   });
 });
 
@@ -137,7 +137,7 @@ async function debriefAfter(page: Page, answers: string[]) {
   await (await endSession(page)).click();
   await expect(page).toHaveURL(/\/sessions\/s-/);
   await showDebrief(page);
-  return page.getByRole("region", { name: "Verdict", exact: true });
+  return page.getByRole("region", { name: "Your level", exact: true });
 }
 
 test.describe("US-20 D99 The verdict step follows the scorecard", () => {
@@ -179,7 +179,7 @@ test.describe("US-20 D99 The verdict step follows the scorecard", () => {
   test("an older saved session gets the step too (derived from its scorecard), and the level block is one", async ({ page, request }) => {
     const { sessions } = await seedReturningUser(request);
     await page.goto(`/sessions/${sessions[0]!.id}?view=debrief`);
-    await expect(page.getByRole("region", { name: "Verdict", exact: true })).toContainText(/Not ready yet|Getting there|Ready/);
+    await expect(page.getByRole("region", { name: "Your level", exact: true })).toContainText(/Not ready yet|Getting there|Ready/);
     await expect(level(page)).toHaveCount(1);
     await expect(level(page)).toHaveAttribute("aria-label", /^Your level: (Not ready yet|Getting there|Ready), step [123] of 3/);
   });
@@ -253,7 +253,7 @@ test.describe("US-23 AC4 The data folder is not writable", () => {
   test("the warning is gone once the folder is writable again", async ({ page, request }) => {
     const { sessions } = await seedReturningUser(request);
     await page.goto(`/sessions/${sessions[0]!.id}?view=debrief`);
-    await expect(page.getByRole("region", { name: /^Verdict/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: /^Your level/ })).toBeVisible();
     await expect(page.getByText("We couldn't save this debrief to your computer")).toHaveCount(0);
   });
 });

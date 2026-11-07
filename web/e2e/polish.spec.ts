@@ -377,7 +377,7 @@ test.describe("UT-3 The voice island never runs its groups into each other", () 
     });
   }
 
-  test("one row where it fits, two rows where it doesn't, Send now always clear", async ({ page }) => {
+  test("one row where it fits, two rows where it doesn't (D107: the Feedback button is gone, so the island needs less room), Send now always clear", async ({ page }) => {
     await skipSetup(page);
     await page.goto("/");
     await page.getByRole("textbox", { name: "Message Mike" }).fill(JOB_TEXT);
@@ -397,7 +397,7 @@ test.describe("UT-3 The voice island never runs its groups into each other", () 
     }).toPass({ timeout: 15_000 });
     const island = page.locator('[data-layout="inline"], [data-layout="stacked"]').filter({ has: voice });
 
-    for (const [width, layout] of [[1440, "inline"], [820, "stacked"], [700, "stacked"], [1100, "inline"]] as const) {
+    for (const [width, layout] of [[1440, "inline"], [820, "inline"], [780, "stacked"], [700, "stacked"], [1100, "inline"]] as const) {
       await page.setViewportSize({ width, height: 900 });
       await expect(island).toHaveAttribute("data-layout", layout);
       expect(await nothingOver(send), `Send now is clear at ${width}px`).toBe(true);

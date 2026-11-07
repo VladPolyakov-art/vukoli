@@ -1,5 +1,5 @@
-/* Screen-local parts of the Session (stage, dock, panel content). Spacing rhythm from the map: sections --space-8,
- * panels / cards --space-5, groups --space-4, rows --space-2. Every value is a token. */
+/* Screen-local parts of the Session (stage, dock). Spacing rhythm from the map: sections --space-8,
+ * cards --space-5, groups --space-4, rows --space-2. Every value is a token. */
 
 /* ---------- running transcript (D49) ---------- */
 .transcript { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; min-width: 0; }
@@ -52,19 +52,6 @@
 /* ---------- dialog ---------- */
 .steps { margin: var(--space-3) 0 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }
 
-/* ---------- panel content ---------- */
-.panelHint { margin: 0; font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-text-secondary); }
-.panelLater { display: flex; flex-direction: column; gap: var(--space-2); }
-.panelLaterTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: var(--leading-tight); color: var(--color-text-primary); }
-.panelWait { display: flex; flex-direction: column; gap: var(--space-4); }
-.panelWait > p { margin: 0; }
-.panelFeedback { display: flex; flex-direction: column; gap: var(--space-5); }
-.earlierList { display: flex; flex-direction: column; gap: var(--space-6); }
-.edit { display: flex; flex-direction: column; gap: var(--space-4); }
-.editHead { display: flex; flex-direction: column; gap: var(--space-1); }
-.editTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); outline: none; }
-.editHint { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
-.editActions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 /* Keyboard shortcuts dialog (V2.3) */
 .keys { display: grid; grid-template-columns: max-content 1fr; align-items: baseline; gap: var(--space-2) var(--space-4); margin: 0; }

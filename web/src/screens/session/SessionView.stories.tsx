@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { OverlayRoot } from "../../ds/OverlayRoot";
 import { fixtureProps, type FixtureOptions } from "./fixtures";
-import { SessionPreview } from "./SessionPreview";
+import { SessionView } from "./SessionView";
 import type { SessionViewProps } from "./types";
 
 /* Screens/Session: one story per state of ds/screens/session.md §4 (S1 to S14), with the v2 island (§V2) and the
@@ -11,16 +11,15 @@ import type { SessionViewProps } from "./types";
  * set-up as the review page.
  * The `frame` control switches 1440 / 900 / 768 / 375. */
 type Frame = "desktop" | "mid" | "tablet" | "mobile";
-interface Args extends Omit<FixtureOptions, "scene"> { frame: Frame }
+interface Args { frame: Frame }
 const SIZE: Record<Frame, [number, number]> = { desktop: [1440, 900], mid: [900, 700], tablet: [768, 1024], mobile: [375, 812] };
 
 const meta: Meta<Args> = {
   title: "Screens/Session",
   parameters: { layout: "wide" },
-  args: { frame: "desktop", layerOrder: "content-first", withChecks: true },
+  args: { frame: "desktop" },
   argTypes: {
     frame: { control: "inline-radio", options: ["desktop", "mid", "tablet", "mobile"] },
-    layerOrder: { control: "inline-radio", options: ["content-first", "delivery-first"] },
   },
 };
 export default meta;
@@ -49,11 +48,11 @@ function scene(name: string, sceneId: FixtureOptions["scene"], extra: Partial<St
   return {
     name,
     ...extra,
-    render: ({ frame, layerOrder, withChecks }) => {
+    render: ({ frame }) => {
       const [w, h] = SIZE[frame];
       return (
-        <Scaled key={`${frame}:${sceneId}:${layerOrder}:${withChecks}`} width={w} height={h}>
-          <SessionPreview {...fixtureProps({ scene: sceneId, layerOrder, withChecks })} {...view} />
+        <Scaled key={`${frame}:${sceneId}`} width={w} height={h}>
+          <SessionView {...fixtureProps({ scene: sceneId })} {...view} />
         </Scaled>
       );
     },
@@ -65,11 +64,11 @@ function scene(name: string, sceneId: FixtureOptions["scene"], extra: Partial<St
 function patched(name: string, sceneId: FixtureOptions["scene"], patch: (p: SessionViewProps) => SessionViewProps): Story {
   return {
     name,
-    render: ({ frame, layerOrder, withChecks }) => {
+    render: ({ frame }) => {
       const [w, h] = SIZE[frame];
       return (
-        <Scaled key={`${frame}:${sceneId}:${layerOrder}:${withChecks}:${name}`} width={w} height={h}>
-          <SessionPreview {...patch(fixtureProps({ scene: sceneId, layerOrder, withChecks }))} />
+        <Scaled key={`${frame}:${sceneId}:${name}`} width={w} height={h}>
+          <SessionView {...patch(fixtureProps({ scene: sceneId }))} />
         </Scaled>
       );
     },
@@ -84,13 +83,7 @@ export const S3Listening = scene("S3 · You are speaking (quiet mode)", "listeni
 export const S3bListeningHintGone = scene("S3b · Listening, the hint folded away (D91)", "listening", {}, { hintMs: 1 });
 export const S14d2SuggesterListening = scene("S14d2 · Suggester on while you speak (D91)", "suggester", {}, { phase: "listening", hintMs: 1 });
 export const S4Thinking = scene("S4 · Thinking", "thinking");
-export const S5aFeedbackContentFirst = scene("S5a · Feedback, content first, with a check", "feedback");
-export const S5bFeedbackDeliveryFirst = scene("S5b · Feedback, delivery first", "feedback", { args: { layerOrder: "delivery-first" } });
-export const S5cThatsNotWhatISaid = scene("S5c · That's not what I said", "that-not-said");
-export const S5dEditWhatISaid = scene("S5d · Edit what I said", "edit");
-export const S5eEditFailed = scene("S5e · Edit what I said, the check failed", "edit-failed");
-export const S5fRechecking = scene("S5f · Checking the edited answer again", "rechecking");
-export const S6TextMode = scene("S6 · Text mode", "text", { args: { withChecks: false } });
+export const S6TextMode = scene("S6 · Text mode", "text", {});
 export const S7Drill = scene("S7 · Drill, Question 1 of 3", "drill");
 export const S8English = scene("S8 · English, Turn 4", "english");
 export const S9Connecting = scene("S9 · Connecting", "connecting");
@@ -106,14 +99,11 @@ export const S12bBrowserBanner = scene("S12b · Browser can't recognise speech",
 export const S11bMicHelpNoMic = scene("S11b · Mic help: no microphone found (opens by itself)", "mic-help", {}, { micHelpReason: "none" });
 export const S12cBothBanners = patched("S12c · Storage and browser banners together", "storage", (p) => ({ ...p, overlay: "none", banners: { browser: true, storage: true } }));
 export const S13Overflow = scene("S13 · Overflow +30%", "overflow");
-export const S14aPreparing = scene("S14a · Preparing feedback", "preparing");
-export const S14bUnavailable = scene("S14b · Feedback unavailable", "unavailable");
-export const S14eLayersUnavailable = scene("S14e · Content and Language unavailable, Delivery still reports", "layers-unavailable");
 export const S14cMuted = scene("S14c · Muted", "muted");
 export const S14c2MutedTalking = scene("S14c2 · Talking while muted: tip over the mic", "muted-talking");
 export const S14dSuggester = scene("S14d · Answer suggester on", "suggester");
 
-/* First-time tips name where feedback opens: right (wide), slides in from the right (mid), slides up (phone). */
+/* First-time tips, in the three layouts. */
 export const S1TipsMid = scene("Mid · First-time tips (text)", "q1-start", { args: { frame: "mid" } }, { input: "text" });
 export const S1TipsNarrow = scene("Narrow · First-time tips (text)", "q1-start", { args: { frame: "mobile" } }, { input: "text" });
 export const S1TipsWideText = scene("S1 · First-time tips (text)", "q1-start", {}, { input: "text" });
@@ -122,26 +112,18 @@ export const S8TipsEnglishWide = scene("English · First-time tips, wide (text)"
 export const S8TipsEnglishMid = scene("English · First-time tips, mid (text)", "q1-start", { args: { frame: "mid" } }, { input: "text", variant: "english" });
 export const S8TipsEnglishNarrow = scene("English · First-time tips, narrow (text)", "q1-start", { args: { frame: "mobile" } }, { input: "text", variant: "english" });
 
-/* The same feedback on a phone and in the mid layout: bottom sheet and right drawer. */
-export const NarrowFeedback = scene("Narrow · Feedback sheet", "feedback", { args: { frame: "mobile" } });
-export const MidFeedback = scene("Mid · Feedback drawer", "feedback", { args: { frame: "mid" } });
 
 /* v2 island (session.md §V2.9). */
 export const S1IslandMoreOpen = scene("S1 · Island, More menu open", "q1-start", {}, { initialOverlay: "more" });
-export const S5PanelHidden = scene("S5 · Feedback ready, panel hidden", "feedback", {}, { panelOpen: false });
-/* 13 (QA-01): feedback is ready and the panel is closed: a dot on the toggle (always so on mid and narrow). */
-export const S5FeedbackReadyDot = scene("S5 · Feedback ready, dot on the toggle", "feedback", {}, { panelOpen: false, feedbackUnread: true });
-export const MidFeedbackReadyDot = scene("Mid · Feedback ready, dot on the toggle", "feedback", { args: { frame: "mid" } }, { panelOpen: false, feedbackUnread: true });
-export const NarrowFeedbackReadyDot = scene("Narrow · Feedback ready, dot on the toggle", "feedback", { args: { frame: "mobile" } }, { panelOpen: false, feedbackUnread: true });
-export const S6TextIsland = scene("S6 · Text mode island (box)", "text", { args: { withChecks: false } });
-export const Shortcuts = scene("Keyboard shortcuts dialog", "feedback", {}, { initialOverlay: "shortcuts" });
+export const S6TextIsland = scene("S6 · Text mode island (box)", "text", {});
+export const Shortcuts = scene("Keyboard shortcuts dialog", "answered", {}, { initialOverlay: "shortcuts" });
 /* 13 (QA-10): the text-mode island on a phone: status and End on row 1, the tools on row 2. */
-export const S6TextIslandPhone = scene("Narrow · Text mode island, two rows", "text", { args: { frame: "mobile", withChecks: false } });
-export const NarrowIsland = scene("Narrow · Island, two rows", "listening", { args: { frame: "mobile" } }, { panelOpen: false });
+export const S6TextIslandPhone = scene("Narrow · Text mode island, two rows", "text", { args: { frame: "mobile" } });
+export const NarrowIsland = scene("Narrow · Island, two rows", "listening", { args: { frame: "mobile" } }, {});
 
 /* v2.1 (D49): running transcript + Presence glow. */
 export const S2YourTurnWaiting = scene("S2 · Your turn (voice), faint glow", "follow-up", {}, { phase: "your-turn" });
-export const S2Reading = scene("S2 · Reading above: Jump to latest", "feedback", {}, { initialFollow: "reading", panelOpen: false });
+export const S2Reading = scene("S2 · Reading above: Jump to latest", "answered", {}, { initialFollow: "reading" });
 export const ReducedSpeaking = scene("Reduced motion · Speaking", "q1-start", {}, { reducedMotion: true });
 export const ReducedListening = scene("Reduced motion · Listening", "listening", {}, { reducedMotion: true });
 export const ReducedThinking = scene("Reduced motion · Thinking", "thinking", {}, { reducedMotion: true });

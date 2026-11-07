@@ -77,6 +77,11 @@ English practice: same five steps, turns E1 level → E2 topic (+ phrases to rev
 - Config (`quickStart.ts`, tested): returning = remembered job (if still saved, else general) + remembered round (`technical` sent as `mix`, §9 B2) + default strictness; first visit = general questions · Unseen mix · default strictness. Questions = settings `questions_per_session`; voice / "typing" follows the text-mode pref (and no speech recognition → typing). English track: no quick start, the end button is Send only.
 - Disabled while loading and while the engine is not ready (the banner says why; typing and Send still work). States `returning`, `firstVisit`, `typed`, `fileAttached`, `quickTextMode`, `quickStarting`, `engineDown`, `loading`; review `start-returning`, `start-first`, `start-typed`, `start-quick-text`, `start-quick-engine-down`.
 
+### 3.2b "Quick start" button (D111, 2026-11-07, owner: «кнопка быстрый старт, где ты сразу залетаешь с майком на разговор, он тебя сам спрашивает о чём говорить будем»)
+- `toolbarStart` = "+", the mode chip, then `Button secondary sm` icon `play` "Quick start" (`data-track="quick-call"`; tooltip "Start a call right away: Mike asks whether you want an interview or English."). Existing DS Button, no new component. Both tracks. On 375 the toolbar keeps one row (the mode chip is the compact one).
+- Click: soft-out like Start, then `/session` with `start.mode = "quick"` (`buildSessionConfig({mode: "quick"})`): a call straight away, no plan, no settings. Voice unless the text-mode pref is on / the browser cannot listen (then typed). Mike asks "interview or English?" and runs the choice (session map §4, `app/server/PROTOCOL.md` → Quick start).
+- Disabled while loading, while the engine is down and while starting. No new states in the review harness beyond `start-*` (the button is visible in all of them).
+
 ### 3.3 Suggestions `data-review-id="Home/Suggestions"`
 ChipGroup `group`, hidden label "Suggestions", centred, wraps, **max 3**. A chip is a one-shot action: its label is sent as the user's first message.
 
@@ -91,7 +96,7 @@ ChipGroup `group`, hidden label "Suggestions", centred, wraps, **max 3**. A chip
 "Kestrel Pay again" = the job of the last interview (S2); the company clamps at 24 characters + Tooltip G6.
 
 ### 3.4 Bottom line `data-review-id="Home/Footer"`
-Centred `--text-sm --color-text-tertiary`: "Practice only: no help during real interviews." + Button `link` "What's free" → `/settings/about#free` (US-30, US-31 AC1). English: "Free forever: no limits on English practice." + "What's free" (US-24 AC5). Also under the bottom composer in the setup chat (like ChatGPT's line under its input).
+Centred `--text-sm --color-text-tertiary`: "Practice only: no help during real interviews." (US-31 AC1). English: no footer. D108 (2026-11-07): mentions of paid features removed until they exist: no "What's free" link, no "Free forever" line. Also under the bottom composer in the setup chat (like ChatGPT's line under its input).
 
 ### 3.5 Where weak spots went
 No block on the start screen (D47e vs US-22 AC1 "weak spots first on Home" → [Q2]). They appear as the "Drill my weak spots" chip (entry, never primary), as one sentence in Mike's drill turn (§4.6) and as the "Watch for" row of the plan (§4.9).
@@ -174,7 +179,7 @@ Inside Mike's last message, full column width. Card `subtle`, `Padding: md`, `--
 - No CV: line under the rows: Icon `info` sm "Add your CV so questions use your own experience." + Button `link sm` "Add CV" → `/settings/profile`.
 - Actions, `--space-5` above, start-aligned: Button `primary lg` Icon `mic` **"Start interview"** (the only primary in the view) + Button `ghost sm` Icon `keyboard` "Type instead" (GR5). Browser without speech recognition (US-06): primary Icon `keyboard`, line "You'll answer by typing.", no "Type instead". Drill: "Start drill". English: "Start talking". Engine down: primary disabled (`--color-action-disabled` + `--color-text-disabled`), reason under it, `aria-describedby`: "Start the AI model first."
 - **Drill plan rows:** Focus "No result · “we” instead of “I”" [Change: Menu radio All / Content / Language / Delivery] · Length "3 questions, about 12 minutes" 🟡 · Job "Kestrel Pay job" [Change].
-- **English plan rows:** Level "B2: work topics, natural pace" [Change: Menu radio A2–C1 with descriptions] · Topic "Talk about your work" [Change] · Corrections "After each of your turns, up to 3, with a reason. Nothing appears while you speak." (US-24 AC3, D29) · Phrases "discuss the plan · for three years" (if "Yes, use them") [Remove] · line "Free forever: no limits on English practice." (US-24 AC5).
+- **English plan rows:** Level "B2: work topics, natural pace" [Change: Menu radio A2–C1 with descriptions] · Topic "Talk about your work" [Change] · Corrections "After each of your turns, up to 3, with a reason. Nothing appears while you speak." (US-24 AC3, D29) · Phrases "discuss the plan · for three years" (if "Yes, use them") [Remove]. (D108: no "Free forever" line.)
 - A change made in the card cross-fades the value (`fast`); Mike adds no message (the card is the state).
 
 ### 4.10 Starting — `Setup/Starting`

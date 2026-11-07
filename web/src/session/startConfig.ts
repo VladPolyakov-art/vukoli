@@ -5,7 +5,8 @@ import type { FocusSpot, Level, Settings, StartMessage, SttInfo } from "../lib/t
 import type { SessionConfig } from "./useSession";
 
 export interface StartChoices {
-  mode: "interview" | "english";
+  /** `quick` (D111): the call opens with Mike's "interview or English?"; the plan and the job are the server's. */
+  mode: "interview" | "english" | "quick";
   answer: "voice" | "text";
   roundType?: "hr" | "behavioural" | "mix";
   strictness?: number;
@@ -41,7 +42,7 @@ export function buildSessionConfig(choices: StartChoices, settings: Settings | n
     speak: input === "text" ? false : prefs.speak(),
     suggest: false,
   };
-  if (choices.mode === "interview") {
+  if (choices.mode === "interview" || choices.mode === "quick") {
     start.round_type = choices.roundType ?? "mix";
     start.strictness = choices.strictness ?? settings?.strictness ?? 2;
     start.questions = choices.questions ?? settings?.questions_per_session ?? 5;

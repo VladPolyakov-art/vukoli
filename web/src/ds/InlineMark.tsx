@@ -1,10 +1,11 @@
-/* Inline mark (G20): a fragment marked inside the user's own sentence (P8 "a fix, not an error", R11 pattern).
- * - `fix`: the corrected words in "Say" — <mark> on --color-mark-fix + semibold. Never green, never a strikethrough.
- * - `heard`: the words the recogniser heard that the fix changes ("Heard as") — neutral grey dotted underline
- *   (--color-mark-heard). Not red, not struck through: it may simply be what the user said.
- * - `unsure`: a low-confidence word (the engine gave confidence, US-18 AC4) — grey dashed underline + an optional
- *   visible hint "(may be misheard)". Dashed vs dotted is the non-colour cue between the two neutral marks.
- * `srLabel` adds visually hidden context before the fragment for screen readers ("corrected:", "heard as:"). */
+/* Inline mark (G20, D110): a fragment marked inside the user's own sentence, as a rectangle behind the text (like <mark>).
+ * - `heard`: the words the recogniser heard / the user said wrongly ("Heard as") — red rectangle (--color-bg-mark-wrong).
+ * - `fix`: the corrected words, the right answer ("Say") — <mark> on a green rectangle (--color-bg-mark-right) + semibold.
+ *   No underline and no strikethrough on either (D110 replaces P8 "never red / green / struck through").
+ * - `unsure`: a low-confidence word (the engine gave confidence, US-18 AC4) — stays neutral: grey dashed underline + an
+ *   optional visible hint "(may be misheard)". It is not the user's error, so it is not red.
+ * Colour is not the only cue: `srLabel` adds visually hidden context before the fragment for screen readers
+ * ("heard as:", "corrected:"); in the debrief the Heard as / Say labels are visible too. */
 import type { ReactNode } from "react";
 import s from "./InlineMark.module.css";
 

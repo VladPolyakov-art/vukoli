@@ -178,6 +178,7 @@ export function HomeHarness({ scene }: { scene: HomeScene }) {
         return !q ? null : p.loading ? { detail: "" } : { detail: q.detail, answer: q.answer };
       })()}
       onQuickStart={() => { setStarting(true); later(() => setStarting(false), PREP_MS); }}
+      onQuickCall={() => { setStarting(true); later(() => setStarting(false), PREP_MS); }}
       composer={composer}
       setup={view}
       jobs={setup ? [...setup.jobs, ...ctx.jobs.filter((j) => !setup.jobs.some((x) => x.id === j.id))] : ctx.jobs}

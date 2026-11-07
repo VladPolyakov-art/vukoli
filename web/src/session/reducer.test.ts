@@ -308,3 +308,26 @@ describe("a voice turn that was no speech", () => {
     expect(s.openVoiceTurns).toEqual([]);
   });
 });
+
+describe("quick start (D111)", () => {
+  const quick = { ...started, quick: true, questions: [] } as ServerMessage;
+
+  it("starts without a plan, then takes the mode, the questions and the name from mode_selected", () => {
+    const s0 = run([quick, { type: "ready" }]);
+    expect(s0).toMatchObject({ mode: "interview", questions: [], title: "" });
+    const english = run([{ type: "mode_selected", mode: "english", questions: [], title: "English practice" }], s0);
+    expect(english).toMatchObject({ mode: "english", questions: [], title: "English practice" });
+    const interview = run([{ type: "mode_selected", mode: "interview", questions: [{ id: "A1", competency: "A", text: "Why this role?" }], title: "General questions" }], s0);
+    expect(interview.questions).toHaveLength(1);
+  });
+
+  it("marks the answer to 'interview or English?' as a choice, not an answer, also over a voice turn", () => {
+    const s = run([quick,
+      { type: "local/user_turn", turnId: 1, text: "English" },
+      { type: "turn_complete", speaker: "user", full_text: "English", kind: "quick_choice", turn_id: 1 },
+      { type: "local/user_turn", turnId: 2, text: "I went out yesterday" },
+      { type: "turn_complete", speaker: "user", full_text: "I went out yesterday", turn_id: 2 }]);
+    const users = s.transcript.filter((x) => x.speaker === "user");
+    expect(users.map((x) => !!x.choice)).toEqual([true, false]);
+  });
+});

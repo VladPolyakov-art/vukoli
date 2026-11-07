@@ -296,17 +296,6 @@ test.describe("D108 Session dialogs", () => {
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL(/\/session$/);
   });
-
-  test("the Feedback sheet / drawer on a narrow screen: a click on the scrim closes it", async ({ page }) => {
-    test.skip(test.info().project.name !== "mobile", "a drawer exists below 1024 px only");
-    await startTextInterview(page);
-    await page.getByRole("button", { name: "Show feedback (F)" }).click();
-    const sheet = page.getByRole("dialog", { name: "Feedback" });
-    await expect(sheet).toBeVisible();
-    await clickBackdrop(page);                              // the bottom sheet starts well below the top-left corner
-    await expect(sheet).toBeHidden();
-    await expect(page).toHaveURL(/\/session$/);
-  });
 });
 
 test.describe("D108 Menu drawer", () => {

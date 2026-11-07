@@ -49,7 +49,7 @@ test.describe("G4 No horizontal scroll at 375 px", () => {
   test("a finished interview's debrief (the default view), with the long job title", async ({ page, request }) => {
     const { sessions } = await seedReturningUser(request);
     await page.goto(`/sessions/${sessions[0]!.id}`);
-    await expect(page.getByRole("region", { name: /^Verdict/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: /^Your level/ })).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 
@@ -59,7 +59,7 @@ test.describe("G4 No horizontal scroll at 375 px", () => {
     await expect(page.getByRole("log", { name: "Conversation with Mike" })).toBeVisible();
     await expectNoHorizontalScroll(page);
     await page.getByRole("radio", { name: "Debrief" }).click();
-    await expect(page.getByRole("region", { name: /^Verdict/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: /^Your level/ })).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 

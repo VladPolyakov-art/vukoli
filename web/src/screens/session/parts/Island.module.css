@@ -16,7 +16,6 @@
 .sizer { display: grid; visibility: hidden; pointer-events: none; }
 .sizer > * { grid-area: 1 / 1; }
 .slotGrow { display: grid; flex: 1 1 auto; min-width: 0; justify-items: stretch; }
-.dots { display: inline-flex; align-items: center; min-height: var(--control-h-md); padding-inline: var(--space-3); font-size: var(--text-sm); color: var(--color-text-secondary); }
 
 /* More menu header: the context that left the top bar (V2.3). */
 .menuHeader { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; max-width: calc(var(--layout-panel) * 0.75); }

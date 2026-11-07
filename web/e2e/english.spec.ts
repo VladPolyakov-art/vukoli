@@ -11,7 +11,7 @@ import {
   resetApp,
   sendAnswer,
   showDebrief,
-  showFeedbackLater,
+  expectNoFeedbackPanel,
   skipSetup,
 } from "./helpers";
 
@@ -52,9 +52,8 @@ test.describe("US-24 English practice", () => {
     await expect(plan).toContainText("B1: familiar topics, more corrections");
     await expect(plan).toContainText("After the call, each one with a reason. Nothing appears while you speak.");
     // AC5: no cap, paywall or upsell.
-    // 13 (F-13-13): "Free forever" is said once (the footer), and the plan has a Length row.
-    await expect(page.getByText("Free forever: no limits on English practice.")).toHaveCount(1);
-    await expect(plan).not.toContainText("Free forever");
+    // D108: no free/Premium wording anywhere on the English plan; the plan has a Length row.
+    await expect(page.getByText(/free forever|premium|what's free/i)).toHaveCount(0);
     await expect(plan).toContainText("As long as you like · end any time");
     await plan.getByRole("button", { name: "Type instead" }).click();
 
@@ -69,12 +68,10 @@ test.describe("US-24 English practice", () => {
     await expect(transcript).toContainText("Mike: That sounds interesting.");
     await expect(page.getByText("Turn 2")).toBeVisible();
 
-    // AC3 / D96: corrections come after the call, not after the turn: the panel only says so.
-    const panel = await showFeedbackLater(page);
-    await expect(panel).toContainText("Feedback comes after the call");
-    await expect(panel).not.toContainText("since five years");
-    await expect(panel.getByRole("region", { name: "Content" })).toHaveCount(0);
-    await expect(panel.getByRole("region", { name: "Delivery" })).toHaveCount(0);
+    // AC3 / D96 / D107: corrections come after the call, not after the turn, and there is no panel to show them.
+    await expectNoFeedbackPanel(page);
+    await expect(page.getByRole("region", { name: "Content" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Delivery" })).toHaveCount(0);
 
     // End: the debrief lists the corrections in order, and the session is in the history under English.
     await (await endSession(page, "End practice")).click();
@@ -127,7 +124,9 @@ test.describe("US-24 English practice", () => {
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
     await (await endSession(page, "End practice")).click();
     await showDebrief(page);
-    await expect(page.getByRole("region", { name: "Corrections" })).toContainText("No corrections this time.");
+    // D109: with nothing to list there is no Corrections frame; the line sits in the Summary frame.
+    await expect(page.getByRole("region", { name: "Summary" })).toContainText("No corrections this time.");
+    await expect(page.getByRole("region", { name: "Corrections" })).toHaveCount(0);
   });
 
   test("negative: an English debrief with no phrases to review never says 'uses these 0 phrases'", async ({ page }) => {
@@ -136,8 +135,7 @@ test.describe("US-24 English practice", () => {
     await expect(conversation(page)).toContainText("Mike: That sounds interesting.");
     await (await endSession(page, "End practice")).click();
     await showDebrief(page);
-    await expect(page.getByRole("region", { name: "Corrections" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Corrections" })).toContainText("No corrections this time.");
+    await expect(page.getByRole("region", { name: "Summary" })).toContainText("No corrections this time.");
     // One "Practise again", near the top (next to the view switch), a plain label with no phrases to review; none further down.
     await expect(page.getByRole("button", { name: "Practise again" })).toHaveCount(1);
     await expect(page.getByRole("region", { name: "What next" })).toHaveCount(0);

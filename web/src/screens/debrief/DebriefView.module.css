@@ -4,8 +4,8 @@
  * sideways (a clip, unlike hidden, makes no scroll container, so the sticky jump bar still sticks to <main>). */
 .page { min-width: 0; }
 .page.fluid { max-width: none; overflow-x: clip; }
-.debrief { display: flex; flex-direction: column; gap: var(--space-10); max-width: var(--layout-content); min-width: 0; }
-.debrief.wide { max-width: none; gap: var(--space-6); }
+.debrief { display: flex; flex-direction: column; gap: var(--space-4); max-width: var(--layout-content); min-width: 0; }
+.debrief.wide { max-width: none; }
 /* The conversation view: the chat spans the page; the jump between questions stays at the top of <main> while it scrolls. */
 .chat { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .jump {
@@ -21,6 +21,3 @@
 .jumpLabel { color: var(--color-text-secondary); font-size: var(--text-sm); font-weight: var(--weight-medium); }
 .skipped { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
 
-@container page (width < 560px) {
-  .debrief { gap: var(--space-8); }
-}

@@ -4,13 +4,13 @@
  * Sections (D78): general (your CV: files to drop, replace or remove — several, D79 — and your own text under a
  * disclosure; the theme), AI engine (the
  * engine in use on top, the others under it, each set up in place), voice and speech, practice, privacy and data,
- * about and what's free (D58: the free-vs-premium table of US-30, practice-only statement, licence; `#free` anchor).
+ * about (D108: practice-only statement, setup, feedback, licence; the free-vs-premium table was removed).
  * Deep links stay: /settings/<section>[#<row>] opens the popup at that row; old sections redirect (profile → general).
  * A change saves at once and says nothing (D79): the control shows the new value; only an error shows. */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useNavigationType, type Location } from "react-router-dom";
 import {
-  Badge, Button, Callout, CopyField, Dialog, Icon, IconButton, Input, Segmented, Select, SettingGroup,
+  Button, Callout, CopyField, Dialog, Icon, IconButton, Input, Segmented, Select, SettingGroup,
   SettingRow, Skeleton, Toggle, scrollBehavior, type IconName,
 } from "../ds";
 import { t, tp, type MessageKey } from "../i18n";
@@ -73,7 +73,6 @@ const SEARCH: SearchItem[] = [
   { id: "privacy-folder", section: "privacy", label: "settings.privacy.folder", description: "settings.privacy.folderHint", keywords: "storage files path disk" },
   { id: "privacy-obsidian", section: "privacy", label: "settings.privacy.obsidian", description: "settings.privacy.obsidianHint", keywords: "obsidian markdown export notes" },
   { id: "privacy-trash", section: "privacy", label: "settings.privacy.trash", description: "settings.privacy.trashHint", keywords: "deleted restore" },
-  { id: "free", section: "about", label: "settings.about.freeTitle", description: "settings.about.freeIntro", keywords: "premium price cost" },
   { id: "about-setup", section: "about", label: "settings.about.setupRun", description: "settings.about.setupHint", keywords: "onboarding wizard start first run welcome" },
   { id: "about-feedback", section: "about", label: "support.settings.aboutLabel", description: "support.settings.aboutHint", keywords: "feedback idea problem bug report contact support" },
   { id: "about-licence", section: "about", label: "settings.about.licenceTitle", description: "settings.about.licence", keywords: "agpl open source license" },
@@ -595,64 +594,11 @@ function PrivacySection() {
   );
 }
 
-/** US-30 rows in table order: free-forever features first, then what Premium adds. A text cell says what the free core
- * offers instead (D13); no cell means "not included". */
-const FREE_ROWS = ["practice", "english", "prep", "bank", "debrief", "memory", "drill"] as const;
-const PREMIUM_ROWS = [
-  { id: "setup", free: "setup" },
-  { id: "voice", free: "voice" },
-  { id: "trends", free: null },
-  { id: "devices", free: "devices" },
-] as const;
-
-function Included() {
-  return <span className={s.yes}><Icon name="check" size="sm" /><span className="visually-hidden">{t("settings.about.included")}</span></span>;
-}
-
-function NotIncluded() {
-  return <span className={s.no}><span aria-hidden="true">—</span><span className="visually-hidden">{t("settings.about.notIncluded")}</span></span>;
-}
-
-/** About and what's free (D58): reached from the account menu ("Help & what's free") and Home's "What's free" link. */
+/** About (D108: the free-vs-premium table is gone until paid features exist): reached from the account menu ("Help"). */
 function AboutSection() {
   const navigate = useNavigate();
   return (
     <>
-      <div id="free" className={s.anchor}>
-        <SettingGroup title={t("settings.about.freeTitle")} id="about-free-title" description={t("settings.about.freeIntro")} flush>
-          <div className={s.tableWrap}>
-            <table className={s.table} data-review-id="Settings/freeTable">
-              <caption className="visually-hidden">{t("settings.about.tableCaption")}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">{t("settings.about.feature")}</th>
-                  <th scope="col">{t("settings.about.free")}</th>
-                  <th scope="col">
-                    <span className={s.premiumHead}>{t("settings.about.premium")}<Badge tone="outline">{t("settings.about.later")}</Badge></span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {FREE_ROWS.map((id) => (
-                  <tr key={id}>
-                    <th scope="row">{t(`settings.about.row.${id}`)}</th>
-                    <td><Included /></td>
-                    <td><Included /></td>
-                  </tr>
-                ))}
-                {PREMIUM_ROWS.map((row) => (
-                  <tr key={row.id}>
-                    <th scope="row">{t(`settings.about.row.${row.id}`)}</th>
-                    <td>{row.free ? <span className={s.cellText}>{t(`settings.about.cell.${row.free}`)}</span> : <NotIncluded />}</td>
-                    <td><Included /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SettingGroup>
-        <p className={s.note}>{t("settings.about.premiumNote")}</p>
-      </div>
       <SettingGroup title={t("settings.about.practiceTitle")} id="about-practice-title">
         <p className={s.lead}>{t("app.practiceOnly")}</p>
       </SettingGroup>

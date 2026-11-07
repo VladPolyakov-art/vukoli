@@ -47,6 +47,8 @@ export interface TranscriptItem {
   /** Model line still streaming. */
   live?: boolean;
   lowConf?: LowConfWord[];
+  /** The answer to a quick start's "interview or English?": shown, but not an answer (nothing is saved for it). */
+  choice?: boolean;
 }
 
 export interface StrongerState {
@@ -70,6 +72,8 @@ export interface SessionState {
   input: InputMode;
   sessionId: string;
   mode: "interview" | "english";
+  /** Quick start: the session's name once the user has chosen (the server's; empty before and in other sessions). */
+  title: string;
   engine: string;
   model: string;
   speaks: boolean;
@@ -131,7 +135,7 @@ function settle(open: number[], turn: number | undefined): number[] {
 
 export function initialState(input: InputMode, mode: "interview" | "english" = "interview"): SessionState {
   return {
-    phase: "connecting", input, sessionId: "", mode, engine: "", model: "", speaks: false, questions: [], stt: null,
+    phase: "connecting", input, sessionId: "", mode, title: "", engine: "", model: "", speaks: false, questions: [], stt: null,
     suggesterAvailable: false, suggestOn: false, warnings: [], ready: false, mikeTurnOpen: false, awaitingReply: false,
     recording: false, recordingTurnId: null, openVoiceTurns: [], awaitingBeforeVoice: false, preview: "", transcript: [], threadOrder: [], currentThreadId: "",
     followUps: [], currentQuestionText: "", closing: false, threadOfTurn: {}, feedback: {}, feedbackOrder: [],
@@ -177,15 +181,15 @@ function ended(state: SessionState): SessionState {
 }
 
 function upsertUser(transcript: TranscriptItem[], turnId: number | undefined | null, text: string, threadId: string,
-  lowConf?: LowConfWord[]): TranscriptItem[] {
+  lowConf?: LowConfWord[], choice?: boolean): TranscriptItem[] {
   const idx = turnId == null ? -1 : transcript.findIndex((t) => t.speaker === "user" && t.turnId === turnId);
   if (idx >= 0) {
     const copy = transcript.slice();
     const prev = copy[idx]!;
-    copy[idx] = { ...prev, text, lowConf: lowConf ?? prev.lowConf };
+    copy[idx] = { ...prev, text, lowConf: lowConf ?? prev.lowConf, ...(choice ? { choice } : null) };
     return copy;
   }
-  return [...transcript, { key: nextKey("u"), speaker: "user", text, turnId: turnId ?? undefined, threadId, lowConf }];
+  return [...transcript, { key: nextKey("u"), speaker: "user", text, turnId: turnId ?? undefined, threadId, lowConf, ...(choice ? { choice } : null) }];
 }
 
 function applyFlag(record: FeedbackRecord, flag: LanguageItem, language?: FeedbackRecord["layers"]["language"]): FeedbackRecord {
@@ -242,6 +246,8 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
       };
     case "ready":
       return { ...state, ready: true };
+    case "mode_selected":
+      return { ...state, mode: action.mode, questions: action.questions, title: action.title };
 
     /* ---------- Mike's turns ---------- */
     case "turn_start":
@@ -270,7 +276,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
         const turnId = action.turn_id ?? undefined;
         return {
           ...state,
-          transcript: upsertUser(state.transcript, turnId, action.full_text, threadId),
+          transcript: upsertUser(state.transcript, turnId, action.full_text, threadId, undefined, action.kind === "quick_choice"),
           threadOfTurn: turnId == null ? state.threadOfTurn : { ...state.threadOfTurn, [turnId]: threadId },
           preview: "",
         };

@@ -21,7 +21,7 @@ export function stageFor(p: SessionViewProps): Stage {
   const { phase, input, muted, variant, data } = p;
   const voice = input === "voice";
   // English has no "Next question": after the feedback the conversation goes on, so it is the user's turn again.
-  const effective = variant === "english" && (phase === "feedback" || phase === "between" || phase === "preparing") ? "your-turn" : phase;
+  const effective = variant === "english" && (phase === "feedback" || phase === "between") ? "your-turn" : phase;
   const sec = data.pauseSec;
   switch (effective) {
     case "connecting":
@@ -39,16 +39,11 @@ export function stageFor(p: SessionViewProps): Stage {
       return muted
         ? { presence: "idle", pill: "muted", label: t("session.status.muted"), sub: t("session.sub.muted"), live: false }
         : { presence: "waiting", pill: "your-turn", label: t("session.status.yourTurn"), sub: t("session.sub.yourTurn"), live: true, hint: true };
-    case "preparing":
-    case "rechecking":
-      return { presence: "idle", pill: "between", label: t("session.status.preparingFeedback"), live: false };
-    case "unavailable":
-      return { presence: "idle", pill: "between", label: t("session.status.saved"), sub: betweenLine(p), live: false };
     case "interrupted":
       return { presence: "idle", pill: "paused", label: t("session.status.paused"), sub: t("session.sub.paused"), live: false };
     case "saving":
       return { presence: "idle", pill: "between", label: t("session.saving"), live: false };
-    default: // between · feedback · editing
+    default: // between · feedback
       return { presence: "idle", pill: "between", label: t("session.status.between"), sub: betweenLine(p), live: false };
   }
 }

@@ -12,7 +12,7 @@ export function ExampleCard({ order = "content-first" }: { order?: "content-firs
       layer: "language" as const,
       body: (
         <>
-          “{t("home.example.langFrom")} <InlineMark kind="fix">{t("home.example.langWrong")}</InlineMark>” → “{t("home.example.langTo")}{" "}
+          “{t("home.example.langFrom")} <InlineMark kind="heard">{t("home.example.langWrong")}</InlineMark>” → “{t("home.example.langTo")}{" "}
           <InlineMark kind="fix">{t("home.example.langRight")}</InlineMark>”
           <span className={s.exampleLevel}> · {t("home.example.langLevel")}</span>
         </>

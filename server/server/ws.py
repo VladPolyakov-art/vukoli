@@ -23,6 +23,7 @@ MAX_AUDIO_PACKET = 65536
 MAX_MESSAGE = 12000
 MAX_TEXT_TURN = 4000
 MODES = ("interview", "english")
+START_MODES = (*MODES, "quick")      # D111: "quick" starts a call where Mike asks which of the two to practise
 ROUND_TYPES = tuple(content.ROUND_TYPES)
 
 
@@ -55,8 +56,11 @@ def asks_for_answer(kind: str | None, text: str) -> bool:
 
 def parse_start(data: dict, settings: dict) -> dict:
     mode = data.get("mode", "interview")
-    if mode not in MODES:
+    if mode not in START_MODES:
         raise ValueError("mode")
+    quick = mode == "quick"
+    if quick:
+        mode = "interview"          # until the user answers; the session is saved under the mode they chose
     round_type = data.get("round_type", "mix")
     if round_type not in ROUND_TYPES:
         raise ValueError("round_type")
@@ -86,7 +90,7 @@ def parse_start(data: dict, settings: dict) -> dict:
             "strictness": strictness, "input": input_mode, "vacancy_id": vacancy_id, "topic": topic,
             "drill": drill, "focus": focus, "level": config.normalize_level(data.get("level") or settings["level"]),
             "voice": voice, "speak": data.get("speak", True) is not False,
-            "suggest": bool(data.get("suggest", False)), "resume": resume_id}
+            "suggest": bool(data.get("suggest", False)), "resume": resume_id, "quick": quick and not resume_id}
 
 
 # US-13 AC5: a session cut off by the connection can be picked up again from its saved record.
@@ -176,6 +180,7 @@ async def session_socket(websocket: WebSocket) -> None:
     driver = None
     opts: dict = {}
     session: dict = {}
+    vacancy_title_of = [""]            # the job's title for the quick start's session name
     llm: LLMEngine | None = None
     gate = ModelGate(enabled=False)    # enabled for single-model engines once the engine is known
     settings = config.load_settings()
@@ -228,6 +233,9 @@ async def session_socket(websocket: WebSocket) -> None:
                 queue_suggestion(text)
             return
         state["pending_voice"] = False
+        if meta.get("kind") == "quick_choice":         # "interview or English?": not an answer, no feedback
+            release_audio(meta.get("transcript"))
+            return
         history = driver.transcript_history
         if not meta.get("question"):
             meta["question"] = next((t["text"] for t in reversed(history[:-1]) if t["role"] == "model"), "")
@@ -244,6 +252,16 @@ async def session_socket(websocket: WebSocket) -> None:
         # D96: no feedback work runs during the call. The record and the recording wait for End (post_call below).
         backlog.append((record, transcript))
         records.append(record)
+
+    def mode_selected(mode: str, plan: list) -> None:
+        """Quick start (D111): the user chose; the session is, from here on, an interview or an English practice."""
+        opts["mode"] = mode
+        questions = [q.public() for q in plan]
+        update = {"mode": mode, "questions": questions, "title": storage.session_title(mode, vacancy_title_of[0])}
+        if mode == "english":
+            update.update(vacancy_id="", vacancy_title="", round_type="mix")
+        session.update(update)
+        emit("mode_selected", mode=mode, questions=questions, title=update["title"])
 
     def release_audio(transcript: stt.Transcript | None) -> None:
         """Release a recording that no feedback will use (a too-short answer, a redone one)."""
@@ -527,6 +545,10 @@ async def session_socket(websocket: WebSocket) -> None:
         gate.enabled = engine_id != "gemini_live" and llm.single_worker
         profile = storage.read_profile().get("text", "")
         jd, vacancy_title, extra = "", "", []
+        if opts["quick"] and not opts["vacancy_id"]:        # D111: no choice screen, so the newest saved job with questions
+            newest = sorted((v for v in storage.list_records("vacancies") if v.get("questions")),
+                            key=lambda v: v.get("created_at", ""), reverse=True)
+            opts["vacancy_id"] = newest[0]["id"] if newest else ""
         if opts["vacancy_id"]:
             try:
                 vacancy = storage.read_record("vacancies", opts["vacancy_id"])
@@ -537,12 +559,13 @@ async def session_socket(websocket: WebSocket) -> None:
                 opts["vacancy_id"] = ""
         from .documents import known_terms
         opts.update(profile=profile, jd=jd, context_terms=known_terms(profile, jd))
+        vacancy_title_of[0] = vacancy_title
         resume_info = None
         if resume_saved:
             plan, resume_info = resume_state(resume_saved)
         else:
             plan = planner.plan_questions(opts["round_type"], opts["questions"], extra=extra, focus=opts["focus"]) \
-                if opts["mode"] == "interview" else []
+                if opts["mode"] == "interview" else []      # quick: the interview plan is ready; English drops it
         state["suggest"] = opts["suggest"] and settings["answer_suggester"]
         callbacks = dict(
             on_audio_chunk=audio,
@@ -566,6 +589,8 @@ async def session_socket(websocket: WebSocket) -> None:
                 preset = content.level_presets().get(opts["level"], "")
                 system = content.system("p5a_tutor", level=opts["level"], level_preset=preset)
             system += content.name_line(settings.get("name", ""))
+            if opts["quick"]:       # no mode switch on Gemini Live: Mike asks, then runs the interview or just talks; saved as an interview
+                system += "\n\n" + content.copy("quick_live_instruction")
             driver = GeminiLiveDriver(api_key=block.get("api_key", ""), model_name=block.get("model", ""),
                                       voice_name=block.get("voice", "Puck"), system_instruction=system,
                                       manual_turns=True, **callbacks)
@@ -576,6 +601,7 @@ async def session_socket(websocket: WebSocket) -> None:
                 llm, mode=opts["mode"], plan=plan, strictness=opts["strictness"], level=opts["level"],
                 voice=opts["voice"], speed=settings["kokoro_speed"], speak=opts["speak"], stt=recogniser,
                 settings=settings, topic=opts["topic"], focus_gaps=planner.focus_gaps(opts["focus"]),
+                quick=opts["quick"], on_mode=mode_selected,
                 on_notice=lambda code, text: emit("notice", code=code, message=text),
                 on_preview=lambda text: emit("speech_preview", turn_id=state["voice_turn"], text=text),
                 on_error=lambda code, message, hint, retryable: error(code, message, hint, retryable),
@@ -598,7 +624,8 @@ async def session_socket(websocket: WebSocket) -> None:
         SAVED[session["id"]] = saved_event
         OWNER[session["id"]] = state["owner"]
         emit("session_started", session_id=session["id"], mode=opts["mode"], engine=engine_id,
-             model=session["model"], questions=session["questions"], speaks=bool(driver.produces_audio),
+             model=session["model"], questions=[] if opts["quick"] else session["questions"],
+             **({"quick": True} if opts["quick"] else {}), speaks=bool(driver.produces_audio),
              **({"focus": opts["focus"]} if opts["focus"] else {}),
              audio={"sample_rate_out": tts.SAMPLE_RATE, "sample_rate_in": stt.SAMPLE_RATE},
              stt=stt_info, suggester_available=settings["answer_suggester"], suggest=state["suggest"],

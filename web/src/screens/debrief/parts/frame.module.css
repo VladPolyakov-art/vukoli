@@ -1,0 +1,11 @@
+/* Frame: the inner padding adds to the card's `sm` padding (space-3 + space-2 = 20px wide, 16px on a phone). */
+.inner { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-2); min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-width: 0; }
+.titles { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.title { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: var(--leading-tight); }
+.hint { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.aside { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2) var(--space-4); min-width: 0; }
+
+@container page (width < 560px) {
+  .inner { padding: var(--space-1); gap: var(--space-3); }
+}

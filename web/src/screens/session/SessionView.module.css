@@ -12,8 +12,6 @@
    * room for the dialogue, but not too much). The glow's bright band stays clear of text. */
   --text-top: calc(var(--stage-reach) * 0.4);
   --text-fade: var(--space-16);
-  /* Wide, panel open: the stage content shifts left by half of what the floating panel takes (V2.4, "Stage shift"). */
-  --stage-shift: calc((var(--layout-panel) + var(--space-4)) / -2);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -99,16 +97,6 @@
 .islandBox[data-input="text"] { max-width: var(--layout-narrow); }
 .islandBox > * { pointer-events: auto; }
 
-/* Stage shift (docs/motion.md "Stage shift"): transform only, `slower`, instant under reduced motion (tokens = 0). */
-.shift { transition: transform var(--duration-slower) var(--ease-standard); }
-.root[data-panel="open"] .shift { transform: translateX(var(--stage-shift)); }
-/* Shifted content must still fit left of the panel on a 1024-1280 window. D63: with a wider margin on both sides
- * (space-12, was space-8), so the text doesn't run up to the left edge. */
-.root[data-panel="open"] .flow,
-.root[data-panel="open"] .dock {
-  max-width: min(var(--layout-narrow), calc(100cqw - var(--layout-panel) - var(--space-4) * 3 - var(--space-12) * 2));
-}
-
 @container session (width < 768px) {
   .root { --island-offset: var(--space-4); }
   .body { --stage-reach: var(--presence-reach-sm); }
@@ -120,24 +108,5 @@
   .islandWrap { padding-inline: var(--layout-gutter); bottom: calc(var(--island-offset) + env(safe-area-inset-bottom)); }
 }
 
-/* ---------- floating feedback panel (wide, V2.4): no scrim, the session stays usable ---------- */
-.float {
-  container: panel / inline-size;
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  bottom: var(--space-4);
-  z-index: var(--z-overlay);
-  display: flex;
-  width: var(--layout-panel);
-  min-height: 0;
-}
-.float > * { flex: 1 1 auto; min-width: 0; }
-.panel { box-shadow: var(--shadow-overlay); }
-/* Drawer slide (docs/motion.md "Drawer G5"): translateX + opacity. */
-@keyframes panel-in { from { opacity: 0; transform: translateX(var(--space-6)); } }
-@keyframes panel-out { to { opacity: 0; transform: translateX(var(--space-6)); } }
-.floatIn { animation: panel-in var(--duration-slower) var(--ease-enter) backwards; }
-.floatOut { animation: panel-out var(--duration-exit) var(--ease-exit) forwards; pointer-events: none; }
 /* D72: the muted-speech tooltip over the mic says the same thing; the status keeps its place but steps back. */
 .statusQuiet { visibility: hidden; }

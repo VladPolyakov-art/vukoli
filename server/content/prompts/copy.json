@@ -1,6 +1,11 @@
 {
   "interview_opening": "{hi} I'm Mike. Thanks for joining. This is a practice interview with {count} main questions. Take your time with each answer. Let's start. {question}",
   "interview_closing": "Okay. That was my last question. Thank you for your time. You can end the session now to see your debrief.",
+  "quick_opening": "{hi} I'm Mike. Do you want to practise an interview or English today?",
+  "quick_again": "Sorry, I didn't catch that. Interview or English?",
+  "quick_interview": "Great, let's do an interview. This is a practice round with {count} main questions. Take your time with each answer. Let's start. {question}",
+  "quick_english": "Great, English practice. What would you like to talk about today?",
+  "quick_live_instruction": "This is a quick start. Open the call yourself with one short question: does the candidate want to practise an interview or English today? Then run the one they choose: for an interview, follow the plan above; for English, have a relaxed conversation on a topic they pick, as their English tutor. If they say neither, ask once more, then run the interview.",
   "english_opening": "{hi} I'm Mike, your English practice partner. What would you like to talk about today?",
   "english_opening_topic": "{hi} I'm Mike, your English practice partner. Today's topic is {topic}. What comes to mind first?",
   "short_answer": "Take your time. Would you like me to repeat the question?",

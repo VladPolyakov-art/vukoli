@@ -10,15 +10,12 @@ import type { ComposerSend } from "../../../ds";
 import { Button, Chip, ChipGroup, Composer, ComposerAttachment, Icon, IconButton, Menu, Skeleton } from "../../../ds";
 import { t } from "../../../i18n";
 import type { HomeViewProps, Track } from "../types";
-import { TextLink } from "./TextLink";
 import s from "./parts.module.css";
 
 export function Footer({ track }: { track: Track }) {
-  return (
-    <p className={s.footer} data-review-id="Home/Footer">
-      {track === "english" ? t("english.free") : t("home.disclaimer")} <TextLink to="/settings/about#free" track="home-free-link">{t("home.free")}</TextLink>
-    </p>
-  );
+  // D108: no free/Premium wording; the English track has no footer, the interview track keeps the practice-only line.
+  if (track === "english") return null;
+  return <p className={s.footer} data-review-id="Home/Footer">{t("home.disclaimer")}</p>;
 }
 
 function ModeMenu({ track, open, onChange }: { track: Track; open?: boolean; onChange?: (track: Track) => void }) {
@@ -78,6 +75,12 @@ export function StartScreen(props: StartScreenProps) {
     ? (e: KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }
     : undefined;
   const addFile = english ? null : <IconButton icon="plus" size="sm" outlined label={t("chat.start.addFile")} data-track="composer-add-file" onClick={props.onAddFile} />;
+  const quickCall = (
+    <Button variant="secondary" size="sm" icon="play" data-track="quick-call" title={t("chat.quick.callHint")}
+      disabled={props.loading || !props.engineReady || props.starting} onClick={props.onQuickCall}>
+      {t("chat.quick.call")}
+    </Button>
+  );
   const modeMenu = <ModeMenu track={track} open={props.initialOverlay === "mode"} onChange={props.onModeChange} />;
 
   return (
@@ -103,7 +106,7 @@ export function StartScreen(props: StartScreenProps) {
             />
           ) : undefined}
           onKeyDown={holdEnter}
-          toolbarStart={<>{addFile}{modeMenu}</>}
+          toolbarStart={<>{addFile}{modeMenu}{props.onQuickCall ? quickCall : null}</>}
           send={send}
         />
       </div>

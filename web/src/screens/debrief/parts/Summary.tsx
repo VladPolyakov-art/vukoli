@@ -8,6 +8,7 @@ import type { ScoreRowModel, VerdictModel } from "../types";
 import { verdictStep } from "../verdictStep";
 import { averageScore } from "./debriefShared";
 import { LevelProgress, levelProgress } from "./LevelProgress";
+import { Frame } from "./Frame";
 import { SkillsHoverCard } from "./SkillsHoverCard";
 import { verdictLine } from "./verdictLine";
 import s from "./summary.module.css";
@@ -37,16 +38,26 @@ export function Summary({ verdict: given, rows, id, uid, note, onJump }: Summary
   const avg = averageScore(rows);
   const progress = verdict.step !== undefined ? levelProgress(verdict.step, rows) : null;
   return (
-    <section className={s.summary} aria-labelledby={id} data-skills-row="" data-review-id="Debrief/Summary" data-review-section="Debrief · Summary" data-comment-target="">
-      <div className={s.verdict}>
-        <h2 id={id} className="visually-hidden">{t("debrief.verdict")}</h2>
-        <p className={s.headline}>{verdict.headline}</p>
-        {verdict.line ? <p className={s.line}>{verdict.line}</p> : null}
-        {note}
-        {progress ? <LevelProgress data={progress} /> : null}
-        {next ? <p className={s.next}>{next}</p> : null}
+    <Frame
+      id={id}
+      title={t("debrief.level.label")}
+      data-skills-row=""
+      data-review-id="Debrief/Summary"
+      data-review-section="Debrief · Your level"
+      data-comment-target=""
+    >
+      <div className={s.body}>
+        <div className={s.verdict}>
+          <p className={s.headline}>{verdict.headline}</p>
+          {verdict.line ? <p className={s.line}>{verdict.line}</p> : null}
+          {note}
+          {next ? <p className={s.next}>{next}</p> : null}
+        </div>
+        <div className={s.side}>
+          {avg && rows ? <SkillsHoverCard rows={rows} value={avg.value} n={avg.n} uid={uid} onJump={onJump} /> : null}
+          {progress ? <LevelProgress data={progress} /> : null}
+        </div>
       </div>
-      {avg && rows ? <SkillsHoverCard rows={rows} value={avg.value} n={avg.n} uid={uid} onJump={onJump} /> : null}
-    </section>
+    </Frame>
   );
 }

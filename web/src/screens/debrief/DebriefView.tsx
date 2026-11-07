@@ -219,7 +219,7 @@ export function DebriefView(props: DebriefViewProps) {
       {partial ? <PartialBanner answered={model.partial!.answered} total={model.partial!.total} /> : null}
 
       {view === "debrief" ? (
-        <div className={`${s.debrief} ${english ? "" : s.wide}`} data-review-id="Debrief/DebriefView">
+        <div className={`${s.debrief} ${s.wide}`} data-review-id="Debrief/DebriefView">
           {model.verdictNotice && model.verdictNotice !== "template" && !partial ? <VerdictNotice kind={model.verdictNotice} id={ids.verdict} rerunning={props.rerunning} onRerun={props.onRerun} /> : null}
           {english ? null : summaryBlock}
           {planBlock}

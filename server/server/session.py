@@ -40,6 +40,21 @@ YES = re.compile(r"^\W*(?:yes|yeah|yep|yup|sure|please|ok(?:ay)?|go ahead|of cou
 SMALL_TALK = re.compile(r"\bhow (?:are|r) (?:you|u)\b|\bhow'?s it going\b|\bnice to meet you\b|^\W*(?:hi|hello|hey)\W*$",
                         re.I)
 NO = re.compile(r"^\W*(?:no|nope|not needed|i'?m (?:ready|fine|good|ok(?:ay)?)|i (?:got|understand) it)\b", re.I)
+# Quick start (D111): Mike asks "interview or English?" and the first words of the answer choose the practice.
+# Russian stems are written as \u escapes (the public export rejects Cyrillic text).
+# Whichever of the two words comes first wins ("English interview" is English, "interview in English" is an interview).
+CHOICE_ENGLISH = re.compile(r"english|\u0430\u043d\u0433\u043b|speaking|free talk", re.I)
+CHOICE_INTERVIEW = re.compile(r"interview|\u0438\u043d\u0442\u0435\u0440\u0432\u044c\u044e|\u0441\u043e\u0431\u0435\u0441|job\b|hiring|behaviou?ral|\bhr\b", re.I)
+
+
+def classify_choice(text: str) -> str | None:
+    """The answer to Mike's "interview or English?": "interview", "english", or None when it says neither."""
+    eng, itv = CHOICE_ENGLISH.search(text or ""), CHOICE_INTERVIEW.search(text or "")
+    if eng and itv:
+        return "english" if eng.start() < itv.start() else "interview"
+    return "english" if eng else "interview" if itv else None
+
+
 GAP_TAG = {"own_part": "YP", "result": "RN", "reflection": "WD", "tradeoff": "CT"}
 TAG_PREFIX = re.compile(r"^\s*(?:YP|RN|WD|CT)\s*[:\-–]\s*")
 # The model announcing a new main question in a follow-up turn (question drift).
@@ -73,7 +88,8 @@ class TextDriver:
                  on_user_transcript: Optional[Callable] = None, on_metrics: Optional[Callable] = None,
                  on_voice_dropped: Optional[Callable] = None, on_voice_noise: Optional[Callable] = None,
                  gate: ModelGate | None = None, resume: dict | None = None,
-                 focus_gaps: list[str] | None = None, **_ignored) -> None:
+                 focus_gaps: list[str] | None = None, quick: bool = False,
+                 on_mode: Optional[Callable] = None, **_ignored) -> None:
         self.llm = llm
         self.mode = mode
         self.plan = list(plan or [])
@@ -89,6 +105,10 @@ class TextDriver:
         self.produces_audio = self.speak
         self.stt = stt
         self.topic = topic
+        # Quick start: the session opens with "interview or English?"; the answer sets `mode` (and drops the plan for English).
+        self._quick = bool(quick) and not resume
+        self._quick_asked = False
+        self.on_mode = on_mode
         self.focus_gaps = list(focus_gaps or [])     # a drill: the gaps the interviewer checks first (planner.focus_gaps)
         self.on_turn_start = on_turn_start
         self.on_transcript_delta = on_transcript_delta
@@ -181,6 +201,14 @@ class TextDriver:
             return
         await self._cancel_reply(interrupted=True, turn_id=turn_id)
         self._hold()
+        if self._quick:                                         # the answer to "interview or English?": no feedback, no history
+            meta = {"turn_id": turn_id, "source": "voice" if transcript is not None else "text", "kind": "quick_choice",
+                    "transcript": transcript}
+            if self.on_turn_complete:
+                self.on_turn_complete("user", clean, meta)
+            self._metrics = {"turn_id": turn_id, "t0": time.perf_counter(), "stt_ms": stt_ms}
+            self._reply_task = self._spawn(self._quick_respond(clean))
+            return
         self._snapshots.append((self.q_index, list(self.follow_ups), self.finished))
         question = self.current_question()
         last_model = next((t for t in reversed(self.transcript_history) if t["role"] == "model"), None)
@@ -331,6 +359,11 @@ class TextDriver:
             + content.name_line(self.settings.get("name", ""))
 
     async def _opening(self) -> None:
+        if self._quick:
+            self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
+            await self._deliver(self._from_list(_sentences(content.copy("quick_opening", name=self.settings.get("name", "")))),
+                                lambda: {"kind": "turn"}, record=False)
+            return
         if self.mode == "interview":
             first = self.plan[0]
             text = content.copy("interview_opening", name=self.settings.get("name", ""), count=len(self.plan),
@@ -342,6 +375,31 @@ class TextDriver:
             meta = {"kind": "turn"}
         self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
         await self._deliver(self._from_list(_sentences(text)), lambda: meta)
+
+    async def _quick_respond(self, answer: str) -> None:
+        """Quick start: read the choice. Neither word: ask once more; after that it is an interview."""
+        token = self._hold_token
+        try:
+            choice = classify_choice(answer)
+            if choice is None and not self._quick_asked:
+                self._quick_asked = True
+                await self._deliver(self._from_list(_sentences(content.copy("quick_again"))), lambda: {"kind": "turn"},
+                                    record=False)
+                return
+            choice = choice or "interview"
+            self._quick, self.mode = False, choice
+            if choice == "english":
+                self.plan = []
+                text, meta = content.copy("quick_english"), {"kind": "turn"}
+            else:
+                first = self.plan[0]
+                text = content.copy("quick_interview", count=len(self.plan), question=first.text)
+                meta = {"kind": "question", "question_id": first.id, "thread_id": first.id}
+            if self.on_mode:
+                self.on_mode(choice, self.plan)
+            await self._deliver(self._from_list(_sentences(text)), lambda: meta)
+        finally:
+            self._release(token)
 
     async def _resume_opening(self) -> None:
         """US-13 AC5: the session was cut off and is continued from its saved transcript. An answer without a reply

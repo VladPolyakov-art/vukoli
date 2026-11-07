@@ -6,10 +6,10 @@
  * - Connecting (S9): a Dots pill fills groups 1-3, only End stays.
  * - Nothing in the island changes while the user speaks except the mic ring (GR6): the main action becomes Send now
  *   at the moment listening starts, and the toggles keep their state.
- * - D62 `tools`: "open" (default) = nothing behind More on wide: the sample-answer toggle, Feedback and a help button
+ * - D62 `tools`: "open" (default) = nothing behind More on wide: the sample-answer toggle and a help button
  *   (shortcuts + mic help) are icons, the context is the status tooltip; "menu" = the same icons, but shortcuts, mic
  *   help and the context stay in More. Phones (stacked) always keep More. */
-import { useRef, useState, type Ref } from "react";
+import { useRef, useState } from "react";
 import { Badge, Button, Composer, Dots, Island, IconButton, Menu, MicButton, Tooltip, type IconName, type IslandGroup, type MenuEntry } from "../../../ds";
 import { t } from "../../../i18n";
 import { clock } from "../clock";
@@ -19,29 +19,27 @@ import s from "./Island.module.css";
 /** The main action slot of the Voice group (V2.2). */
 type Main =
   | { kind: "button"; id: string; label: string; icon: IconName; variant: "primary" | "secondary"; iconRight?: boolean; disabled?: boolean; onClick?: () => void }
-  | { kind: "dots"; label: string }
   | null;
 
 export interface IslandModel {
-  /** Main action and Redo / Feedback availability, derived once by the view (the keyboard uses the same model). */
+  /** Main action and Redo availability, derived once by the view (the keyboard uses the same model). */
   main: Main;
   canRedo: boolean;
   redoReason?: string;
-  feedback: { enabled: boolean; reason?: string };
 }
 
-const AFTER = new Set<SessionPhase>(["between", "feedback", "unavailable", "editing"]);
+const AFTER = new Set<SessionPhase>(["between", "feedback"]);
 
 /** What the island offers in this phase (V2.2). Shared by the island and the keyboard shortcuts (V2.8). */
 export function islandModel(p: {
   variant: SessionVariant; input: SessionInput; phase: SessionPhase; muted: boolean; interrupted: boolean; data: SessionData;
-  handlers?: SessionHandlers; hasFeedback: boolean;
+  handlers?: SessionHandlers;
 }): IslandModel {
   const { variant, input, phase, muted, interrupted, data, handlers: h } = p;
   const english = variant === "english";
   const voice = input === "voice";
   // English has no Next question: after the feedback the conversation goes on (it is the user's turn again).
-  const yourTurn = phase === "your-turn" || (english && (AFTER.has(phase) || phase === "preparing"));
+  const yourTurn = phase === "your-turn" || (english && AFTER.has(phase));
 
   let main: Main = null;
   if (interrupted || phase === "saving" || phase === "connecting") main = null;
@@ -51,14 +49,13 @@ export function islandModel(p: {
   // Thinking (D55: no dots, the glow and the state text say it). D61: the button you pressed stays, as a disabled
   // "Sent", so the slot never goes empty after a send.
   else if (phase === "thinking") main = { kind: "button", id: "sent", label: t("session.controls.sent"), icon: "check", variant: "secondary", disabled: true };
-  else if (phase === "preparing" || phase === "rechecking") main = { kind: "dots", label: t("session.island.preparing") };
   else if (AFTER.has(phase)) {
     const last = data.nextNumber === null;
     const onClick = last ? h?.onSeeDebrief : h?.onNext;
     if (onClick) {
       main = {
         kind: "button", id: last ? "debrief" : "next", label: last ? t("session.panel.seeDebrief") : t("session.panel.nextQuestion"),
-        icon: "arrowRight", iconRight: true, variant: phase === "editing" ? "secondary" : "primary", onClick,
+        icon: "arrowRight", iconRight: true, variant: "primary", onClick,
       };
     }
   }
@@ -67,10 +64,7 @@ export function islandModel(p: {
   const canRedo = data.answered && redoPhase && Boolean(h?.onRedo);
   const redoReason = canRedo ? undefined : !data.answered ? t("session.island.redoNone") : t("session.island.redoLater");
 
-  // D62: the panel opens any time (before the first answer it says what is coming / that it is still in progress).
-  void p.hasFeedback;
-  const feedback = { enabled: true };
-  return { main, canRedo, redoReason, feedback };
+  return { main, canRedo, redoReason };
 }
 
 export interface SessionIslandProps {
@@ -91,11 +85,6 @@ export interface SessionIslandProps {
   layout: "inline" | "stacked";
   /** A phone-width stacked island (< 420): the text-mode tools go to the second row (13, QA-10). */
   compact?: boolean;
-  panelOpen: boolean;
-  /** QA-01: feedback is ready and the panel is closed: a dot on the toggle, and the name says so. */
-  feedbackUnread?: boolean;
-  onToggleFeedback: () => void;
-  feedbackRef?: Ref<HTMLButtonElement>;
   /** More menu */
   moreOpen?: boolean;
   showSuggester: boolean;
@@ -106,7 +95,7 @@ export interface SessionIslandProps {
   /** D63: the conversation on the stage is hidden (only Mike's current question). */
   onShortcuts: () => void;
   onMicHelp: () => void;
-  /** Text mode: the send stays disabled while the panel waits for Next question. */
+  /** Text mode: the send stays disabled while Next question is pending. */
   sendLocked: boolean;
   autoFocus?: boolean;
   /** Play the island entrance (D5 dock-in) / the pill → box morph. */
@@ -162,8 +151,6 @@ function MainSlot({ main, variant, stacked, sized = true }: { main: Main; varian
         >
           {main.label}
         </Button>
-      ) : main?.kind === "dots" ? (
-        <span key="dots" className={`${s.dots} motion-fade`} role="status"><Dots label={main.label} showLabel /></span>
       ) : <span aria-hidden="true" />}
     </span>
   );
@@ -308,20 +295,6 @@ export function SessionIsland(p: SessionIslandProps) {
   const help = (
     <IconButton icon="help" label={t("session.island.help")} data-track="session-help" onClick={p.onShortcuts} />
   );
-  const feedback = (
-    <IconButton
-      ref={p.feedbackRef}
-      icon="panel"
-      data-track="feedback-toggle"
-      label={p.panelOpen ? t("session.island.feedbackHide") : p.feedbackUnread ? t("session.island.feedbackShowNew") : t("session.island.feedbackShow")}
-      title={model.feedback.reason}
-      pressed={p.panelOpen}
-      dot={p.feedbackUnread && !p.panelOpen}
-      disabled={!model.feedback.enabled}
-      onClick={p.onToggleFeedback}
-    />
-  );
-
   const items: MenuEntry[] = [];
   if (stacked) items.push({ id: "redo", track: "session-redo", label: t("session.controls.redo"), icon: "redo", shortcut: "R", disabled: !model.canRedo, onSelect: h?.onRedo });
   items.push({ id: "shortcuts", track: "session-shortcuts", label: t("session.island.shortcuts"), icon: "keyboard", shortcut: "?", onSelect: p.onShortcuts });
@@ -351,23 +324,23 @@ export function SessionIsland(p: SessionIslandProps) {
     groups = stacked
       ? [
           statusGroup(1, true),
-          { id: "exit", row: 1, label: t("session.island.exit"), reviewId: "Session/Island/More", children: <>{feedback}{end}</> },
+          { id: "exit", row: 1, label: t("session.island.exit"), reviewId: "Session/Island/More", children: end },
           { id: "voice", row: 2, grow: true, label: t("session.island.voice"), reviewId: "Session/Island/Controls", children: <>{mic}{main}</> },
           { id: "tools", row: 2, label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{type}{suggest}{more}</> },
         ]
       : [
           statusGroup(1, false),
           { id: "voice", label: t("session.island.voice"), reviewId: "Session/Island/Controls", children: <>{mic}{main}</> },
-          { id: "tools", label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{redo}{type}{suggest}{feedback}</> },
+          { id: "tools", label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{redo}{type}{suggest}</> },
           { id: "exit", label: t("session.island.exit"), reviewId: "Session/Island/More", children: exit },
         ];
   } else {
-    // Text mode: no mic, the send lives in the composer. The main slot (Next question / Dots) shows only when there is
+    // Text mode: no mic, the send lives in the composer. The main slot (Next question) shows only when there is
     // one, so the row never carries an empty group between two dividers.
     const mainGroup: IslandGroup | null = model.main
       ? { id: "voice", row: 2, grow: true, label: t("session.island.voice"), reviewId: "Session/Island/Controls", children: main }
       : null;
-    const toolsGroup: IslandGroup = { id: "tools", row: p.compact ? 2 : 1, label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{type}{suggest}{feedback}{more}</> };
+    const toolsGroup: IslandGroup = { id: "tools", row: p.compact ? 2 : 1, label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{type}{suggest}{more}</> };
     const exitGroup: IslandGroup = { id: "exit", row: 1, label: t("session.island.exit"), reviewId: "Session/Island/More", children: end };
     groups = stacked && p.compact
       ? [
@@ -386,7 +359,7 @@ export function SessionIsland(p: SessionIslandProps) {
       : [
           statusGroup(1, !mainGroup),
           ...(mainGroup ? [mainGroup] : []),
-          { id: "tools", label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{redo}{type}{suggest}{feedback}</> },
+          { id: "tools", label: t("session.island.tools"), reviewId: "Session/Island/Tools", children: <>{redo}{type}{suggest}</> },
           { id: "exit", label: t("session.island.exit"), reviewId: "Session/Island/More", children: exit },
         ];
   }

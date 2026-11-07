@@ -2,7 +2,7 @@
  * SessionView (screens/session/SessionView.tsx); the review page and Storybook render the same view from fixtures.
  * Terminal states (failed, not saved, not started from Practice) stay here as centred messages. After End there is no
  * full-screen "Saving…": with an answer on record the user is sent Home at once and the session loads in Recents. */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button, Callout, EmptyState, motionMemory } from "../ds";
 import { t, tMaybe } from "../i18n";
@@ -15,11 +15,10 @@ import { useStorageWritable } from "../lib/storageProbe";
 import { useApp } from "../lib/store";
 import { sessionUtScreen, useUtScreen } from "../lib/utScreen";
 import type { EngineId } from "../lib/types";
-import { selectThreads, type SessionState } from "../session/reducer";
-import { editTargets, heardEdit, recheckEdits } from "../session/recheck";
+import type { SessionState } from "../session/reducer";
 import { useSession, type SessionConfig } from "../session/useSession";
 import { SessionView } from "./session/SessionView";
-import type { PanelMode, SessionData, SessionHandlers, SessionOverlay, SessionPhase, TranscriptTurn } from "./session/types";
+import type { SessionData, SessionHandlers, SessionOverlay, SessionPhase, TranscriptTurn } from "./session/types";
 import s from "./Session.module.css";
 
 interface LocationState { config?: SessionConfig; title?: string; /** A drill: the weak spots it works on. */ focus?: string }
@@ -57,7 +56,7 @@ function downloadTranscript(title: string, items: SessionState["transcript"]) {
 }
 
 /** The reducer's flags -> the view's phase (ds/screens/session.md §4). The live app never shows "between": Mike goes on
- * by himself after an answer, so the feedback panel simply updates beside the stage. */
+ * by himself after an answer, so the view just goes on. */
 function phaseOf(state: SessionState, playing: boolean): SessionPhase {
   if (state.phase === "connecting" || (!state.ready && !state.transcript.length)) return "connecting";
   if (state.closing) return "between";
@@ -84,21 +83,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   }, [live, startedAt]);
   const elapsed = useElapsed(startedAt, live || state.phase === "connecting");
 
-  const threads = useMemo(() => selectThreads(state), [state]);
-  const userTurns = state.transcript.filter((x) => x.speaker === "user").length;
-
-  /* "Edit what I said" (US-18 AC3): the editor lives in the feedback panel; saving sends only the changed answers to
-   * be checked again over the socket. The draft stays until the check succeeds, so a failure opens the editor again
-   * with the user's words and the reason (nothing is lost, the old feedback is untouched). */
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<{ answer: string; followUp?: string } | null>(null);
-  const recheckBusy = Object.keys(state.rechecking).length > 0;
-  const threadKey = threads.at(-1)?.key;
-  useEffect(() => { setEditing(false); setDraft(null); }, [threadKey]);
-  useEffect(() => {
-    if (state.recheckError && draft && !recheckBusy) setEditing(true);
-    else if (!state.recheckError && !recheckBusy && draft && !editing) setDraft(null);
-  }, [state.recheckError, recheckBusy, draft, editing]);
+  const userTurns = state.transcript.filter((x) => x.speaker === "user" && !x.choice).length;   // the quick start's "interview or English?" answer is no answer
 
   /* D73: with an answer on record the server saves the session and writes the debrief by itself (the socket is not
    * needed), so after End (the user's, or the server's own: the round is over, the connection backs up) the user goes
@@ -111,7 +96,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     const id = state.sessionId;
     if (handedOff.current || !id || userTurns === 0 || !storageOk) return false;
     handedOff.current = true;
-    pendingSave.start(id, { title, track: english ? "english" : "interview" });
+    pendingSave.start(id, { title: state.title || title, track: english ? "english" : "interview" });
     navigate("/", { replace: true });
     // The session reached its debrief: count it, and ask when it is the 1st or the 6th, 11th… (lib/feedback.isAskTurn).
     const asked = endedByUser.current;
@@ -238,7 +223,6 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   }
   /* ---------- live: reducer -> view props ---------- */
   const start = config.start;
-  const current = threads.at(-1) ?? null;
   const progress = english
     ? t("session.turn", { n: userTurns + 1 })
     : total && questionIndex >= 0 ? t("session.progress", { n: questionIndex + 1, total }) : "";
@@ -295,12 +279,9 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     followUp: state.followUps.at(-1),
     transcript,
     answered: userTurns > 0,
-    thread: current,
-    earlier: threads.slice(0, -1).reverse(),
     nextNumber: null,
     suggestion,
     suggestOn: state.suggestOn,
-    stronger: state.stronger,
     pauseSec: config.pauseSec,
     notices,
     closing: state.closing,
@@ -308,28 +289,6 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
       ? { engine: state.engine as EngineId, input: state.input === "text" ? "text" : "voice", canResume, resuming: paused.resuming, failed: paused.failed }
       : undefined,
   };
-  if (editing && current) {
-    const { main, follow } = editTargets(current.records);
-    data.edit = {
-      answer: draft?.answer ?? main?.answer ?? "",
-      followUp: draft ? draft.followUp : follow?.answer,
-      error: state.recheckError ? tMaybe(`session.edit.err.${state.recheckError.code}`, t("session.edit.failed")) : undefined,
-    };
-  }
-  // A failed "No, I said..." has no editor to come back to: say so as a notice.
-  if (state.recheckError && !draft && !editing && !state.recording) {
-    notices.push({ id: "recheck", tone: "error", text: tMaybe(`session.edit.err.${state.recheckError.code}`, t("session.edit.failed")), onDismiss: actions.dismissRecheckError });
-  }
-
-  /* D96: the panel says "Feedback comes after the call" for every new answer (p0). Only a continued session shows the
-   * feedback it already had (p3, the "Edit what I said" editor and its check); nothing new appears while the user speaks. */
-  const rechecking = Boolean(current?.records.some((r) => state.rechecking[r.id]));
-  const canEdit = Boolean(current && !state.recording && !rechecking && current.records.length && !current.pendingIds.length && current.records.every((r) => r.complete));
-  const panel: PanelMode = state.recording ? "p0"
-    : editing ? "edit"
-    : rechecking ? "recheck"
-    : current?.records.length && canEdit ? "p3" : "p0";
-
   const micHelp = micError ? MIC_HELP[micError] : undefined;
   const overlay: SessionOverlay = paused ? (paused.kind === "engine" ? "interrupted-engine" : "interrupted-voice") : micHelp ? "mic-help" : "none";
 
@@ -348,23 +307,8 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     onFixSettings: () => { window.open("/settings/privacy", "_blank", "noopener"); },
     onTryAgain: actions.retryMic,
     onSendText: actions.sendText,
-    onFlag: actions.flag,
-    onStronger: actions.stronger,
     onSetSuggest: actions.setSuggest,
     onSeeDebrief: end,
-    onEdit: canEdit ? () => { actions.dismissRecheckError(); setEditing(true); } : undefined,
-    onSaveEdit: (answer, followUp) => {
-      const edits = recheckEdits(current?.records ?? [], answer, followUp);
-      setEditing(false);
-      if (!edits.length) { setDraft(null); return; }
-      setDraft({ answer, followUp });
-      actions.recheck(edits);
-    },
-    onCancelEdit: () => { actions.dismissRecheckError(); setEditing(false); setDraft(null); },
-    onSaveHeard: (feedbackId, flagId, said) => {
-      const edit = heardEdit(state.feedback[feedbackId], flagId, said);
-      if (edit) actions.recheck([edit]);
-    },
   };
 
   return (
@@ -381,13 +325,9 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
         muted={muted}
         micLevel={0}
         getMicLevel={getLevel}
-        layerOrder={settings?.layer_order ?? "content-first"}
-        withChecks={Boolean(state.stt?.word_confidence)}
         suggester={!english && state.suggesterAvailable && settings?.answer_suggester !== false ? "on" : "off"}
         data={data}
         handlers={handlers}
-        panel={panel}
-        panelOpen={editing || rechecking ? true : undefined}
         entering
         autoFocusComposer
         globalKeys

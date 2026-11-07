@@ -19,7 +19,7 @@ describe("Session → Presence state (D49)", () => {
   });
 
   it("is idle (no glow) everywhere else", () => {
-    const quiet: SessionPhase[] = ["connecting", "between", "preparing", "feedback", "unavailable", "editing", "rechecking", "interrupted", "saving"];
+    const quiet: SessionPhase[] = ["connecting", "between", "feedback", "interrupted", "saving"];
     for (const p of quiet) expect(at(p), p).toBe("idle");
   });
 
