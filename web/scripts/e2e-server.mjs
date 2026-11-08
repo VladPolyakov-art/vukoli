@@ -36,6 +36,7 @@ rmSync(root, { recursive: true, force: true });
 mkdirSync(dataDir, { recursive: true });
 
 // The server's log goes to a file (keeps the test report readable); a failed run points here.
+process.env.IC_CHECK_DELAY_S ??= "0.5";
 const logFile = join(root, "server.log");
 const log = openSync(logFile, "a");
 const python = join(server, ".venv", "bin", "python");

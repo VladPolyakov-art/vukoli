@@ -7,13 +7,13 @@
  * English: E1 level · E2 topic · phrases (only when there are some), then the plan.
  * Again / Drill / Example: their own short paths. Real work (reading a pasted job, opening a link, reading a file) is
  * a pending Mike message that the container resolves with `resolveJob` once the server answers. */
-import { t, tp } from "../../i18n";
+import { t, tMaybe, tp } from "../../i18n";
 import { lowerFirstWord } from "./sessionFocus";
 import type { WeakSpotLayer } from "../../ds";
-import type { NegotiateStyle, TacticCardData, ToughTheme } from "../../lib/types";
+import type { CourseStep, NegotiateCase, NegotiatePrep, NegotiateScenario, NegotiateStyle, TacticCardData, ToughTheme } from "../../lib/types";
 import { formatAmount } from "../../lib/amount";
 import {
-  numbersFromStart, toNegotiateStart, validateNumbers, valuesFromMemory, type NumbersValues,
+  DEFAULT_SCENARIO, isScenario, numbersFromStart, SCENARIO_FIELDS, SCENARIO_ORDER, toNegotiateStart, validateNumbers, valuesFromMemory, type NumbersValues,
 } from "./numbers";
 import type {
   EnglishTopic, JobItem, Level, NumbersMemory, Phrase, PlanModel, PlanRow, RoundType, SetupModel, SetupReply, SetupTurn,
@@ -45,13 +45,17 @@ export interface ScriptContext {
   /** English: the level from the last English session (null = first visit). */
   level?: Level | null;
   phrases: Phrase[];
+  /** Interview: the plan offers "End with a salary talk" (false for Gemini Live: the server runs it on the scripted / Ollama engines). */
+  moneyTalk?: boolean;
   /** Tough talk: server content, remembered style / numbers, hidden-tactics preferences (absent: the chips only). */
   talk?: TalkContext;
 }
 
 type Stage =
   | "job" | "round" | "anything" | "level" | "topic" | "phrases" | "drill" | "example" | "plan" | "pending"
-  | "role" | "numbers" | "style" | "theme";
+  | "scenario" | "role" | "numbers" | "style" | "theme"
+  /** Negotiation v3 (D118): the "prepare first?" question, the mini-course, the three case questions. */
+  | "prep" | "course" | "case1" | "case2" | "case3";
 
 const isTalk = (track: Track): track is "tough" | "negotiate" => track === "tough" || track === "negotiate";
 const STYLE_ORDER: NegotiateStyle[] = ["friendly", "firm", "tight"];
@@ -78,14 +82,24 @@ interface Draft {
   /** A drill from a debrief works on that debrief's weak spots (C1), not on the shared memory in the context. */
   weak?: WeakItem[];
   /** Negotiate: the role (a saved job's title or typed), the committed numbers card, the range read from the post. */
+  scenario?: NegotiateScenario;
   role?: string;
   numbers?: NumbersValues;
+  /** Interview: "End with a salary talk" and its numbers (the screening fields). */
+  money?: boolean;
+  moneyNumbers?: NumbersValues;
   range?: { low: number; high: number; currency: string | null };
   style?: NegotiateStyle;
   /** Tough questions. */
   theme?: ToughTheme;
   /** "Hide tactics" pressed in this chat; undefined = the stored preference. */
   tacticsHidden?: boolean;
+  /** Negotiate v3: the answer to "Want to prepare first?" (undefined = not asked / skipped). */
+  prep?: "yes" | "no" | "last";
+  /** The course was shown in this chat, or the reused case had it: the call shows the steps strip. */
+  course?: boolean;
+  courseIdx?: number;
+  case?: NegotiateCase;
 }
 
 export interface SetupState {
@@ -106,7 +120,8 @@ export interface SetupState {
 export type StartInput =
   | { kind: "text"; text: string }
   | { kind: "file"; name: string; size: string }
-  | { kind: "suggestion"; id: SuggestionId }
+  /** `scenario`: Negotiate opened from a link (`?scenario=`): the scenario question is skipped. */
+  | { kind: "suggestion"; id: SuggestionId; scenario?: NegotiateScenario }
   /** "Drill these weak spots" in a debrief: straight to the plan, with that interview's job (F-13-8, F-13-14) and,
    *  when given, that interview's own weak spots instead of the shared memory (C1). `jobId: null` = that interview had no
    *  job: General questions, never the remembered one. */
@@ -345,7 +360,7 @@ function showPlan(_ctx: ScriptContext, s: SetupState, text = t("chat.setup.plan"
 /** The first message from the start screen. */
 export function begin(ctx: ScriptContext, input: StartInput): SetupState {
   let s = empty(ctx, ctx.track);
-  if (input.kind === "suggestion") return suggestion(ctx, s, input.id);
+  if (input.kind === "suggestion") return suggestion(ctx, s, input.id, input.scenario);
   if (input.kind === "drill") {
     // Nothing to ask: the weak spots are known and the job comes with the link. The focus stays changeable in the plan.
     s.draft = { ...s.draft, kind: "drill", jobId: input.jobId === undefined ? ctx.last?.jobId ?? null : input.jobId, round: "mix", focus: "all", weak: input.weak?.length ? input.weak : undefined };
@@ -393,7 +408,7 @@ function pickedLine(job: JobItem) {
   return tp("chat.setup.savedPicked", job.questions, { company: job.company, roleTail: roleTail(job) });
 }
 
-function suggestion(ctx: ScriptContext, s: SetupState, id: SuggestionId): SetupState {
+function suggestion(ctx: ScriptContext, s: SetupState, id: SuggestionId, scenario?: NegotiateScenario): SetupState {
   const label = id === "tough" ? t("home.talk.chipTough")
     : id === "negotiate" ? t("home.talk.chipNegotiate")
     : suggestionsFor(ctx).find((x) => x.id === id)?.label ?? id;
@@ -468,9 +483,13 @@ function suggestion(ctx: ScriptContext, s: SetupState, id: SuggestionId): SetupS
       return askTheme(ctx, s);
     }
     case "negotiate": {
-      s = user({ ...s, track: "negotiate", draft: { kind: "negotiate", strictness: ctx.strictness } }, label);
-      s.steps = ["role", "numbers", "style"];
-      return askRole(ctx, s);
+      s = user({ ...s, track: "negotiate", draft: { kind: "negotiate", strictness: ctx.strictness, scenario } }, label);
+      if (scenario) {
+        s.steps = ["role", "numbers", "style", "prep"];
+        return askRole(ctx, s);
+      }
+      s.steps = ["scenario", "role", "numbers", "style", "prep"];
+      return askScenario(ctx, s);
     }
   }
 }
@@ -519,11 +538,23 @@ export function pick(ctx: ScriptContext, s: SetupState, turnId: string, replyId:
   if (kind === "example") {
     return suggestion(ctx, { ...s, turns: s.turns.map((x) => (x.id === turnId ? { ...x, answered: true } : x)) }, value === "english" ? "english" : "general");
   }
+  if (kind === "case3" && value !== "done" && value !== "skip") return toggleFallback(s, turnId, value);
+  if (kind === "case3") return finishCase3(ctx, s, value === "skip");
   let next = user(s, reply.label);
   switch (kind) {
+    case "prep":
+      return answerPrep(ctx, next, value as "yes" | "no" | "last");
+    case "course":
+      return value === "next" ? nextCourseStep(ctx, next) : askCase1(ctx, next);
+    case "case1":
+      return askCase2(ctx, next);
+    case "case2":
+      next.draft = { ...next.draft, case: { ...caseOf(next.draft), reason: value === "skip" ? "" : reasonLabel(value) } };
+      return askCase3(ctx, next);
     case "job": {
       if (s.track === "negotiate") {
         const job = allJobs(ctx, next).find((j) => j.id === value);
+        if (job && !hasField(next.draft, "range")) return askNumbers(ctx, { ...next, draft: { ...next.draft, jobId: job.id, role: job.role.trim() || undefined } });
         return job ? chooseJobForRange(next, job) : askNumbers(ctx, { ...next, draft: { ...next.draft, jobId: null } });
       }
       if (value === "general") {
@@ -555,12 +586,17 @@ export function pick(ctx: ScriptContext, s: SetupState, turnId: string, replyId:
     case "focus":
       next.draft = { ...next.draft, focus: value as "all" | WeakSpotLayer };
       return showPlan(ctx, next);
+    case "scenario": {
+      const sc = isScenario(value) ? value : DEFAULT_SCENARIO;
+      next.draft = { ...next.draft, scenario: sc };
+      return askRole(ctx, { ...next, stage: "scenario" });
+    }
     case "role": // "No job, I'll type it": Mike repeats what to type, the composer says it too.
       next.draft = { ...next.draft, jobId: null };
       return mike({ ...next, stage: "role" }, t("home.talk.negotiate.rolePlaceholder"));
     case "style":
       next.draft = { ...next.draft, style: value as NegotiateStyle };
-      return showPlan(ctx, next, t("home.talk.planLine"));
+      return askPrep(ctx, next);
     case "theme": {
       next.draft = { ...next.draft, theme: value as ToughTheme };
       if (value === "personal") next = mike(next, t("home.talk.tough.personal"));
@@ -586,8 +622,15 @@ export function say(ctx: ScriptContext, s: SetupState, raw: string): SetupState 
   }
   let next = user(s, text);
   switch (s.stage) {
+    case "scenario": {
+      const sc = matchScenario(text, ctx);
+      if (!sc) return mike(next, t("home.talk.scenario.noMatch"), { replies: scenarioReplies(ctx), list: scenarioList(ctx) });
+      next.draft = { ...next.draft, scenario: sc };
+      return askRole(ctx, next);
+    }
     case "role": {
       const job = matchJob(text, allJobs(ctx, s));
+      if (job && !hasField(next.draft, "range")) return askNumbers(ctx, { ...next, draft: { ...next.draft, jobId: job.id, role: job.role.trim() || undefined } });
       if (job) return chooseJobForRange(next, job);
       next.draft = { ...next.draft, jobId: null, role: text.slice(0, ROLE_MAX) };
       return askNumbers(ctx, next);
@@ -599,7 +642,28 @@ export function say(ctx: ScriptContext, s: SetupState, raw: string): SetupState 
       const style = matchStyle(text);
       if (!style) return mike(next, t("home.talk.negotiate.styleNoMatch"), { replies: styleReplies(ctx.talk?.lastStyle ?? null) });
       next.draft = { ...next.draft, style };
-      return showPlan(ctx, next, t("home.talk.planLine"));
+      return askPrep(ctx, next);
+    }
+    case "prep": {
+      const v = text.toLowerCase();
+      const a = /\blast\b|\bsame\b|\bmy case\b/.test(v) ? "last" : /\bno\b|\bnot\b|skip|start now|\bnope\b/.test(v) ? "no" : /\byes\b|\bprepare\b|\bsure\b|\bok/.test(v) ? "yes" : undefined;
+      if (!a || (a === "last" && !lastCaseOf(ctx, s.draft))) return mike(next, t("home.talk.prep.noMatch"), { replies: prepReplies(ctx, s.draft) });
+      return answerPrep(ctx, next, a);
+    }
+    case "course":
+      return nextCourseStep(ctx, next);
+    case "case1": {
+      next.draft = { ...next.draft, case: { ...caseOf(next.draft), results: splitResults(text) } };
+      return askCase2(ctx, next);
+    }
+    case "case2":
+      next.draft = { ...next.draft, case: { ...caseOf(next.draft), reason: text.slice(0, CASE_MAX) } };
+      return askCase3(ctx, next);
+    case "case3": {
+      const have = new Set(caseOf(next.draft).fallbacks);
+      matchLevers(text, scenarioOf(next.draft)).forEach((id) => have.add(id));
+      next.draft = { ...next.draft, case: { ...caseOf(next.draft), fallbacks: [...have] } };
+      return finishCase(ctx, next);
     }
     case "theme": {
       const theme = matchTheme(text);
@@ -734,8 +798,34 @@ const styleReplies = (last: NegotiateStyle | null): SetupReply[] => {
 const themeReplies = (): SetupReply[] => THEMES.map((id) => ({ id: `theme:${id}`, label: themeName(id) }));
 
 function askRole(ctx: ScriptContext, s: SetupState): SetupState {
-  return mike({ ...s, stage: "role" }, t("home.talk.negotiate.role"), { replies: roleReplies(ctx, s) });
+  return mike({ ...s, stage: "role" }, hasField(s.draft, "range") ? t("home.talk.negotiate.role") : t("home.talk.negotiate.roleNow"), { replies: roleReplies(ctx, s) });
 }
+/* ---------- Negotiation v2: the scenario question ---------- */
+
+export const scenarioOf = (d: Draft): NegotiateScenario => d.scenario ?? DEFAULT_SCENARIO;
+const hasField = (d: Draft, f: (typeof SCENARIO_FIELDS)[NegotiateScenario][number]) => SCENARIO_FIELDS[scenarioOf(d)].includes(f);
+/** The name and the one-line blurb of a scenario: the server's content, else the bundled text. */
+export function scenarioInfo(ctx: ScriptContext, id: NegotiateScenario): { id: NegotiateScenario; name: string; blurb: string } {
+  const c = ctx.talk?.content?.scenarios?.find((x) => x.id === id);
+  return { id, name: c?.name ?? t(`home.talk.scenario.${id}.name`), blurb: c?.blurb ?? t(`home.talk.scenario.${id}.blurb`) };
+}
+const scenarioReplies = (ctx: ScriptContext): SetupReply[] => SCENARIO_ORDER.map((id) => ({ id: `scenario:${id}`, label: scenarioInfo(ctx, id).name }));
+const scenarioList = (ctx: ScriptContext) => SCENARIO_ORDER.map((id) => { const i = scenarioInfo(ctx, id); return { term: i.name, text: i.blurb }; });
+function matchScenario(text: string, ctx: ScriptContext): NegotiateScenario | undefined {
+  const v = text.toLowerCase();
+  const byName = SCENARIO_ORDER.find((id) => v.includes(scenarioInfo(ctx, id).name.toLowerCase()));
+  if (byName) return byName;
+  if (/screen|recruiter|expectation/.test(v)) return "screening";
+  if (/intern|graduat|full.?time/.test(v)) return "internship";
+  if (/counter|notice|resign|quit/.test(v)) return "counteroffer";
+  if (/raise|promotion|lead|review/.test(v)) return "raise";
+  if (/offer/.test(v)) return "offer";
+  return undefined;
+}
+function askScenario(ctx: ScriptContext, s: SetupState): SetupState {
+  return mike({ ...s, stage: "scenario" }, t("home.talk.scenario.ask"), { replies: scenarioReplies(ctx), list: scenarioList(ctx) });
+}
+
 function askTheme(_ctx: ScriptContext, s: SetupState): SetupState {
   return mike({ ...s, stage: "theme" }, t("home.talk.tough.theme"), { replies: themeReplies() });
 }
@@ -744,6 +834,127 @@ function askStyle(ctx: ScriptContext, s: SetupState): SetupState {
   const again = !!last && last !== "surprise";
   const text = again ? t("home.talk.negotiate.styleAgain", { style: styleName(last!) }) : t("home.talk.negotiate.styleFirst");
   return mike({ ...s, stage: "style" }, text, { replies: styleReplies(last) });
+}
+
+/* ---------- Negotiation v3 (D118): prepare first, mini-course, "your case" (prd-v3-prep §3 to §5) ---------- */
+
+const CASE_MAX = 200;
+const RESULTS_MAX = 3;
+const COURSE_LEN = 5;
+const REASONS = ["market", "scope", "offer"] as const;
+const LEVERS: Record<"offer" | "raise", string[]> = {
+  offer: ["step_up", "sign_on", "review", "remote", "title"],
+  raise: ["part_now", "dated_raise", "title"],
+};
+
+/** The mini-course and the lever list come in two families: raise, and everything else. */
+export const courseFamily = (sc: NegotiateScenario): "offer" | "raise" => (sc === "raise" ? "raise" : "offer");
+export const leverLabel = (id: string) => tMaybe(`home.talk.prep.lever.${id}`, id);
+const reasonLabel = (id: string) => (REASONS as readonly string[]).includes(id) ? t(`home.talk.prep.reason.${id}` as "home.talk.prep.reason.market") : id;
+const caseOf = (d: Draft): NegotiateCase => d.case ?? { results: [], reason: "", fallbacks: [] };
+const emptyCase = (c: NegotiateCase | undefined) => !c || (!c.results.length && !c.reason && !c.fallbacks.length);
+const courseSteps = (ctx: ScriptContext, d: Draft): CourseStep[] => ctx.talk?.content?.course?.[courseFamily(scenarioOf(d))] ?? [];
+const lastCaseOf = (ctx: ScriptContext, d: Draft): NegotiatePrep | null => {
+  const c = ctx.talk?.lastCases?.[scenarioOf(d)] ?? null;
+  return c && !emptyCase(c) ? c : null;
+};
+
+/** Q1 answer: up to three results, by line or, in one paragraph, by sentence; each at most 200 characters. */
+export function splitResults(text: string): string[] {
+  const lines = text.split(/\r?\n+/).map((x) => x.replace(/^[\s\-*•\d.)]+/, "").trim()).filter(Boolean);
+  const parts = lines.length > 1 ? lines : (lines[0] ?? "").split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+  return parts.slice(0, RESULTS_MAX).map((x) => x.slice(0, CASE_MAX));
+}
+/** A typed Q3 answer: the levers it names ("sign-on bonus and remote days"). */
+function matchLevers(text: string, sc: NegotiateScenario): string[] {
+  const v = text.toLowerCase();
+  const rules: Record<string, RegExp> = {
+    step_up: /step.?up|probation/, sign_on: /sign.?on|bonus/, review: /review/, remote: /remote|home/, title: /title|level/,
+    part_now: /part|now/, dated_raise: /dated|date|later|month/,
+  };
+  return LEVERS[courseFamily(sc)].filter((id) => rules[id]?.test(v));
+}
+
+function prepReplies(ctx: ScriptContext, d: Draft): SetupReply[] {
+  const replies: SetupReply[] = [{ id: "prep:yes", label: t("home.talk.prep.yes") }, { id: "prep:no", label: t("home.talk.prep.no") }];
+  if (lastCaseOf(ctx, d)) replies.push({ id: "prep:last", label: t("home.talk.prep.useLast") });
+  return replies;
+}
+function askPrep(ctx: ScriptContext, s: SetupState): SetupState {
+  return mike({ ...s, stage: "prep" }, t("home.talk.prep.ask"), { replies: prepReplies(ctx, s.draft) });
+}
+
+const caseCard = (c: NegotiateCase) => ({ results: c.results, reason: c.reason, fallbacks: c.fallbacks.map(leverLabel) });
+function answerPrep(ctx: ScriptContext, s: SetupState, answer: "yes" | "no" | "last"): SetupState {
+  const d = s.draft;
+  if (answer === "no") return showPlan(ctx, { ...s, draft: { ...d, prep: "no", course: false, case: undefined } }, t("home.talk.planLine"));
+  if (answer === "last") {
+    const c = lastCaseOf(ctx, d);
+    if (!c) return showPlan(ctx, { ...s, draft: { ...d, prep: "no" } }, t("home.talk.planLine"));
+    // The strip follows the course: shown now, or taken in the case reused.
+    const next = { ...s, draft: { ...d, prep: "last" as const, course: Boolean(c.course), case: { results: c.results, reason: c.reason, fallbacks: c.fallbacks } } };
+    return showPlan(ctx, mike(next, t("home.talk.prep.lastShown"), { caseCard: caseCard(c) }), t("home.talk.planLine"));
+  }
+  const steps = s.steps.includes("course") ? s.steps : [...s.steps, "course", "case1", "case2", "case3"] as Stage[];
+  const next: SetupState = { ...s, steps, draft: { ...d, prep: "yes", courseIdx: 0 } };
+  return courseSteps(ctx, d).length ? showCourseStep(ctx, next, 0) : askCase1(ctx, next);
+}
+
+function showCourseStep(ctx: ScriptContext, s: SetupState, i: number): SetupState {
+  const step = courseSteps(ctx, s.draft)[i]!;
+  return mike(
+    { ...s, stage: "course", draft: { ...s.draft, course: true, courseIdx: i } },
+    `**${i + 1}. ${step.title}** ${step.rule}`,
+    {
+      list: [{ term: t("home.talk.prep.example"), text: quoted(step.example) }],
+      replies: [{ id: "course:next", label: t("home.talk.prep.next") }, { id: "course:skip", label: t("home.talk.prep.toCase") }],
+    },
+  );
+}
+function nextCourseStep(ctx: ScriptContext, s: SetupState): SetupState {
+  const i = (s.draft.courseIdx ?? 0) + 1;
+  return i < Math.min(COURSE_LEN, courseSteps(ctx, s.draft).length) ? showCourseStep(ctx, s, i) : askCase1(ctx, s);
+}
+
+const skipReply = (stage: string): SetupReply => ({ id: `${stage}:skip`, label: t("home.talk.prep.skip") });
+function askCase1(_ctx: ScriptContext, s: SetupState): SetupState {
+  const raise = courseFamily(scenarioOf(s.draft)) === "raise";
+  const steps = s.steps.includes("case1") ? s.steps : [...s.steps, "case1", "case2", "case3"] as Stage[];
+  return mike({ ...s, steps, stage: "case1", draft: { ...s.draft, case: caseOf(s.draft) } }, t(raise ? "home.talk.prep.q1Raise" : "home.talk.prep.q1"), { replies: [skipReply("case1")] });
+}
+function askCase2(_ctx: ScriptContext, s: SetupState): SetupState {
+  const replies: SetupReply[] = [...REASONS.map((id) => ({ id: `case2:${id}`, label: reasonLabel(id) })), skipReply("case2")];
+  return mike({ ...s, stage: "case2" }, t("home.talk.prep.q2"), { replies });
+}
+function levelReplies(d: Draft): SetupReply[] {
+  const chosen = new Set(caseOf(d).fallbacks);
+  return [
+    ...LEVERS[courseFamily(scenarioOf(d))].map((id) => ({ id: `case3:${id}`, label: leverLabel(id), selected: chosen.has(id) })),
+    { id: "case3:done", label: t("home.talk.prep.done") },
+    skipReply("case3"),
+  ];
+}
+function askCase3(_ctx: ScriptContext, s: SetupState): SetupState {
+  return mike({ ...s, stage: "case3" }, t("home.talk.prep.q3"), { replies: levelReplies(s.draft) });
+}
+/** A lever chip is a toggle: the question stays open and the chip shows it is chosen. */
+function toggleFallback(s: SetupState, turnId: string, id: string): SetupState {
+  const c = caseOf(s.draft);
+  const fallbacks = c.fallbacks.includes(id) ? c.fallbacks.filter((x) => x !== id) : [...c.fallbacks, id];
+  const draft = { ...s.draft, case: { ...c, fallbacks } };
+  return { ...s, draft, turns: s.turns.map((x) => (x.id === turnId ? { ...x, replies: levelReplies(draft) } : x)) };
+}
+function finishCase3(ctx: ScriptContext, s: SetupState, skipped: boolean): SetupState {
+  const c = caseOf(s.draft);
+  const draft = skipped ? { ...s.draft, case: { ...c, fallbacks: [] } } : s.draft;
+  const labels = skipped ? [t("home.talk.prep.skip")] : draft.case!.fallbacks.length ? [draft.case!.fallbacks.map(leverLabel).join(", ")] : [t("home.talk.prep.done")];
+  return finishCase(ctx, push(answerLast({ ...s, draft }), { speaker: "user", text: labels[0] }));
+}
+/** Mike ends the questions with the "Your case" card (an empty case is fine: straight to the plan). */
+function finishCase(ctx: ScriptContext, s: SetupState): SetupState {
+  const c = caseOf(s.draft);
+  if (emptyCase(c)) return showPlan(ctx, s, t("home.talk.planLine"));
+  return showPlan(ctx, mike(s, t("home.talk.prep.summary"), { caseCard: caseCard(c) }), t("home.talk.planLine"));
 }
 
 /** Remembered values (US-63 AC6): this job's last numbers, else the last ones used (without a range: it belongs to a post). */
@@ -756,9 +967,10 @@ function memoryFor(ctx: ScriptContext, jobId: string | null | undefined): Number
 
 function askNumbers(ctx: ScriptContext, s: SetupState): SetupState {
   const d = s.draft;
+  const sc = scenarioOf(d);
   const values = { ...valuesFromMemory(memoryFor(ctx, d.jobId), currenciesOf(ctx), d.range), role: d.role ?? "" };
-  return mike({ ...s, stage: "numbers" }, t("home.talk.negotiate.numbers"), {
-    numbers: { values, fromPost: !!d.range, roleField: !d.role, currencies: currenciesOf(ctx) },
+  return mike({ ...s, stage: "numbers" }, t(`home.talk.negotiate.numbersFor.${sc}` as "home.talk.negotiate.numbersFor.offer"), {
+    numbers: { values, fromPost: !!d.range, roleField: !d.role, currencies: currenciesOf(ctx), scenario: sc },
   });
 }
 
@@ -793,25 +1005,47 @@ export function resolveRange(ctx: ScriptContext, s: SetupState, result: RangeRes
 
 const offerText = (hasOffer: boolean) => t(hasOffer ? "home.talk.negotiate.hasOffer" : "home.talk.negotiate.noOffer");
 
+/** What the user "said" when the numbers card was sent: one line per scenario. */
+function numbersAnswer(sc: NegotiateScenario, p: NonNullable<ReturnType<typeof validateNumbers>["parsed"]>): string {
+  const cur = p.currency;
+  const fa = formatAmount;
+  if (sc === "raise") {
+    return t("home.talk.negotiate.answerRaise", { current: fa(p.currentPay ?? 0), ask: fa(p.ask ?? 0), currency: cur });
+  }
+  if (sc === "counteroffer") {
+    return t("home.talk.negotiate.answerCounter", { current: fa(p.currentPay ?? 0), offer: fa(p.newOffer ?? 0), currency: cur, reason: t(`home.talk.leaveReason.${p.reason ?? "other"}`).toLowerCase() });
+  }
+  const offer = sc === "offer" ? offerText(p.hasOffer) : "";
+  const text = p.low !== undefined && p.high !== undefined
+    ? t("home.talk.negotiate.answer", { low: fa(p.low), high: fa(p.high), currency: cur, target: fa(p.target), offer })
+    : t("home.talk.negotiate.answerNoRange", { target: fa(p.target), currency: cur, offer });
+  // "… · " with no offer part reads as noise: drop the dangling separator.
+  return text.replace(/ · $/, "");
+}
+
 /** The numbers card was sent (turn id: from Mike's message) or saved (null: the plan's "Change your numbers" dialog). */
 export function submitNumbers(ctx: ScriptContext, s: SetupState, turnId: string | null, values: NumbersValues): SetupState {
+  if (s.track === "interview" && turnId === null) {
+    // The interview's "End with a salary talk": the screening fields from the plan's dialog.
+    const job = s.draft.jobId ? allJobs(ctx, s).find((j) => j.id === s.draft.jobId) : undefined;
+    const check = validateNumbers(values, { roleRequired: !job, scenario: "screening" });
+    if (!check.ok) return s;
+    return { ...s, draft: { ...s.draft, money: true, moneyNumbers: values } };
+  }
   const roleRequired = turnId === null ? true : !s.draft.role || (s.turns.find((x) => x.id === turnId)?.numbers?.roleField ?? false);
-  const check = validateNumbers(values, { roleRequired });
+  const sc = scenarioOf(s.draft);
+  const check = validateNumbers(values, { roleRequired, scenario: sc });
   if (!check.ok || !check.parsed) return s;
   const parsed = check.parsed;
   const role = roleRequired ? parsed.role.slice(0, ROLE_MAX) : s.draft.role ?? "";
-  const start = toNegotiateStart({ ...parsed, role }, s.draft.style ?? "friendly");
+  const start = toNegotiateStart({ ...parsed, role }, s.draft.style ?? "friendly", sc);
   const stored = numbersFromStart(start, currenciesOf(ctx));
   const r = s.draft.range;
   const stillPost = !!r && parsed.low === r.low && parsed.high === r.high;
   const draft: Draft = { ...s.draft, role, numbers: stored, range: stillPost ? r : undefined };
   if (turnId === null) return { ...s, draft };
   let next: SetupState = { ...s, draft, turns: s.turns.map((x) => (x.id === turnId ? { ...x, numbers: undefined } : x)) };
-  const offer = offerText(parsed.hasOffer);
-  const text = parsed.low !== undefined && parsed.high !== undefined
-    ? t("home.talk.negotiate.answer", { low: formatAmount(parsed.low), high: formatAmount(parsed.high), currency: parsed.currency, target: formatAmount(parsed.target), offer })
-    : t("home.talk.negotiate.answerNoRange", { target: formatAmount(parsed.target), currency: parsed.currency, offer });
-  next = push(next, { speaker: "user", text });
+  next = push(next, { speaker: "user", text: numbersAnswer(sc, parsed) });
   return askStyle(ctx, next);
 }
 
@@ -819,13 +1053,19 @@ export function submitNumbers(ctx: ScriptContext, s: SetupState, turnId: string 
 export const setTacticsHidden = (s: SetupState, hidden: boolean): SetupState => ({ ...s, draft: { ...s.draft, tacticsHidden: hidden } });
 
 /** Cards in the order of the call (tough-talk.md §3). */
-export function tacticOrder(mode: "tough" | "negotiate", opts: { theme?: ToughTheme; hasOffer?: boolean }): string[] {
+export function tacticOrder(mode: "tough" | "negotiate", opts: { theme?: ToughTheme; hasOffer?: boolean; scenario?: NegotiateScenario }): string[] {
   if (mode === "negotiate") {
-    return ["N2", "N1", "N3", "N4", "N5", "N6", "N9", "N10", ...(opts.hasOffer ? ["N7"] : []), "N8"];
+    switch (opts.scenario) {
+      case "screening": return ["S1", "S2", "N2", "N3", "N1", "N4", "N5"];
+      case "internship": return ["I1", "N5", "N9", "N10", "N4", "N6", "N8"];
+      case "counteroffer": return ["C1", "C2", "N8", "N4", "N5", "N3", "N10"];
+      case "raise": return ["R1", "R2", "N5", "N9", "N10", "N4", "N6", ...(opts.hasOffer ? ["N7"] : [])];
+      default: return ["N2", "N1", "N3", "O1", "O2", "N4", "N5", "N6", "N9", "N10", ...(opts.hasOffer ? ["N7"] : []), "N8"];
+    }
   }
   return opts.theme === "money" || opts.theme === "mix" ? ["N3", "T1", "T2"] : ["T1", "T2", "N3"];
 }
-function tacticsFor(ctx: ScriptContext, mode: "tough" | "negotiate", opts: { theme?: ToughTheme; hasOffer?: boolean }): TacticCardData[] {
+function tacticsFor(ctx: ScriptContext, mode: "tough" | "negotiate", opts: { theme?: ToughTheme; hasOffer?: boolean; scenario?: NegotiateScenario }): TacticCardData[] {
   const cards = ctx.talk?.content?.cards ?? [];
   return tacticOrder(mode, opts).flatMap((id) => cards.find((c) => c.id === id && c.modes.includes(mode)) ?? []);
 }
@@ -843,18 +1083,21 @@ export function skip(ctx: ScriptContext, s: SetupState): SetupState {
     d.theme ??= "mix";
   } else if (s.track === "negotiate") {
     d.style ??= ctx.talk?.lastStyle ?? "friendly";
+    d.scenario ??= DEFAULT_SCENARIO;
+    // "Skip questions" skips the rest of the prep too: what was answered stays, the rest is left out.
+    if (d.prep === undefined && s.stage === "prep") d.prep = "no";
     if (!d.numbers) {
       // Remembered numbers fill in when they are complete; otherwise the numbers card is the one thing left to ask.
       const m = memoryFor(ctx, d.jobId);
       const values = { ...valuesFromMemory(m, currenciesOf(ctx), d.range), role: d.role ?? m?.role ?? "" };
-      const check = validateNumbers(values);
+      const check = validateNumbers(values, { roleRequired: true, scenario: scenarioOf(d) });
       if (!check.ok || !check.parsed) {
         if (s.stage === "numbers") return s;
         const base: SetupState = { ...answerLast(s), draft: { ...d, role: d.role ?? undefined }, skipped: true };
         return askNumbers(ctx, base);
       }
       d.role = check.parsed.role;
-      d.numbers = numbersFromStart(toNegotiateStart(check.parsed, d.style), currenciesOf(ctx));
+      d.numbers = numbersFromStart(toNegotiateStart(check.parsed, d.style, scenarioOf(d)), currenciesOf(ctx));
     }
   } else if (s.track === "english") {
     d.level ??= ctx.level ?? "B1";
@@ -879,6 +1122,18 @@ export function change(ctx: ScriptContext, s: SetupState, row: PlanRow, value: s
   if (row === "style") d.style = value as NegotiateStyle;
   if (row === "theme") d.theme = value as ToughTheme;
   if (row === "offer" && d.numbers) d.numbers = { ...d.numbers, hasOffer: value === "on" };
+  if (row === "scenario" && isScenario(value) && value !== scenarioOf(d)) {
+    // The numbers belong to the scenario: keep them only when they are still complete for the new one.
+    d.scenario = value;
+    if (d.numbers && !validateNumbers(d.numbers, { roleRequired: false, scenario: value }).ok) d.numbers = undefined;
+  }
+  if (row === "money") d.money = value === "on";
+  if (row === "case") {
+    // "Your case" → Change: the three questions again. The plan card leaves the log until the new case is in.
+    const steps = s.steps.includes("case1") ? s.steps : [...s.steps.filter((x) => x !== "plan"), "case1", "case2", "case3"] as Stage[];
+    const turns = s.turns.map((x) => (x.plan ? { ...x, plan: false } : x));
+    return askCase1(ctx, { ...s, steps, turns, draft: { ...d, prep: "yes", case: { results: [], reason: "", fallbacks: [] } } });
+  }
   if (row === "role" && s.track === "negotiate") {
     // A saved job: its title and the numbers stay; "Type a role": the numbers dialog shows the Role field.
     if (value === "type") { d.jobId = null; d.range = undefined; }
@@ -923,6 +1178,8 @@ function talkPlan(ctx: ScriptContext, s: SetupState): PlanModel {
       currencies: known,
       fromPost: !!d.range,
       roleEditable: !job,
+      scenarios: SCENARIO_ORDER.map((id) => scenarioInfo(ctx, id)),
+      numbers: d.numbers ?? { ...valuesFromMemory(memoryFor(ctx, d.jobId), known, d.range), role: d.role ?? "" },
     },
   };
   if (mode === "tough") {
@@ -934,13 +1191,31 @@ function talkPlan(ctx: ScriptContext, s: SetupState): PlanModel {
       tactics: tacticsFor(ctx, "tough", { theme }),
     };
   }
-  const check = d.numbers ? validateNumbers(d.numbers, { roleRequired: false }) : null;
-  const start = check?.parsed ? toNegotiateStart({ ...check.parsed, role: d.role ?? "" }, d.style ?? "friendly") : undefined;
+  const sc = scenarioOf(d);
+  const check = d.numbers ? validateNumbers(d.numbers, { roleRequired: false, scenario: sc }) : null;
+  const start = check?.parsed ? toNegotiateStart({ ...check.parsed, role: d.role ?? "" }, d.style ?? "friendly", sc) : undefined;
+  const c = d.prep === "yes" || d.prep === "last" ? caseOf(d) : undefined;
+  if (start && c) start.prep = { course: Boolean(d.course), results: c.results, reason: c.reason, fallbacks: c.fallbacks };
   return {
-    ...base, questions: NEGOTIATE_TURNS, minutes: NEGOTIATE_MINUTES,
+    ...base, questions: NEGOTIATE_TURNS,
+    case: c && !emptyCase(c) ? { ...c, fallbacks: c.fallbacks.map(leverLabel) } : undefined, minutes: NEGOTIATE_MINUTES,
+    scenario: sc,
     negotiate: start ? { ...start, company: job?.company } : undefined,
-    tactics: tacticsFor(ctx, "negotiate", { hasOffer: !!start?.has_real_offer }),
+    tactics: tacticsFor(ctx, "negotiate", { hasOffer: !!start?.has_real_offer, scenario: sc }),
   };
+}
+
+/** Interview plan: the "End with a salary talk" row (screening fields; the role is the job's). */
+function moneyModel(ctx: ScriptContext, s: SetupState, job: JobItem | null): PlanModel["money"] {
+  const d = s.draft;
+  const known = currenciesOf(ctx);
+  const role = job?.role.trim() || d.moneyNumbers?.role || "";
+  const values: NumbersValues = { ...(d.moneyNumbers ?? valuesFromMemory(memoryFor(ctx, d.jobId), known, undefined)), role };
+  const check = validateNumbers(values, { roleRequired: !job, scenario: "screening" });
+  const start = d.money && check.parsed
+    ? { role: check.parsed.role, target: check.parsed.target, currency: check.parsed.currency, ...(check.parsed.low !== undefined && check.parsed.high !== undefined ? { job_low: check.parsed.low, job_high: check.parsed.high } : {}) }
+    : undefined;
+  return { on: !!d.money && !!start, ready: check.ok, values, roleEditable: !job, currencies: known, start };
 }
 
 export function planFor(ctx: ScriptContext, s: SetupState): PlanModel {
@@ -979,6 +1254,7 @@ export function planFor(ctx: ScriptContext, s: SetupState): PlanModel {
     level: d.level,
     topic: d.topic,
     phrases: d.usePhrases ? ctx.phrases.map((p) => p.to) : undefined,
+    money: d.kind === "interview" && ctx.moneyTalk !== false ? moneyModel(ctx, s, job) : undefined,
   };
 }
 

@@ -25,6 +25,7 @@ export const talkPrefs = {
     const s = read<Stored>(NUMBERS_KEY);
     return s && typeof s === "object" ? { last: s.last ?? null, byJob: s.byJob ?? {} } : { last: null, byJob: {} };
   },
+  rememberStyle(style: NegotiateStyle) { write(STYLE_KEY, style); },
   remember(style: NegotiateStyle, jobId: string | null, n: NumbersMemory) {
     write(STYLE_KEY, style);
     const s = talkPrefs.numbers();

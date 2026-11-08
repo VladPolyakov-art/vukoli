@@ -113,3 +113,74 @@ export const toughModelFailed: SessionRecord = base("tough", "tough-code", tough
 /** One or two answers: no counts. */
 export const toughTwo: SessionRecord = base("tough", "tough-two", tough([tq(1), tq(2)], { summary: { answered: 2, calm: 2, show_counts: false, hurt_most: null } }), toughTranscript(2));
 export const toughOne: SessionRecord = base("tough", "tough-one", tough([tq(1)], { summary: { answered: 1, calm: 1, show_counts: false, hurt_most: null } }), toughTranscript(1));
+
+/* Negotiation v2 (protocol.md §7): one fixture per scenario, shaped like the captured server debriefs. */
+const none = { mike: [], you: [], mike_total: 0, you_total: 0 };
+const v2 = (scenario: NonNullable<NegotiateDebrief["scenario"]>, scenario_name: string, over: Parameters<typeof neg>[0]) =>
+  neg({ version: 2, scenario, scenario_name, who_moved: none, check: null, deadline: null, objections: [], ...over });
+
+const rt = (lines: Array<[("model" | "user"), string]>): SessionRecord["transcript"] =>
+  lines.map(([role, text], i) => (role === "model" ? { role, text, kind: i === 0 ? ("question" as const) : undefined } : { role, text }));
+
+/** Screening call: did you anchor, or deflect? No offer figures. */
+export const negotiateScreening: SessionRecord = base("negotiate", "neg-screening", v2("screening", "Screening call", {
+  outcome: "ended", no_offer: true,
+  summary: { opening: null, final_offer: null, captured_now_pct: null, captured_pct: null, target: 95000, job_low: 85000, job_high: 105000 },
+  section: { first_number: 95000, first_turn: 2, vs_band: "inside", asked_range: true, got_range: false, range_given: false, revealed_current: false, tied_to_scope: false, flexible_on_package: false },
+  objections: [{ id: "SC2", turn: 2, mike_line: "Help me understand that a bit more.", user_reply: "ok thanks", answered: false, may_be_wrong: true }],
+  say_it_better: [{ id: "scope", title: "Tie the number to the scope", what_happened: "You named a number without a reason.", you_said: "95,000.", try: "For a role with this scope, I am looking at 95,000.", card_id: "N2", why: "A number with a reason is harder to push down." }],
+}), rt([["model", "Before we go further: what salary are you looking for?"], ["user", "95,000."], ["model", "Help me understand that a bit more."], ["user", "ok thanks"]]));
+
+/** Raise with your lead: got now, at a date, or non-money; here a dated raise. */
+export const negotiateRaise: SessionRecord = base("negotiate", "neg-raise", v2("raise", "Raise with your lead", {
+  outcome: "accepted", style: "firm", style_name: "Firm",
+  summary: { opening: 60000, final_offer: 60000, captured_now_pct: 0, captured_later_pct: 60, target: 72000, job_low: 60000, job_high: null },
+  section: { asked: 72000, current: 60000, raise_now: null, dated: { amount: 66000, after_months: 6, criteria: true, in_writing: true }, results_named: true, other_levers: ["Title change"], threat_without_offer: false, captured_now_pct: 0, captured_later_pct: 60 },
+  deal: { now: 60000, later: 66000, after_months: 6, in_writing: true, criteria_named: true, line: "" },
+  check: { used: true, turn: 2, result: { kind: "lever", from: null, to: null, lever: "title" } },
+  objections: [
+    { id: "RA2", turn: 1, mike_line: "Budgets are tight this year.", user_reply: "I took over the design system and cut review time in half.", answered: true, may_be_wrong: true },
+    { id: "RA4", turn: 3, mike_line: "I could look at a title change, but money is harder.", user_reply: null, answered: false, may_be_wrong: true },
+  ],
+  say_it_better: [{ id: "date", title: "Put a date on it", what_happened: "The review date was left open.", you_said: null, try: "Could we agree a review in six months, with the goals written down?", card_id: "N6", why: "A date and goals make it a plan, not a hope." }],
+}), rt([["model", "Thanks for making the time. What did you want to talk about?"], ["user", "My pay. I took over the design system and cut review time in half."], ["model", "Budgets are tight this year."], ["user", "Could we agree 66,000 after six months, with goals in writing?"], ["model", "I will check with the hiring manager and come back."]]));
+
+/** Counteroffer: two offers side by side. No stay or go verdict. */
+export const negotiateCounter: SessionRecord = base("negotiate", "neg-counter", v2("counteroffer", "Counteroffer", {
+  outcome: "ended",
+  summary: { opening: 62000, final_offer: 66000, captured_now_pct: null, target: 70000, job_low: 60000, job_high: null },
+  section: { reason_named: true, reason: "growth", counter_matched: false, counter_in_writing: true, time_asked: true, unwritten_promise_accepted: false, deadline_accepted: false, decision: "time", note: "Vukoli does not say whether to stay or leave." },
+  objections: [{ id: "CO1", turn: 1, mike_line: "We can match the number, but not the title.", user_reply: "Growth matters most to me. Could I have until Friday?", answered: true, may_be_wrong: true }],
+}), rt([["model", "I heard you have another offer."], ["user", "Growth matters most to me. Could I have until Friday?"]]));
+
+/** Internship to full-time: the conversion terms. */
+export const negotiateInternship: SessionRecord = base("negotiate", "neg-intern", v2("internship", "Internship to full-time", {
+  outcome: "accepted",
+  summary: { opening: 58000, final_offer: 62500, captured_now_pct: 40, target: 68000, job_low: 55000, job_high: 70000 },
+  section: { level_asked: true, level_won: false, step_up_line: null, results_named: false },
+  objections: [{ id: "IN2", turn: 1, mike_line: "I need something new to move on that. The offer is 62,500 EUR.", user_reply: "Could we revisit at 6 months with clear goals?", answered: false, may_be_wrong: true }],
+}), rt([["model", "We would like to offer you a full-time role."], ["user", "Could we revisit at 6 months with clear goals?"]]));
+
+/** The salary part of an interview: screening-shaped, noted by Mike. */
+export const moneyTalkDebrief: NegotiateDebrief = v2("screening", "Salary talk", {
+  outcome: "noted", no_offer: true, hidden_range: null,
+  summary: { opening: null, final_offer: null, captured_now_pct: null, captured_pct: null, target: 95000, job_low: 85000, job_high: 105000 },
+  section: { first_number: 90000, first_turn: 1, vs_band: "inside", asked_range: false, got_range: false, range_given: false, revealed_current: false, tied_to_scope: true, flexible_on_package: false },
+  objections: [{ id: "SC2", turn: 1, mike_line: "That is a bit above what we planned.", user_reply: "For this scope, I would look at 90,000.", answered: true, may_be_wrong: true }],
+});
+
+/** Negotiation v3 (D118): an offer call where the same reason came up three times and the prep was skipped. */
+export const negotiateHomework: SessionRecord = (() => {
+  const r = base("negotiate", "neg-homework", {
+    ...(negotiateStrong.debrief as NegotiateDebrief),
+    homework: [
+      { id: "results", text: "Write down 2–3 results with a number: what you did and what changed.", quote: null, card_id: null },
+      { id: "range", text: "Find the range for this role: two or three job posts or a salary site.", quote: null, card_id: null },
+      { id: "objection", text: "Prepare one answer to this: Mike said “That would put you above people on the team.”", quote: "That would put you above people on the team.", card_id: "X2" },
+      { id: "prep_skipped", text: "Next time, take 3 minutes to prepare your case first.", quote: null, card_id: null },
+    ],
+    repeats: { count: 3, quote: "I'm still aiming for 60,000 based on the work I have done" },
+    case: null,
+  }, negotiateTranscript);
+  return r;
+})();

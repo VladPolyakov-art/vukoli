@@ -18,13 +18,15 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import difflib
 import json
+import os
 import logging
 import re
 import time
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
-from . import content, negotiation, talk, tough, tts
+from . import bargain, content, hintgen, talkcase, negotiation, talk, tough, tts
 from .content import Question
 from .engines.base import EngineError, LLMEngine
 from .engines.gemini_live import drop_last_answer
@@ -76,6 +78,15 @@ NOISE_TURN_MIN_S = 4             # ... after at least this much audio: it is noi
 MAX_RECORD_BYTES = 16000 * 2 * 240      # up to 4 minutes per answer
 
 
+INTENT_TIMEOUT_S = float(os.environ.get("IC_INTENT_TIMEOUT_S", "8"))
+SLOW_ENGINES = ("claude_cli", "codex_cli", "antigravity_cli")   # one call starts a CLI process: seconds, not tokens
+HINT_GEN_TIMEOUT_S = float(os.environ.get("IC_HINT_GEN_TIMEOUT_S", "6"))
+FIXED_HINT_LINES = ("O2", "N4")            # "Wait while he checks": the fixed line is the right one
+FOLLOW_UP_TIMEOUT_S = float(os.environ.get("IC_FOLLOW_UP_TIMEOUT_S", "5"))
+MONEY_SKIP = re.compile(r"\b(?:skip|rather not|prefer not|not (?:going to|ready to|comfortable) (?:discuss|talk|share|say)|"
+                        r"don'?t want to (?:discuss|talk|share|say))\b", re.I)
+
+
 class TextDriver:
     needs_server_stt = True
 
@@ -92,7 +103,7 @@ class TextDriver:
                  gate: ModelGate | None = None, resume: dict | None = None,
                  focus_gaps: list[str] | None = None, quick: bool = False,
                  on_mode: Optional[Callable] = None, neg: dict | None = None,
-                 tough_state: dict | None = None, **_ignored) -> None:
+                 tough_state: dict | None = None, money_plan: dict | None = None, **_ignored) -> None:
         self.llm = llm
         self.mode = mode
         self.plan = list(plan or [])
@@ -142,6 +153,12 @@ class TextDriver:
         # Tough talk modes: the negotiation / tough-question state lives here (code owns it; the model only phrases lines).
         self.neg = (resume or {}).get("negotiation") or neg
         self.tough = (resume or {}).get("tough") or tough_state
+        # Interview money talk (v2): after the last question Mike asks about salary; a screening call, at most 6 turns.
+        self.money_plan = (resume or {}).get("money_plan") or money_plan
+        self.money = (resume or {}).get("money_talk")
+        self._money_start_now = False
+        if resume and self.money:
+            self.finished = self.money.get("phase") == "closed"
         if mode == "negotiate" and not self.neg:
             raise ValueError("a negotiation needs its state")
         if mode == "tough" and not self.tough:
@@ -188,11 +205,11 @@ class TextDriver:
         return bool(self._reply_task and not self._reply_task.done())
 
     def current_question(self) -> Question | None:
-        return self.plan[self.q_index] if self.mode == "interview" and self.plan else None
+        return self.plan[self.q_index] if self.mode == "interview" and self.plan and self.money is None else None
 
     async def run(self, audio_input_stream: AsyncGenerator[bytes, None]) -> None:
         self._running = True
-        warm = [self.llm.warm_up(self._warm_messages())] if self.mode != "tough" else []
+        warm = [self.llm.warm_up(self._warm_messages())]
         if self.stt is not None and self.stt.available:
             warm.append(asyncio.to_thread(self.stt.warm_up))
         self._warm_task = asyncio.ensure_future(asyncio.gather(*warm, return_exceptions=True))
@@ -225,7 +242,7 @@ class TextDriver:
             self._reply_task = self._spawn(self._quick_respond(clean))
             return
         self._snapshots.append((self.q_index, list(self.follow_ups), self.finished))
-        self._talk_snaps.append((copy.deepcopy(self.neg), copy.deepcopy(self.tough)))
+        self._talk_snaps.append((copy.deepcopy(self.neg), copy.deepcopy(self.tough), copy.deepcopy(self.money)))
         question = self.current_question()
         last_model = next((t for t in reversed(self.transcript_history) if t["role"] == "model"), None)
         if self.mode == "interview" and question:                  # not "Take your time..." or "Sure. <question>"
@@ -249,6 +266,8 @@ class TextDriver:
 
     def _answer_kind(self) -> str:
         if self.mode == "interview":
+            if self.money is not None:
+                return "money"
             return "follow_up" if self.follow_ups else "main"
         if self.mode == "tough":
             return "question"
@@ -343,7 +362,7 @@ class TextDriver:
         if self._snapshots:
             self.q_index, self.follow_ups, self.finished = self._snapshots.pop()
         if self._talk_snaps:
-            self.neg, self.tough = self._talk_snaps.pop()
+            self.neg, self.tough, self.money = self._talk_snaps.pop()
         self._repeat_offered = False
         question = drop_last_answer(self.transcript_history)
         if question:
@@ -374,9 +393,11 @@ class TextDriver:
         if self.mode == "interview":
             return [{"role": "system", "content": self._p1_system()}, {"role": "user", "content": "warm-up"}]
         if self.mode == "negotiate":
+            if bargain.is_v2(self.neg):
+                return [{"role": "system", "content": self._p9_system()}, {"role": "user", "content": "warm-up"}]
             return [{"role": "system", "content": self._p7_system()}, {"role": "user", "content": "warm-up"}]
-        if self.mode == "tough":
-            return []
+        if self.mode == "tough":                     # D117: follow-ups are written by the model now, so load it early
+            return [{"role": "system", "content": content.system("p12_follow_up")}, {"role": "user", "content": "warm-up"}]
         return [{"role": "system", "content": self._tutor_system()}, {"role": "user", "content": "warm-up"}]
 
     def _p1_system(self) -> str:
@@ -386,6 +407,9 @@ class TextDriver:
 
     def _p7_system(self) -> str:
         return content.system("p7_recruiter") + content.name_line(self.settings.get("name", ""))
+
+    def _p9_system(self) -> str:
+        return content.system("p9_bargain") + content.name_line(self.settings.get("name", ""))
 
     def _tutor_system(self) -> str:
         preset = content.level_presets().get(self.level, content.level_presets().get("B1", ""))
@@ -400,7 +424,11 @@ class TextDriver:
             return
         if self.mode == "negotiate":
             self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
-            line = negotiation.opening_line(self.neg, self.settings.get("name", ""))
+            if bargain.is_v2(self.neg):
+                line = bargain.opening_line(self.neg, self.settings.get("name", ""))
+                self.neg["recent"] = [line]
+            else:
+                line = negotiation.opening_line(self.neg, self.settings.get("name", ""))
             await self._deliver(self._from_list(_sentences(line)), lambda: self._neg_meta("turn"))
             return
         if self.mode == "tough":
@@ -455,12 +483,22 @@ class TextDriver:
             await self._respond(last["text"], None)
             return
         if self.mode == "negotiate":
+            v2 = bargain.is_v2(self.neg)
             if self.neg["phase"] == "closed":
-                await self._deliver(self._from_list(_sentences(talk.data()["recruiter_lines"]["closed_again"]["*"])),
-                                    lambda: self._neg_meta("closing"), record=False)
+                text = bargain.closed_line(self.neg) if v2 else talk.data()["recruiter_lines"]["closed_again"]["*"]
+                await self._deliver(self._from_list(_sentences(text)), lambda: self._neg_meta("closing"), record=False)
+            elif v2 and self.neg["check"]["pending"]:
+                await self._come_back(resumed=True)
             else:
-                await self._deliver(self._from_list(_sentences(negotiation.restate_line(self.neg))),
-                                    lambda: self._neg_meta("turn"))
+                text = bargain.restate_line(self.neg) if v2 else negotiation.restate_line(self.neg)
+                await self._deliver(self._from_list(_sentences(text)), lambda: self._neg_meta("turn"))
+            return
+        if self.money is not None:
+            if self.money["phase"] == "closed":
+                await self._deliver(self._from_list(_sentences(content.copy("interview_closing"))),
+                                    lambda: {"kind": "closing"}, record=False)
+            else:
+                await self._deliver(self._from_list(_sentences(bargain.restate_line(self.money))), lambda: self._money_meta("turn"))
             return
         if self.mode == "tough":
             if self.tough["closed"]:
@@ -486,10 +524,15 @@ class TextDriver:
     async def _respond(self, answer: str, transcript: Transcript | None) -> None:
         token = self._hold_token
         try:
-            if self.mode == "interview":
+            if self.mode == "interview" and self.money is not None:
+                await self._money_reply(answer)
+            elif self.mode == "interview":
                 await self._interview_reply(answer, transcript)
             elif self.mode == "negotiate":
-                await self._negotiate_reply(answer)
+                if bargain.is_v2(self.neg):
+                    await self._bargain_reply(answer)
+                else:
+                    await self._negotiate_reply(answer)
             elif self.mode == "tough":
                 await self._tough_reply(answer)
             else:
@@ -499,9 +542,13 @@ class TextDriver:
 
     # ---------- tough talk modes ----------
 
-    def _neg_meta(self, kind: str, reply=None) -> dict:
+    def _neg_meta(self, kind: str, reply=None, **extra) -> dict:
         st = self.neg
         out = {"kind": kind, "outcome": st["outcome"], "index": st["user_turns"]}
+        step = talkcase.talk_step(st) if bargain.is_v2(st) else None
+        if step is not None:
+            out["talk_step"] = step
+        out.update(extra)
         return out
 
     def _tough_meta(self, kind: str) -> dict:
@@ -536,6 +583,172 @@ class TextDriver:
             self.finished = work["phase"] == "closed"
             return self._neg_meta(kind)
         await self._deliver(self._from_list(_sentences(text)), meta)
+
+    # ---------- Negotiation v2: the bargaining engine ----------
+
+    async def _bargain_reply(self, answer: str) -> None:
+        """Code decides the act (bargain.step on a copy); the model words it inside that act; the guard replaces the line only
+        on a leak. After a "let me check" line the server waits a few seconds and Mike comes back by himself."""
+        work = copy.deepcopy(self.neg)
+        reply = bargain.step(work, answer, await self._intent(work, answer))
+        await self._bargain_deliver(work, reply, answer, state_attr="neg")
+        if reply.check and self.neg is not None and self.neg["check"]["pending"] and self.neg["phase"] != "closed":
+            await asyncio.sleep(bargain.check_delay())
+            await self._come_back()
+
+    async def _come_back(self, resumed: bool = False) -> None:
+        work = copy.deepcopy(self.neg)
+        reply = bargain.come_back(work)
+        self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
+        await self._bargain_deliver(work, reply, "", state_attr="neg", came_back=True)
+
+    async def _intent(self, st: dict, text: str) -> dict | None:
+        """The model's reading of the user's line (one short JSON call, checked by code). None = use the keyword reading."""
+        if st["phase"] == "closed":
+            return None
+        if self.settings.get("engine") in SLOW_ENGINES:
+            # A CLI call takes ~10 s: waiting up to 8 s for a reading the keywords give anyway made every turn slow
+            # (owner 08.11, claude_cli: 10-17 s a turn). Keywords only on these engines.
+            self._metrics["intent"] = "keywords"
+            return None
+        user = content.user("p10_intent", scenario_name=bargain.scenario_info(st["scenario"])["name"],
+                            offer=bargain.fmt(st, st["offer"]) if st["offer"] is not None else "nothing yet",
+                            mike_last=(st["recent"][-1] if st["recent"] else "")[:300], user_line=text[:400])
+        messages = [{"role": "system", "content": content.system("p10_intent")}, {"role": "user", "content": user}]
+
+        async def call() -> str:
+            raw = ""
+            agen = self.llm.chat_stream(messages, temperature=0.0, max_tokens=110, json_schema=content.schema("p10_intent"))
+            try:
+                async for delta in agen:
+                    raw += delta
+            finally:
+                await agen.aclose()
+            return raw
+        try:
+            raw = await asyncio.wait_for(call(), timeout=INTENT_TIMEOUT_S)
+            data = json.loads(raw)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.info("Intent reading skipped: %s", type(exc).__name__)
+            self._metrics["intent"] = "keywords"
+            return None
+        found = bargain.validate_intent(data, text)
+        self._metrics["intent"] = "model" if found else "keywords"
+        if found:
+            st.setdefault("intents", []).append({"turn": st["user_turns"] + 1, "intent": found["intent"]})
+        return found
+
+    async def _bargain_deliver(self, work: dict, reply, answer: str, state_attr: str, came_back: bool = False) -> None:
+        name = self.settings.get("name", "")
+        base = bargain.scripted_line(work, reply, name, base_only=True)
+        line = base
+        self._metrics["path"] = "fixed"
+        if reply.move not in bargain.FIXED_ACTS:
+            said = await self._bargain_model_line(work, reply, answer)
+            if said:
+                line, self._metrics["path"] = said, "model"
+            elif said is not None:
+                work["guard_replacements"] = work.get("guard_replacements", 0) + 1
+        bargain.said(work, reply, line)
+        text = bargain.with_tail(work, line, reply)
+        kind = "closing" if reply.closing else "checking" if reply.check else "turn"
+        extra = {}
+        if reply.check:
+            extra = {"checking": True, "check_s": int(bargain.check_delay())}
+        if came_back or reply.came_back:
+            extra["came_back"] = True
+
+        def meta() -> dict:
+            setattr(self, state_attr, work)
+            if state_attr == "neg":
+                self.finished = work["phase"] == "closed"
+                return self._neg_meta(kind, **extra)
+            return self._money_meta(kind, **extra)
+        await self._deliver(self._from_list(_sentences(text)), meta)
+
+    async def _bargain_model_line(self, st: dict, reply, answer: str) -> str | None:
+        """The model's wording of one act. "" = the line failed the guard (the caller counts it and uses the scripted line);
+        None = no model line (error or empty)."""
+        inp = bargain.model_input(st, reply, answer)
+        user = content.user("p9_bargain", **{k: ("" if v is None else v) for k, v in inp.items()})
+        messages = [{"role": "system", "content": self._p9_system()}, {"role": "user", "content": user}]
+        raw = ""
+        agen = self.llm.chat_stream(messages, temperature=0.7, max_tokens=160, json_schema=content.schema("p9_bargain"))
+        try:
+            async for delta in agen:
+                raw += delta
+        except EngineError as exc:
+            log.warning("Bargain line failed: %s", exc.code)
+            return None
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.warning("Bargain line failed: %s", type(exc).__name__)
+            return None
+        finally:
+            await agen.aclose()
+        try:
+            line = norm(str(json.loads(raw).get("bargain_line", "")))
+        except (ValueError, AttributeError):
+            m = re.search(r'"bargain_line"\s*:\s*"((?:[^"\\]|\\.)*)', raw)
+            line = norm(m.group(1)) if m else ""
+        if not line:
+            return None
+        line = trim_words(line, 70)
+        ok, why = bargain.guard_ok(st, reply, line)
+        if not ok:
+            log.info("Bargain line replaced by the scripted line (%s)", why)
+            st.setdefault("guard_reasons", []).append(why)
+            return ""
+        return line
+
+    # ---------- interview money talk ----------
+
+    def _money_meta(self, kind: str, **extra) -> dict:
+        st = self.money
+        out = {"kind": kind, "outcome": st["outcome"], "index": st["user_turns"]}
+        out.update(extra)
+        return out
+
+    def _closing_sentences(self) -> list[str]:
+        """The end of the interview: the closing line, or (money talk on) the salary question that starts the call."""
+        plan = self.money_plan
+        if plan and self.money is None:
+            form = dict(plan["form"], scenario="screening")
+            self.money = bargain.new_state(form, plan["style"])
+            self.money["cap"] = bargain.data()["caps"]["money_cap"]
+            line = bargain.data()["money_talk"]["start_line"]
+            self.money["recent"] = [line]
+            self._money_start_now = True
+            self.finished = False
+            return _sentences(line)
+        return _sentences(content.copy("interview_closing"))
+
+    def _closing_meta(self) -> dict:
+        if self._money_start_now:
+            self._money_start_now = False
+            return {"kind": "money_start"}
+        return {"kind": "closing"}
+
+    async def _money_reply(self, answer: str) -> None:
+        if MONEY_SKIP.search(answer):               # "Skip" / "I'd rather not talk about it": the interview closes as usual
+            work = copy.deepcopy(self.money)
+            work["user_turns"] += 1
+            work["phase"], work["outcome"] = "closed", "skipped"
+
+            def meta() -> dict:
+                self.money = work
+                self.finished = True
+                return {"kind": "closing"}
+            await self._deliver(self._from_list(_sentences(content.copy("interview_closing"))), meta)
+            return
+        work = copy.deepcopy(self.money)
+        reply = bargain.step(work, answer, await self._intent(work, answer))
+        await self._bargain_deliver(work, reply, answer, state_attr="money")
+        if self.money["phase"] == "closed":
+            self.finished = True
 
     async def _recruiter_model_line(self, st: dict, reply, answer: str) -> str | None:
         """The model's phrasing of one move. "" = the line failed the number guard (caller counts it);
@@ -574,6 +787,12 @@ class TextDriver:
         work = copy.deepcopy(self.tough)
         res = tough.step(work, answer)
         self._metrics["path"] = "fixed"
+        if res["kind"] == "follow_up":
+            line = await self._tough_follow_up(work, answer, res["line"])
+            if line:
+                res["line"] = line
+                work["log"][-1]["pushes"][-1]["text"] = line
+                self._metrics["path"] = "model"
 
         def meta() -> dict:
             self.tough = work
@@ -582,18 +801,141 @@ class TextDriver:
                                                                    "repeat") else "question")
         await self._deliver(self._from_list(_sentences(res["line"])), meta)
 
-    def hint(self) -> dict | None:
-        """An in-call tactic card chosen by code (no model). Recorded in the state for the debrief."""
+    async def _tough_follow_up(self, work: dict, answer: str, fixed: str) -> str | None:
+        """D117: Mike's follow-up written from the answer (owner 08.11: "Will you need a visa?" → "No, I don't" got the
+        fixed "How long would that take?"). Code still decides that a follow-up comes; None keeps the fixed line."""
+        if self.settings.get("engine") in SLOW_ENGINES:
+            return None
+        q = tough.current(work)
+        if q is None:
+            return None
+        user = content.user("p12_follow_up", question=q["text"], checking=q["checking"], purpose=fixed,
+                            answer=answer[:1200])
+        messages = [{"role": "system", "content": content.system("p12_follow_up")}, {"role": "user", "content": user}]
+
+        async def call() -> str:
+            raw = ""
+            agen = self.llm.chat_stream(messages, temperature=0.6, max_tokens=60, json_schema=content.schema("p12_follow_up"))
+            try:
+                async for delta in agen:
+                    raw += delta
+            finally:
+                await agen.aclose()
+            return raw
+        try:
+            raw = await asyncio.wait_for(call(), timeout=FOLLOW_UP_TIMEOUT_S)
+            line = " ".join(str(json.loads(raw).get("follow_up", "")).split())
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.info("Follow-up line skipped: %s", type(exc).__name__)
+            return None
+        allowed = hintgen.allowed_numbers([answer, q["text"]], [])
+        if not line or len(line.split()) > 24 or not line.endswith("?") or hintgen.numbers_in(line) - allowed:
+            return None
+        if difflib.SequenceMatcher(None, line.lower(), fixed.lower()).ratio() >= 0.8:
+            return None                               # the model copied the fixed line: same thing, keep it fixed
+        return line
+
+    def hint(self, another: bool = False) -> dict | None:
+        """An in-call tactic card chosen by code (no model). Recorded in the state for the debrief. `another` = the next-best
+        card for this moment (cards already shown at this turn are skipped). It never fails: if the card cannot be built, a
+        fixed fallback card answers (None only outside Tough talk)."""
+        if self.mode == "interview" and getattr(self, "money", None) is not None:
+            return self._money_hint(another)
+        if self.mode not in ("negotiate", "tough"):
+            return None
+        try:
+            return self._hint(another)
+        except Exception:  # a hint must always arrive, a broken state or card must not leave the button waiting
+            log.exception("hint failed, answering with the fallback card")
+            return talk.fallback_hint(self.mode)
+
+    async def hint_example(self, payload: dict) -> str | None:
+        """D117: the card's "Try saying" line written by the model from what the person said (hintgen checks it). None =
+        keep the fixed example: a slow (CLI) engine, Mike is speaking, a card whose fixed line is right, or no good line."""
+        if (self.settings.get("engine") in SLOW_ENGINES or self.replying() or payload.get("card_id") in FIXED_HINT_LINES
+                or not payload.get("title")):
+            return None
+        said = [t["text"] for t in self.transcript_history if t.get("role") == "user" and t.get("text")][-6:]
+        mike = [t["text"] for t in self.transcript_history if t.get("role") != "user" and t.get("text")]
+        values: list = []
+        labels: list[str] = []
+        if self.mode == "tough":
+            practice = "tough interview questions"
+        else:
+            st = self.money if getattr(self, "money", None) is not None else self.neg
+            practice = "a salary talk" + (f" ({bargain.scenario_info(st['scenario'])['name']})" if st.get("scenario") else "")
+            su = (st.get("levers") or {}).get("step_up") or {}
+            said_ask = st.get("user_anchor") or st.get("ask")
+            named = [("their target (private)" if not said_ask else "", st.get("target")), ("the number they asked for", said_ask),
+                     ("their current pay", st.get("current_pay")), ("Mike's first offer", st.get("opening") or st.get("offer")),
+                     ("Mike's offer now", st.get("new_offer")), ("step-up now", su.get("now_amount")),
+                     ("step-up later", su.get("later_amount"))]
+            labels = [f"{name} {talk.money(v)}" for name, v in named if name and isinstance(v, (int, float)) and v]
+            values = [v for _, v in named] + [st.get("offer")]
+        case_texts = [] if self.mode == "tough" else [*((st.get("case") or {}).get("results") or [])]
+        allowed = hintgen.allowed_numbers(said + mike + case_texts, values)
+        named_set = hintgen.allowed_numbers([], values)
+        rest = sorted(allowed - named_set)
+        numbers = "; ".join(labels + ([f"also said in the talk: {', '.join(rest)}"] if rest else [])) or "none"
+        case_block = talkcase.hint_context(st) if self.mode != "tough" else ""
+        shape = payload.get("shape") or ""
+        user = content.user("p11_hint", practice=practice, tactic_title=payload["title"], tactic_rule=payload.get("text", ""),
+                            shape_line=f"ANSWER SHAPE: {shape}" if shape and shape != payload.get("text") else "",
+                            example=payload.get("example") or "(none)",
+                            mike_last=(mike[-1] if mike else "")[:300],
+                            said="\n".join(f"- {x[:300]}" for x in said) or "(nothing yet)",
+                            numbers=numbers, case=case_block)
+        messages = [{"role": "system", "content": content.system("p11_hint")}, {"role": "user", "content": user}]
+
+        async def call() -> str:
+            raw = ""
+            agen = self.llm.chat_stream(messages, temperature=0.5, max_tokens=90, json_schema=content.schema("p11_hint"))
+            try:
+                async for delta in agen:
+                    raw += delta
+            finally:
+                await agen.aclose()
+            return raw
+        try:
+            raw = await asyncio.wait_for(call(), timeout=HINT_GEN_TIMEOUT_S)
+            line = str(json.loads(raw).get("candidate_line", ""))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.info("Hint line skipped: %s", type(exc).__name__)
+            return None
+        return hintgen.clean(line, allowed, said)
+
+    def _money_hint(self, another: bool) -> dict:
+        try:
+            st = self.money
+            spoken = [t for t in self.transcript_history if t["role"] == "user" and t.get("kind") == "money"]
+            exclude = bargain.hints_shown_now(st)
+            cid = bargain.pick_hint(st, spoken, exclude)
+            st["hints_used"].append({"card_id": cid, "turn": st["user_turns"]})
+            return talk.hint_payload(cid, "negotiate", len(st["hints_used"]), example=bargain.card_example(cid, st))
+        except Exception:
+            log.exception("money hint failed, answering with the fallback card")
+            return talk.fallback_hint("negotiate")
+
+    def _hint(self, another: bool) -> dict:
+        if self.mode == "negotiate" and bargain.is_v2(self.neg):
+            spoken = [t for t in self.transcript_history if t["role"] == "user"]
+            exclude = bargain.hints_shown_now(self.neg)             # every press moves on (owner 08.11: H gave the same card again)
+            cid = bargain.pick_hint(self.neg, spoken, exclude)
+            self.neg["hints_used"].append({"card_id": cid, "turn": self.neg["user_turns"]})
+            return talk.hint_payload(cid, "negotiate", len(self.neg["hints_used"]), example=bargain.card_example(cid, self.neg))
         if self.mode == "negotiate":
             spoken = [t for t in self.transcript_history if t["role"] == "user"]
-            cid = negotiation.pick_hint(self.neg, spoken)
+            exclude = negotiation.hints_shown_now(self.neg)             # every press moves on (owner 08.11: H gave the same card again)
+            cid = negotiation.pick_hint(self.neg, spoken, exclude)
             self.neg["hints_used"].append({"card_id": cid, "turn": self.neg["user_turns"]})
             return talk.hint_payload(cid, "negotiate", len(self.neg["hints_used"]), example=negotiation.card_example(cid, self.neg))
-        if self.mode == "tough":
-            h = tough.pick_hint(self.tough)
-            self.tough["hints_used"].append({"card_id": h["card_id"], "question_id": h["question_id"]})
-            return talk.hint_payload(h["card_id"], "tough", len(self.tough["hints_used"]), h["shape"])
-        return None
+        h = tough.pick_hint(self.tough, another)
+        self.tough["hints_used"].append({"card_id": h["card_id"], "question_id": h["question_id"], "turn": h["turn"]})
+        return tough.hint_payload(self.tough, h, len(self.tough["hints_used"]))
 
     async def _interview_reply(self, answer: str, transcript: Transcript | None) -> None:
         question = self.plan[self.q_index]
@@ -664,8 +1006,8 @@ class TextDriver:
 
     def _follow_meta(self) -> dict:
         if self._decision == "moved_on":
-            if self.finished:
-                return {"kind": "closing"}
+            if self.finished or self._money_start_now:
+                return self._closing_meta()
             question = self.plan[self.q_index]
             return {"kind": "question", "question_id": question.id, "thread_id": question.id}
         question = self.plan[self.q_index]
@@ -751,7 +1093,7 @@ class TextDriver:
         nxt = self.plan[self.q_index + 1] if self.q_index + 1 < len(self.plan) else None
         if nxt is None:
             self.finished = True
-            closing = _sentences(content.copy("interview_closing"))
+            closing = self._closing_sentences()
             return lines + (closing[1:] if said and closing and closing[0] == "Okay." else closing)
         self.q_index += 1
         self.follow_ups = []
@@ -772,8 +1114,8 @@ class TextDriver:
         nxt = self.plan[self.q_index + 1] if self.q_index + 1 < len(self.plan) else None
         if nxt is None:
             self.finished = True
-            await self._deliver(self._from_list(_sentences(content.copy("interview_closing"))),
-                                lambda: {"kind": "closing"})
+            sentences = self._closing_sentences()
+            await self._deliver(self._from_list(sentences), self._closing_meta)
             return
         self.q_index += 1
         self.follow_ups = []

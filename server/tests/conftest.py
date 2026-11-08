@@ -64,7 +64,7 @@ class FakeLLM(LLMEngine):
         props = set(schema.get("properties", {}))
         for key, marker in (("p1", "say"), ("p2b", "items"), ("p5b", "corrections"), ("p3", "verdict"),
                             ("p2c", "rewrite"), ("suggester", "story"), ("p0", "questions"),
-                            ("p7", "recruiter_line"), ("p8", "shares_personal_info")):
+                            ("p7", "recruiter_line"), ("p9", "bargain_line"), ("p10", "intent"), ("p8", "shares_personal_info"), ("p11", "candidate_line"), ("p12", "follow_up")):
             if marker in props:
                 return key
         if "voice" in props or "relevant" in props:

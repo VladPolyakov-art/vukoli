@@ -14,11 +14,12 @@ import { pendingSave } from "../lib/pendingSave";
 import { useStorageWritable } from "../lib/storageProbe";
 import { useApp } from "../lib/store";
 import { sessionUtScreen, useUtScreen } from "../lib/utScreen";
-import type { EngineId } from "../lib/types";
+import type { EngineId, NegotiateStart } from "../lib/types";
 import type { SessionState } from "../session/reducer";
 import { useSession, type SessionConfig } from "../session/useSession";
 import { SessionView } from "./session/SessionView";
 import type { SessionData, SessionHandlers, SessionOverlay, SessionPhase, TranscriptTurn } from "./session/types";
+import { talkStepsModel } from "./session/talkSteps";
 import s from "./Session.module.css";
 
 interface LocationState { config?: SessionConfig; title?: string; /** A drill: the weak spots it works on. */ focus?: string }
@@ -229,12 +230,13 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   const start = config.start;
   const progress = turnBased
     ? t("session.turn", { n: userTurns + 1 })
+    : state.moneyPart ? t("session.moneyPart")
     : total && questionIndex >= 0 ? t("session.progress", { n: questionIndex + 1, total }) : "";
   const roundLabel = start.round_type ? t(`session.round.${start.round_type}`) : "";
   const strictLabel = start.strictness && STRICT[start.strictness as 1 | 2 | 3] ? t(`session.strict.${STRICT[start.strictness as 1 | 2 | 3]}`) : "";
   const drill = state.mode === "interview" && start.drill === true;
   // Tough talk (tough-talk.md §4.3): the More header's second line. The negotiate style stays hidden while it is a surprise.
-  const negotiateStart = start.negotiate;
+  const negotiateStart = start.negotiate as NegotiateStart | undefined;
   const sub = english ? undefined
     : tough ? t("session.tough.sub", { n: state.questions.length || 5 })
       : negotiate ? (negotiateStart?.style === "surprise"
@@ -270,6 +272,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     if (micError && micError !== "stt_unsupported" && !MIC_HELP[micError]) notices.push({ id: "mic", tone: "warning", text: tMaybe(`session.mic.${micError}`, t("session.mic.failed")) });
     if (state.notice && state.notice.code !== "muted_speech") notices.push({ id: "notice", tone: "info", text: state.notice.message, onDismiss: actions.dismissNotice });
     if (state.error) notices.push({ id: "error", tone: "error", text: [state.error.message, state.error.hint].filter(Boolean).join(" "), onDismiss: actions.dismissError });
+    if (state.hintWait === "stalled" && !state.hint) notices.push({ id: "hint", tone: "warning", text: t("tactic.hintStalled"), onDismiss: actions.hideHint, action: { label: t("tactic.hintRetry"), onClick: actions.anotherHint } });
     if (state.closing) notices.push({ id: "closing", tone: "info", title: t("session.closing.title"), text: t("session.closing.body"), action: { label: t("session.closing.debrief"), onClick: end } });
   }
 
@@ -283,7 +286,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     sub,
     badges: english && start.level ? [{ label: start.level, tone: "outline", icon: "language" }] : undefined,
     progress,
-    step: !turnBased && total && questionIndex >= 0 ? { n: questionIndex + 1, of: total } : undefined,
+    step: !turnBased && !state.moneyPart && total && questionIndex >= 0 ? { n: questionIndex + 1, of: total } : undefined,
     elapsed,
     question: state.currentQuestionText,
     followUp: state.followUps.at(-1),
@@ -292,12 +295,16 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     nextNumber: null,
     suggestion,
     suggestOn: state.suggestOn,
-    hint: tough || negotiate
+    checking: state.checking,
+    moneyPart: state.moneyPart,
+    talkSteps: negotiate ? talkStepsModel(state.talkStep, state.scenario) ?? undefined : undefined,
+    hint: tough || negotiate || state.moneyPart
       ? {
         available: state.hintAvailable,
         open: state.hint !== null,
         card: state.hint ? { id: state.hint.card_id, title: state.hint.title, text: state.hint.text, example: state.hint.example, shape: state.hint.shape } : undefined,
         used: state.hintsUsed,
+        wait: state.hintWait,
       }
       : undefined,
     pauseSec: config.pauseSec,
@@ -326,8 +333,9 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     onTryAgain: actions.retryMic,
     onSendText: actions.sendText,
     onSetSuggest: actions.setSuggest,
-    onToggleHint: tough || negotiate ? actions.toggleHint : undefined,
-    onHideHint: tough || negotiate ? actions.hideHint : undefined,
+    onToggleHint: tough || negotiate || state.moneyPart ? actions.toggleHint : undefined,
+    onHideHint: tough || negotiate || state.moneyPart ? actions.hideHint : undefined,
+    onAnotherHint: tough || negotiate || state.moneyPart ? actions.anotherHint : undefined,
     onSeeDebrief: end,
   };
 
@@ -345,7 +353,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
         muted={muted}
         micLevel={0}
         getMicLevel={getLevel}
-        suggester={state.mode === "interview" && state.suggesterAvailable && settings?.answer_suggester !== false ? "on" : "off"}
+        suggester={state.mode === "interview" && !state.moneyPart && state.suggesterAvailable && settings?.answer_suggester !== false ? "on" : "off"}
         data={data}
         handlers={handlers}
         entering

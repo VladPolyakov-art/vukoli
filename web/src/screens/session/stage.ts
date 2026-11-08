@@ -23,6 +23,10 @@ export function stageFor(p: SessionViewProps): Stage {
   // English has no "Next question": after the feedback the conversation goes on, so it is the user's turn again.
   const effective = variant === "english" && (phase === "feedback" || phase === "between") ? "your-turn" : phase;
   const sec = data.pauseSec;
+  // Negotiation v2: Mike is checking with the hiring manager. The user may still type or talk: that reply is the come-back.
+  if (data.checking && (effective === "your-turn" || effective === "thinking" || effective === "mike-speaking")) {
+    return { presence: "thinking", pill: "thinking", label: t("session.status.checking"), live: false };
+  }
   switch (effective) {
     case "connecting":
       return { presence: "idle", pill: "connecting", label: t("session.status.connecting"), sub: t("session.sub.connecting"), live: false };

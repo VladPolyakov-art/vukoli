@@ -331,3 +331,73 @@ describe("quick start (D111)", () => {
     expect(users.map((x) => !!x.choice)).toEqual([true, false]);
   });
 });
+
+describe("negotiation v2 turns", () => {
+  const model = (extra: Partial<Extract<SessionAction, { type: "turn_complete" }>>): SessionAction[] => [
+    { type: "turn_start", speaker: "model" },
+    { type: "turn_complete", speaker: "model", full_text: "I will check with the hiring manager.", kind: "checking", checking: true, check_s: 4, ...extra } as SessionAction,
+    { type: "response_complete" },
+  ];
+  it("shows the checking state until Mike speaks again", () => {
+    const s = run([started, { type: "ready" }, ...model({})]);
+    expect(s.checking).toBe(true);
+    const back = run([{ type: "turn_start", speaker: "model" }], s);
+    expect(back.checking).toBe(false);
+  });
+  it("switches to the salary part on money_start", () => {
+    const s = run([started, { type: "ready" }, { type: "turn_start", speaker: "model" },
+      { type: "turn_complete", speaker: "model", full_text: "Let us talk about pay.", kind: "money_start" } as SessionAction]);
+    expect(s.moneyPart).toBe(true);
+    expect(s.hintAvailable).toBe(true);
+  });
+});
+
+
+describe("hint_update (D117)", () => {
+  const card = { type: "hint" as const, mode: "tough" as const, card_id: "T2", title: "Stay calm", text: "rule", example: "fixed example", n: 1 };
+  const withCard = () => run([started, { type: "ready" }, card as SessionAction]);
+  it("replaces the example of the matching card and keeps the rest", () => {
+    const s = run([{ type: "hint_update", n: 1, card_id: "T2", example: "I led [your result]." }], withCard());
+    expect(s.hint?.example).toBe("I led [your result].");
+    expect(s.hint?.title).toBe("Stay calm");
+  });
+  it("ignores another n or card_id", () => {
+    const s0 = withCard();
+    expect(run([{ type: "hint_update", n: 2, card_id: "T2", example: "x" }], s0).hint?.example).toBe("fixed example");
+    expect(run([{ type: "hint_update", n: 1, card_id: "N4", example: "x" }], s0).hint?.example).toBe("fixed example");
+  });
+  it("does nothing after the hint was hidden", () => {
+    const hidden = run([{ type: "local/hint_hide" }], withCard());
+    const s = run([{ type: "hint_update", n: 1, card_id: "T2", example: "x" }], hidden);
+    expect(s).toBe(hidden);
+    expect(s.hint).toBeNull();
+  });
+  it("does not touch the wait state", () => {
+    const pending = run([{ type: "local/hint_requested" }], withCard());
+    const s = run([{ type: "hint_update", n: 1, card_id: "T2", example: "x" }], pending);
+    expect(s.hintWait).toBe("pending");
+  });
+});
+
+describe("Negotiation v3: talk_step (the steps strip)", () => {
+  const negotiate: ServerMessage = { ...started, mode: "negotiate", negotiate: { period: "year", scenario: "raise" } } as ServerMessage;
+  const line = (extra: object): SessionAction[] => [
+    { type: "turn_start", speaker: "model" },
+    { type: "turn_complete", speaker: "model", full_text: "Hm.", kind: "turn", ...extra } as SessionAction,
+    { type: "response_complete" },
+  ];
+
+  it("is null until the server sends a step, then follows Mike's turns; a line without a step keeps the last", () => {
+    let s = run([negotiate, ...line({})]);
+    expect(s.talkStep).toBeNull();
+    expect(s.scenario).toBe("raise");
+    s = run(line({ talk_step: 2 }), s);
+    expect(s.talkStep).toBe(2);
+    s = run(line({}), s);
+    expect(s.talkStep).toBe(2);
+    s = run(line({ talk_step: 9 }), s);
+    expect(s.talkStep).toBe(2);
+    s = run(line({ talk_step: 4 }), s);
+    expect(s.talkStep).toBe(4);
+  });
+});

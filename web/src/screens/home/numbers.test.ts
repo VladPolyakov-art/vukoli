@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_NUMBERS, validateNumbers, toNegotiateStart, type NumbersValues } from "./numbers";
+import { EMPTY_NUMBERS, validateNumbers, toNegotiateStart, isScenario, type NumbersValues } from "./numbers";
 
 const ok: NumbersValues = { ...EMPTY_NUMBERS, role: "Product Designer", low: "85,000", high: "98,000", target: "96k", currency: "EUR" };
 
@@ -48,6 +48,37 @@ describe("validateNumbers", () => {
   });
   it("builds the start block without a range when none was given", () => {
     const p = validateNumbers({ ...EMPTY_NUMBERS, role: "PD", target: "90000" }).parsed!;
-    expect(toNegotiateStart(p, "firm")).toEqual({ role: "PD", target: 90000, currency: "USD", style: "firm", has_real_offer: false });
+    expect(toNegotiateStart(p, "firm", "offer")).toEqual({ scenario: "offer", role: "PD", target: 90000, currency: "USD", style: "firm", has_real_offer: false });
+  });
+});
+
+describe("scenario numbers (Negotiation v2)", () => {
+  const raise = { ...EMPTY_NUMBERS, role: "PD", currentPay: "60,000", ask: "72,000", currency: "EUR" };
+  it("raise: the ask must be above the current pay", () => {
+    expect(validateNumbers(raise, { scenario: "raise" }).ok).toBe(true);
+    expect(validateNumbers({ ...raise, ask: "50,000" }, { scenario: "raise" }).ok).toBe(false);
+    expect(validateNumbers({ ...raise, currentPay: "" }, { scenario: "raise" }).ok).toBe(false);
+  });
+  it("raise: sends the ask as the target and the current pay", () => {
+    const p = validateNumbers(raise, { scenario: "raise" }).parsed!;
+    expect(toNegotiateStart(p, "firm", "raise")).toMatchObject({ scenario: "raise", target: 72000, current_pay: 60000, ask: 72000 });
+  });
+  it("counteroffer: needs a new offer above current pay and a reason", () => {
+    const c: NumbersValues = { ...EMPTY_NUMBERS, role: "PD", currentPay: "60,000", newOffer: "70,000", reason: "growth", currency: "EUR" };
+    expect(validateNumbers(c, { scenario: "counteroffer" }).ok).toBe(true);
+    expect(validateNumbers({ ...c, reason: "" }, { scenario: "counteroffer" }).ok).toBe(false);
+    expect(validateNumbers({ ...c, newOffer: "55,000" }, { scenario: "counteroffer" }).ok).toBe(false);
+    const p = validateNumbers(c, { scenario: "counteroffer" }).parsed!;
+    expect(toNegotiateStart(p, "firm", "counteroffer")).toMatchObject({ scenario: "counteroffer", new_offer: 70000, current_pay: 60000, leave_reason: "growth" });
+  });
+  it("screening and internship need only role and target", () => {
+    const v = { ...EMPTY_NUMBERS, role: "PD", target: "90000" };
+    expect(validateNumbers(v, { scenario: "screening" }).ok).toBe(true);
+    expect(validateNumbers(v, { scenario: "internship" }).ok).toBe(true);
+  });
+  it("knows the five scenario ids", () => {
+    expect(["screening", "offer", "internship", "counteroffer", "raise"].every((s) => isScenario(s))).toBe(true);
+    expect(isScenario("nope")).toBe(false);
+    expect(isScenario(null)).toBe(false);
   });
 });

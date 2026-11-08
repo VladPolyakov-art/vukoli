@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { AppShellView, type RecentState, type ShellEngine } from "../../components/AppShell";
 import { OverlayRoot } from "../../ds/OverlayRoot";
 import type { LayerOrder } from "../../lib/types";
+import { moneyTalkDebrief } from "./talk/fixtures";
 import { DEFAULT_OPEN, englishS3, exampleSam, interviewLong, interviewPartial, interviewS2 } from "./fixtures";
 import { DebriefView } from "./DebriefView";
 import { withQuestions } from "./moreQuestions";
@@ -108,12 +109,17 @@ const interviewOnePlanStep: DebriefModel = {
   drill: { questions: 2, points: 1, minutes: 6 },
 };
 
+/** Negotiation v2: an interview that ended with a salary talk. */
+const interviewMoney: DebriefModel = { ...interviewS2, moneyTalk: moneyTalkDebrief };
+
 const base = { variant: "interview", state: "ready" } as const;
 
 const interviewTen = withQuestions(interviewS2, 10);
 const interviewTwelve = withQuestions(interviewS2, 12);
 
 export const DEBRIEF_SCENES = {
+  /** Interview with a salary part: the "Salary talk" frames after the plan. */
+  interviewMoney: { ...base, model: interviewMoney, ui: { view: "debrief", selected: 1 } },
   /** §3.1–3.5: Q2 open, its stronger answer open. */
   interviewFull: { ...base, model: interviewS2, ui: { view: "debrief", open: DEFAULT_OPEN.s2, strongerOpen: [2] } },
   /** Layout D, the shape of a real session: question 4 opened from a link (`?q=4`), its feedback list, the plan above. */

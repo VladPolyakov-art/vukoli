@@ -7,6 +7,7 @@
  * "Practise again" sits next to the switch in both views. A session with nothing to show (`model.empty`) has the
  * conversation only, and no switch. Layer tints live only in the debrief (CONTRACT §2.6); fixes are marked inside the
  * user's own sentence, never red / green (P8). Container queries on `page`, no viewport media queries. */
+import { SalaryTalkFrames } from "./talk/NegotiateDebrief";
 import { useEffect, useId, useRef, useState } from "react";
 import { Callout, Segmented, durationMs, scrollBehavior } from "../../ds";
 import { t } from "../../i18n";
@@ -223,6 +224,7 @@ export function DebriefView(props: DebriefViewProps) {
           {model.verdictNotice && model.verdictNotice !== "template" && !partial ? <VerdictNotice kind={model.verdictNotice} id={ids.verdict} rerunning={props.rerunning} onRerun={props.onRerun} /> : null}
           {english ? null : summaryBlock}
           {planBlock}
+          {model.moneyTalk && !partial ? <SalaryTalkFrames d={model.moneyTalk} /> : null}
           {english ? (
             <EnglishBody english={english} ctx={rowsFor(0)} ids={{ summary: `${uid}-sum`, corrections: `${uid}-cor`, phrases: `${uid}-phr` }} />
           ) : null}

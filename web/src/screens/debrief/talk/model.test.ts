@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { NegotiateDebrief, ToughDebrief } from "../../../lib/types";
 import {
-  negotiateStrong, negotiateNotInWriting, negotiateAcceptedFirst, negotiateNoOffer, toughNormal, toughModelFailed, toughTwo, toughOne,
+  negotiateCounter, negotiateHomework, negotiateInternship, negotiateRaise, negotiateScreening, moneyTalkDebrief, negotiateStrong, negotiateNotInWriting, negotiateAcceptedFirst, negotiateNoOffer, toughNormal, toughModelFailed, toughTwo, toughOne,
 } from "./fixtures";
 import {
-  causeText, conversationTurns, hintsLine, hurtItems, movesEmpty, negotiateEdge, negotiateMoves, negotiateResult, signalText, toughSummary,
+  homeworkModel, objectionRows, scenarioFacts, causeText, conversationTurns, hintsLine, hurtItems, movesEmpty, negotiateEdge, negotiateMoves, negotiateResult, signalText, toughSummary,
 } from "./model";
 
 const neg = (r: { debrief: unknown }) => r.debrief as NegotiateDebrief;
@@ -149,5 +149,71 @@ describe("conversation turns", () => {
     const turns = conversationTurns(negotiateStrong);
     expect(turns[0]).toMatchObject({ speaker: "mike", opens: true, q: 1 });
     expect(new Set(turns.map((x) => x.q))).toEqual(new Set([1]));
+  });
+});
+
+describe("negotiation v2 debriefs", () => {
+  it("screening: no offer figures, the first number against the band", () => {
+    const r = negotiateResult(neg(negotiateScreening));
+    expect(r.edge).toBe("screening");
+    expect(scenarioFacts(neg(negotiateScreening)).length).toBeGreaterThan(0);
+  });
+  it("raise: a dated raise is the headline, not a verdict on the boss", () => {
+    const d = neg(negotiateRaise);
+    const r = negotiateResult(d);
+    expect(r.headline).toMatch(/66,000/);
+    expect(r.later).toMatchObject({ months: 6 });
+    expect(r.writingLabel).toBe("In writing");                       // a raise has no offer letter
+    expect(negotiateResult(neg(negotiateStrong)).writingLabel).toBe("In the offer letter");
+  });
+  it("counteroffer: two offers side by side and no stay or go verdict", () => {
+    const r = negotiateResult(neg(negotiateCounter));
+    expect(r.edge).toBe("counter");
+    expect(r.compare?.length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(r)).not.toMatch(/you should (stay|leave)/i);
+  });
+  it("internship: the conversion terms show as facts", () => {
+    expect(scenarioFacts(neg(negotiateInternship)).length).toBeGreaterThan(0);
+  });
+  it("objections keep the code-judged marker", () => {
+    const rows = objectionRows(neg(negotiateRaise));
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ answered: true, mayBeWrong: true });
+    expect(rows[1]).toMatchObject({ answered: false, reply: null });
+  });
+  it("the interview's salary part is a screening-shaped debrief", () => {
+    expect(negotiateResult(moneyTalkDebrief).edge).toBe("screening");
+  });
+  it("v1 records still render as before", () => {
+    expect(negotiateResult(neg(negotiateStrong)).edge).toBe("none");
+    expect(objectionRows(neg(negotiateStrong))).toEqual([]);
+  });
+});
+
+describe("negotiation v3: homework (Before the real talk)", () => {
+  it("numbers the items, keeps the quote, notes the repeats and flags the skipped prep", () => {
+    const h = homeworkModel(neg(negotiateHomework))!;
+    expect(h.rows.map((r) => r.n)).toEqual([1, 2, 3, 4]);
+    expect(h.rows[2]!.quote).toBe("That would put you above people on the team.");
+    expect(h.rows[0]!.quote).toBeNull();
+    expect(h.repeat).toEqual({ count: 3, quote: "I'm still aiming for 60,000 based on the work I have done" });
+    expect(h.prepSkipped).toBe(true);
+  });
+
+  it("is absent when the server sent no homework (older record) or an empty list", () => {
+    expect(homeworkModel(neg(negotiateStrong))).toBeNull();
+    expect(homeworkModel({ ...neg(negotiateHomework), homework: [] })).toBeNull();
+  });
+
+  it("no extra repeat note when the list already has the repeated item", () => {
+    const h = homeworkModel({ ...neg(negotiateHomework), repeats: { count: 3, quote: "same" },
+      homework: [{ id: "repeated", text: "You gave the same reason 3 times.", quote: "same", card_id: "X3" }] })!;
+    expect(h.repeat).toBeNull();
+  });
+
+  it("a repeat count of zero is no note; no prep_skipped item is no link", () => {
+    const h = homeworkModel({ ...neg(negotiateHomework), repeats: { count: 0, quote: "x" }, homework: [{ id: "range", text: "Find the range.", quote: null, card_id: null }] })!;
+    expect(h.repeat).toBeNull();
+    expect(h.prepSkipped).toBe(false);
   });
 });

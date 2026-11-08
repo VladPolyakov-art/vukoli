@@ -249,7 +249,7 @@ function LiveDebrief() {
     }
   };
   // Every practice opens its own setup: English, Tough questions and Negotiate salary by `?track=`, interviews at Home.
-  const practise = () => navigate(record.mode === "interview" ? "/" : `/?track=${record.mode}`);
+  const practise = () => navigate(record.mode === "interview" ? "/" : record.mode === "negotiate" ? `/?track=negotiate&scenario=${record.negotiation?.scenario ?? "offer"}` : `/?track=${record.mode}`);
   const drill = () => navigate(record.mode !== "interview" ? `/?track=${record.mode}` : `/?drill=1&session=${encodeURIComponent(record.id)}${record.vacancy_id ? `&job=${encodeURIComponent(record.vacancy_id)}` : ""}`);
 
   /* Tough talk (tough-talk.md §5, §6): own pages, fed straight from the saved debrief. */

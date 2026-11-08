@@ -1,7 +1,7 @@
 /* Home fixture: docs/ia.md §6 (Alex Morgan, Product Designer; Kestrel Pay / Lumen Health / Fieldnote). All fictional.
  * The stress fixture (+30% text) lives apart, as the shared rules ask (ds/screens/_index.md §2). */
 import type { ScriptContext } from "./script";
-import { TALK_FIRST, TALK_RETURNING } from "./talkFixtures";
+import { TALK_FIRST, TALK_RETURNING, TALK_WITH_LAST_CASE } from "./talkFixtures";
 import type { JobItem, Phrase, WeakItem } from "./types";
 
 export const KESTREL: JobItem = {
@@ -100,6 +100,7 @@ export const CTX_ENGLISH_FIRST: ScriptContext = { ...CTX_FIRST, track: "english"
 export const CTX_TOUGH: ScriptContext = { ...CTX_RETURNING, track: "tough" };
 export const CTX_NEGOTIATE: ScriptContext = { ...CTX_RETURNING, track: "negotiate" };
 export const CTX_NEGOTIATE_AGAIN: ScriptContext = { ...CTX_RETURNING, track: "negotiate", talk: TALK_RETURNING };
+export const CTX_NEGOTIATE_LAST: ScriptContext = { ...CTX_RETURNING, track: "negotiate", talk: TALK_WITH_LAST_CASE };
 export const CTX_NEGOTIATE_FIRST: ScriptContext = { ...CTX_FIRST, track: "negotiate" };
 
 /** A pasted job the server read (company and role from its first line). */

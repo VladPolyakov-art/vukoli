@@ -6,7 +6,7 @@ import { Button, Card, Dots, Icon, Menu, ScrollStrip, TacticCard, TextShimmer, t
 import { t, tp } from "../../../i18n";
 import { joinTitle } from "../../../components/vacancyTitle";
 import { formatAmount } from "../../../lib/amount";
-import { numbersFromStart, type NumbersValues } from "../numbers";
+import { numbersFromStart, SCENARIO_FIELDS, type NumbersValues } from "../numbers";
 import { levelValue, roundValue, strictnessValue } from "../script";
 import type { HomeViewProps, JobItem, Level, PlanModel, PlanRow, RoundType, Strictness } from "../types";
 import { NumbersDialog } from "./NumbersForm";
@@ -51,6 +51,43 @@ function ChangeMenu({ row, label, items, open }: { row: PlanRow; label: string; 
   );
 }
 
+/** Interview plan: "End with a salary talk" (off by default). Turning it on without numbers opens the numbers dialog. */
+function MoneyRow({ plan, onNumbers, onChange }: Pick<PlanCardProps, "plan" | "onNumbers" | "onChange">) {
+  const money = plan.money!;
+  const [dialog, setDialog] = useState(false);
+  const [draft, setDraft] = useState<NumbersValues | null>(null);
+  const turnOn = () => (money.ready ? onChange?.("money", "on") : setDialog(true));
+  return (
+    <>
+      <Row
+        term={t("home.talk.plan.money")}
+        action={money.on
+          ? (
+            <span className={s.rowActions}>
+              <Button variant="link" size="sm" data-track="plan-money-edit" aria-label={t("home.talk.plan.changeLabel", { what: t("home.talk.plan.money").toLowerCase() })} onClick={() => setDialog(true)}>{t("home.talk.change")}</Button>
+              <Button variant="link" size="sm" data-track="plan-money-off" aria-label={t("home.talk.plan.moneyTurnOff")} onClick={() => onChange?.("money", "off")}>{t("home.talk.plan.moneyTurnOff")}</Button>
+            </span>
+          )
+          : <Button variant="link" size="sm" className={s.rowAction} data-track="plan-money-on" aria-label={t("home.talk.plan.moneyTurnOn")} onClick={turnOn}>{t("home.talk.plan.moneyTurnOn")}</Button>}
+      >
+        {money.on && money.start ? t("home.talk.plan.moneyOn", { target: formatAmount(money.start.target), currency: money.start.currency }) : t("home.talk.plan.moneyOff")}
+      </Row>
+      <NumbersDialog
+        scenario="screening"
+        title={t("home.talk.numbersCard.moneyTitle")}
+        open={dialog}
+        values={draft ?? money.values}
+        roleField={money.roleEditable}
+        fromPost={false}
+        currencies={money.currencies}
+        onValues={setDraft}
+        onClose={() => setDialog(false)}
+        onSave={() => { onNumbers?.(null, draft ?? money.values); setDraft(null); setDialog(false); }}
+      />
+    </>
+  );
+}
+
 function Row({ term, children, action }: { term: string; children: ReactNode; action?: ReactNode }) {
   return (
     <div className={s.row}>
@@ -73,7 +110,8 @@ function TalkPlan({ plan, jobs, initialOverlay, onChange, onNumbers, onTactics, 
   const negotiate = plan.kind === "negotiate";
   const [dialog, setDialog] = useState(initialOverlay === "change-numbers");
   const [draft, setDraft] = useState<NumbersValues | null>(null);
-  const fromPlan: NumbersValues | null = neg ? numbersFromStart(neg, talk.currencies) : null;
+  const scenario = plan.scenario ?? "offer";
+  const fromPlan: NumbersValues | null = neg ? numbersFromStart(neg, talk.currencies) : talk.numbers ?? null;
   const radio = (row: PlanRow, items: { id: string; label: string; description?: string }[], current: string): MenuEntry[] =>
     items.map((o) => ({ id: o.id, track: `plan-${row}-${o.id}`, label: o.label, description: o.description, checked: o.id === current, onSelect: () => onChange?.(row, o.id) }));
 
@@ -81,11 +119,18 @@ function TalkPlan({ plan, jobs, initialOverlay, onChange, onNumbers, onTactics, 
   const mike = negotiate
     ? style === "surprise" ? t("home.talk.style.surprise.blurb") : `${talk.styles.find((x) => x.id === style)?.label ?? ""}: ${lowerFirst(t(`home.talk.style.${style}.blurb` as "home.talk.style.firm.blurb"))}`
     : t("home.talk.tough.mike");
+  const reasonText = neg?.leave_reason ? t(`home.talk.leaveReason.${neg.leave_reason}`).toLowerCase() : "";
   const numbersText = neg
-    ? neg.job_low !== undefined && neg.job_high !== undefined
+    ? scenario === "raise"
+      ? t("home.talk.plan.numbersRaise", { current: formatAmount(neg.current_pay ?? 0), ask: formatAmount(neg.ask ?? 0), currency: neg.currency })
+      : scenario === "counteroffer"
+        ? t("home.talk.plan.numbersCounter", { current: formatAmount(neg.current_pay ?? 0), offer: formatAmount(neg.new_offer ?? 0), currency: neg.currency, reason: reasonText })
+        : neg.job_low !== undefined && neg.job_high !== undefined
       ? t("home.talk.plan.numbersRange", { low: formatAmount(neg.job_low), high: formatAmount(neg.job_high), currency: neg.currency, target: formatAmount(neg.target) })
-      : t("home.talk.plan.numbersNoRange", { target: formatAmount(neg.target), currency: neg.currency })
-    : "";
+      : scenario === "internship"
+        ? t("home.talk.plan.numbersIntern", { target: formatAmount(neg.target), currency: neg.currency })
+        : t("home.talk.plan.numbersNoRange", { target: formatAmount(neg.target), currency: neg.currency })
+    : t("home.talk.plan.numbersMissing");
   const jobOptions: ListboxOption[] = [
     ...jobs.map((j) => ({ id: j.id, track: "job-option", label: j.company, description: j.role, icon: "briefcase" as const })),
     { id: "type", track: "role-option-type", label: t("home.talk.plan.typeRole"), icon: "edit" as const },
@@ -97,6 +142,9 @@ function TalkPlan({ plan, jobs, initialOverlay, onChange, onNumbers, onTactics, 
       <dl className={s.rows}>
         {negotiate ? (
           <>
+            <Row term={t("home.talk.plan.scenario")} action={<ChangeMenu row="scenario" label={t("home.talk.plan.changeLabel", { what: t("home.talk.plan.scenario").toLowerCase() })} items={radio("scenario", talk.scenarios.map((x) => ({ id: x.id, label: x.name, description: x.blurb })), scenario)} />}>
+              {talk.scenarios.find((x) => x.id === scenario)?.name}
+            </Row>
             <Row
               term={t("home.talk.plan.role")}
               action={(
@@ -125,9 +173,18 @@ function TalkPlan({ plan, jobs, initialOverlay, onChange, onNumbers, onTactics, 
             <Row term={t("home.talk.plan.mike")} action={<ChangeMenu row="style" open={initialOverlay === "change-style"} label={t("home.talk.plan.changeLabel", { what: t("home.talk.plan.mike") })} items={radio("style", talk.styles.map((x) => ({ id: x.id, label: x.label, description: x.difficulty || undefined })), style)} />}>
               {mike}
             </Row>
-            <Row term={t("home.talk.plan.offer")} action={<Button variant="link" size="sm" className={s.rowAction} aria-label={t("home.talk.plan.changeLabel", { what: t("home.talk.plan.offer").toLowerCase() })} data-track="plan-change-offer" onClick={() => onChange?.("offer", neg?.has_real_offer ? "off" : "on")}>{t("home.talk.change")}</Button>}>
+            {SCENARIO_FIELDS[scenario].includes("offer") ? <Row term={t("home.talk.plan.offer")} action={<Button variant="link" size="sm" className={s.rowAction} aria-label={t("home.talk.plan.changeLabel", { what: t("home.talk.plan.offer").toLowerCase() })} data-track="plan-change-offer" onClick={() => onChange?.("offer", neg?.has_real_offer ? "off" : "on")}>{t("home.talk.change")}</Button>}>
               {t(neg?.has_real_offer ? "home.talk.plan.offerYes" : "home.talk.plan.offerNo")}
-            </Row>
+            </Row> : null}
+            {plan.case ? (
+              <Row term={t("home.talk.plan.case")} action={<Button variant="link" size="sm" className={s.rowAction} aria-label={t("home.talk.plan.changeLabel", { what: t("home.talk.plan.case").toLowerCase() })} data-track="plan-change-case" onClick={() => onChange?.("case", "")}>{t("home.talk.change")}</Button>}>
+                {[
+                  plan.case.results.length ? tp("home.talk.plan.caseSummary", plan.case.results.length) : "",
+                  plan.case.reason,
+                  plan.case.fallbacks.join(", "),
+                ].filter(Boolean).join(" · ")}
+              </Row>
+            ) : null}
             <Row term={t("home.talk.plan.length")}>{t("home.talk.negotiate.length")}</Row>
           </>
         ) : (
@@ -162,6 +219,7 @@ function TalkPlan({ plan, jobs, initialOverlay, onChange, onNumbers, onTactics, 
       ) : null}
       {negotiate && fromPlan ? (
         <NumbersDialog
+          scenario={scenario}
           open={dialog}
           values={draft ?? fromPlan}
           roleField={talk.roleEditable}
@@ -185,6 +243,7 @@ export function PlanCard(props: PlanCardProps) {
   // QA-02: while Mike writes the job's questions the plan says so, and a session started now would use general ones.
   const waiting = !english && !talk && plan.jobStatus === "preparing" && Boolean(plan.job);
   const reasonId = "home-start-reason";
+  const needsNumbers = plan.kind === "negotiate" && !plan.negotiate;
 
   const radio = <V extends string | number>(row: PlanRow, values: readonly V[], current: V, label: (v: V) => string, desc?: (v: V) => string): MenuEntry[] =>
     values.map((v) => ({ id: String(v), track: `plan-${row}-${String(v).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, label: label(v), description: desc?.(v), checked: v === current, onSelect: () => onChange?.(row, String(v)) }));
@@ -266,6 +325,7 @@ export function PlanCard(props: PlanCardProps) {
                   </Row>
                 </>
               ) : null}
+              {!drill && plan.money ? <MoneyRow plan={plan} onNumbers={props.onNumbers} onChange={onChange} /> : null}
               <Row term={t("chat.plan.length")}>
                 {drill ? t("chat.plan.drillLength", { n: plan.questions, min: plan.minutes }) : t("chat.plan.lengthValue", { n: plan.questions, min: plan.minutes })}
               </Row>
@@ -296,7 +356,7 @@ export function PlanCard(props: PlanCardProps) {
               size="lg"
               icon={textMode ? "keyboard" : "mic"}
               data-track={english ? "start-english" : drill ? "start-drill" : plan.kind === "negotiate" ? "start-negotiate" : plan.kind === "tough" ? "start-tough" : "start-interview"}
-              disabled={(!engineReady && !talk) || waiting}
+              disabled={(!engineReady && !talk) || waiting || needsNumbers}
               aria-describedby={(!engineReady && !talk) || waiting ? reasonId : undefined}
               onClick={props.onStart}
             >

@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { t } from "../i18n";
 import { Card } from "./Card";
 import { Disclosure } from "./Disclosure";
-import { IconButton } from "./Button";
+import { Button, IconButton } from "./Button";
 import { Icon } from "./icons";
 import s from "./TacticCard.module.css";
 
@@ -24,6 +24,9 @@ export interface TacticCardProps {
   alt?: { title: string; example: string };
   /** `hint` only: the hide button. */
   onHide?: () => void;
+  /** `hint` only: "Another hint" (a refresh icon-button next to the hide button) and, when the answer is late, a Try again row. */
+  onAnother?: () => void;
+  anotherState?: "idle" | "pending" | "stalled";
   /** Heading level of the title (tile and hint). Default 3. `inline` uses the Disclosure heading. */
   headingLevel?: 2 | 3 | 4;
   /** Root element for `tile` (a `li` inside a ScrollStrip). */
@@ -36,7 +39,7 @@ function Quote({ children }: { children: ReactNode }) {
 }
 
 export function TacticCard({
-  size, title, rule, example, evidence, alt, onHide, headingLevel = 3, as = "div", className,
+  size, title, rule, example, evidence, alt, onHide, onAnother, anotherState = "idle", headingLevel = 3, as = "div", className,
 }: TacticCardProps) {
   const H = `h${headingLevel}` as "h2" | "h3" | "h4";
 
@@ -69,6 +72,7 @@ export function TacticCard({
       <div className={s.head}>
         <Icon name="bulb" size="sm" />
         <span className={s.headLabel}>{t("tactic.hint")}</span>
+        {onAnother ? <IconButton icon="refresh" size="sm" label={t("tactic.anotherHint")} onClick={onAnother} disabled={anotherState === "pending"} aria-busy={anotherState === "pending" || undefined} className={s.hide} /> : null}
         {onHide ? <IconButton icon="x" size="sm" label={t("tactic.hideHint")} onClick={onHide} className={s.hide} /> : null}
       </div>
       <H className={s.title}>{title}</H>
@@ -77,6 +81,12 @@ export function TacticCard({
         <div className={s.try}>
           <span className={s.label}>{t("tactic.trySaying")}</span>
           <Quote>{example}</Quote>
+        </div>
+      ) : null}
+      {anotherState === "stalled" && onAnother ? (
+        <div className={s.stalled} role="status">
+          <span>{t("tactic.hintStalled")}</span>
+          <Button variant="link" onClick={onAnother}>{t("tactic.hintRetry")}</Button>
         </div>
       ) : null}
       {alt ? (

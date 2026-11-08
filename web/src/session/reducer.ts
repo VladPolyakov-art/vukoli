@@ -1,7 +1,7 @@
 /* Pure session state: every server message (PROTOCOL.md) and local action goes through `sessionReducer`.
  * No I/O here, so it is unit-tested in reducer.test.ts. useSession.ts wires it to the socket and audio. */
 import type {
-  AnyDebrief, FeedbackRecord, HintCard, InputMode, LanguageItem, LowConfWord, NegotiateOutcome, PracticeMode, Question,
+  AnyDebrief, FeedbackRecord, HintCard, InputMode, LanguageItem, LowConfWord, NegotiateOutcome, NegotiateScenario, PracticeMode, Question,
   ServerError, ServerMessage, SttInfo, TurnKind,
 } from "../lib/types";
 
@@ -121,10 +121,22 @@ export interface SessionState {
   hint: HintCard | null;
   /** Tough talk: hints asked so far in this session (the server's `n`). */
   hintsUsed: number;
+  /** Tough talk: a hint was asked and has not come back (`pending`), or did not within ~3 s (`stalled`: the card offers Try again). */
+  hintWait: "idle" | "pending" | "stalled";
   /** Tough talk, `negotiate`: how Mike closed the call (US-66 AC6); null until then. */
   outcome: NegotiateOutcome | null;
   /** Tough talk: Hint is ready (the server said so at the start). */
   hintAvailable: boolean;
+  /** Negotiation v3 (D118): the step of the talk Mike's last line was in (1..5); null until the server sends one (no course taken). */
+  talkStep: number | null;
+  /** Negotiation v3: the scenario of the call (the strip's labels follow its family). */
+  scenario: NegotiateScenario | null;
+  /** Negotiation v2: Mike went to check with the hiring manager and has not come back yet. */
+  checking: boolean;
+  /** Interview with a salary talk: what the start carried (null: none). */
+  moneyTalk: NonNullable<Extract<ServerMessage, { type: "session_started" }>["money_talk"]> | null;
+  /** Interview: the salary part has begun (`turn_complete kind:"money_start"`). */
+  moneyPart: boolean;
   notice: { code: string; message: string } | null;
   error: ServerError | null;
   fatal: ServerError | null;
@@ -148,7 +160,7 @@ export function initialState(input: InputMode, mode: PracticeMode = "interview")
     suggesterAvailable: false, suggestOn: false, warnings: [], ready: false, mikeTurnOpen: false, awaitingReply: false,
     recording: false, recordingTurnId: null, openVoiceTurns: [], awaitingBeforeVoice: false, preview: "", transcript: [], threadOrder: [], currentThreadId: "",
     followUps: [], currentQuestionText: "", closing: false, threadOfTurn: {}, feedback: {}, feedbackOrder: [],
-    feedbackProgress: null, unavailable: {}, stronger: {}, rechecking: {}, recheckError: null, suggestion: null, hint: null, hintsUsed: 0, outcome: null, hintAvailable: false, notice: null, error: null, fatal: null,
+    feedbackProgress: null, unavailable: {}, stronger: {}, rechecking: {}, recheckError: null, suggestion: null, hint: null, hintsUsed: 0, hintWait: "idle", outcome: null, hintAvailable: false, talkStep: null, scenario: null, checking: false, moneyTalk: null, moneyPart: false, notice: null, error: null, fatal: null,
     savedSessionId: "", debrief: null, saveError: "", endedReason: "", lastTurnMs: null, interrupted: null,
   };
 }
@@ -164,6 +176,9 @@ export type LocalAction =
   | { type: "local/suggest"; on: boolean }
   /** Tough talk: Hide the hint (button, H, or Mike's next line). */
   | { type: "local/hint_hide" }
+  /** The Hint / Another hint press went out; `local/hint_stalled` ~3 s later if no card came back. */
+  | { type: "local/hint_requested" }
+  | { type: "local/hint_stalled" }
   | { type: "local/end_requested" }
   | { type: "local/input_changed"; input: InputMode }
   | { type: "local/socket_closed" }
@@ -255,6 +270,8 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
         model: action.model, speaks: action.speaks, questions: action.questions, stt: action.stt,
         suggesterAvailable: action.suggester_available, suggestOn: action.suggest, warnings: action.warnings ?? [],
         hintAvailable: action.hint_available === true,
+        scenario: action.negotiate?.scenario ?? (action.mode === "negotiate" ? "offer" : null),
+        moneyTalk: action.money_talk?.enabled ? action.money_talk : null,
       };
     case "ready":
       return { ...state, ready: true };
@@ -264,7 +281,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     /* ---------- Mike's turns ---------- */
     case "turn_start":
       return {
-        ...state, mikeTurnOpen: true, awaitingReply: false, notice: null, error: null, hint: null,
+        ...state, mikeTurnOpen: true, awaitingReply: false, notice: null, error: null, hint: null, hintWait: "idle", checking: false,
         transcript: [...state.transcript, { key: nextKey("m"), speaker: "model", text: "", live: true }],
       };
     case "transcript_delta": {
@@ -312,7 +329,10 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
           transcript.splice(at - 1, 1);
         }
       }
-      let next: SessionState = { ...state, transcript };
+      let next: SessionState = { ...state, transcript, checking: kind === "checking" || action.checking === true };
+      // Negotiation v3: the strip follows Mike's turns; a line without a step keeps the last one.
+      if (typeof action.talk_step === "number" && action.talk_step >= 1 && action.talk_step <= 5) next.talkStep = Math.round(action.talk_step);
+      if (kind === "money_start") next = { ...next, moneyPart: true, hintAvailable: true };
       if (kind === "question" && threadId) {
         const isNew = !state.threadOrder.includes(threadId);
         const q = state.questions.find((x) => x.id === (action.question_id || threadId));
@@ -328,7 +348,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
       } else if (kind === "follow_up") {
         next = { ...next, followUps: [...state.followUps, action.full_text] };
         if (threadId && !state.currentThreadId) next.currentThreadId = threadId;
-      } else if (kind === "turn") {
+      } else if (kind === "turn" || kind === "money_start" || kind === "checking") {
         // English mode: each coach line is its own "question".
         next = { ...next, currentQuestionText: action.full_text };
       } else if (kind === "closing") {
@@ -497,10 +517,18 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     case "hint": {
       const { type: _type, ...card } = action;
       void _type;
-      return { ...state, hint: card, hintsUsed: Math.max(state.hintsUsed, action.n) };
+      return { ...state, hint: card, hintWait: "idle", hintsUsed: Math.max(state.hintsUsed, action.n) };
     }
+    case "hint_update":
+      // D117: only the card still on screen gets the model's example; a stale update (other n / card, hidden) is ignored. hintWait is untouched.
+      return state.hint && state.hint.n === action.n && state.hint.card_id === action.card_id && action.example
+        ? { ...state, hint: { ...state.hint, example: action.example } } : state;
     case "local/hint_hide":
-      return state.hint ? { ...state, hint: null } : state;
+      return state.hint || state.hintWait !== "idle" ? { ...state, hint: null, hintWait: "idle" } : state;
+    case "local/hint_requested":
+      return { ...state, hintWait: "pending" };
+    case "local/hint_stalled":
+      return state.hintWait === "pending" ? { ...state, hintWait: "stalled" } : state;
 
     /* ---------- end ---------- */
     case "local/end_requested":

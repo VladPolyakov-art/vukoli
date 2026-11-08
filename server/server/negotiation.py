@@ -210,8 +210,8 @@ def reasons_in(text: str, has_real_offer: bool) -> tuple[list[str], bool]:
 
 def lever_in(text: str) -> str | None:
     kw = talk.data()["lever_keywords"]
-    for lever in ("perf_bonus", "equity", "sign_on", "review", "pto", "remote", "title", "package"):
-        if any(re.search(p, text, re.I) for p in kw[lever]):
+    for lever in ("perf_bonus", "equity", "sign_on", "review", "pto", "remote", "title", "training", "scope", "package"):
+        if any(re.search(p, text, re.I) for p in kw.get(lever, [])):
             return lever
     return None
 
@@ -913,8 +913,8 @@ def model_input(st: dict, reply: Reply, last_user_line: str) -> dict:
 DEADLINE_KEYS = ("deadline_soft", "deadline_48h")
 
 
-def pick_hint(st: dict, spoken: list[dict] | None = None) -> str:
-    """The tactic card for this moment (§5.4, §9), by code from what the user can see or said."""
+def _primary_hint(st: dict, spoken: list[dict] | None = None) -> str:
+    """The best tactic card for this moment (§5.4, §9), by code from what the user can see or said."""
     su = st["levers"]["step_up"]
     asked_step = any(a.get("lever") == "step_up" for a in st["asks"])
     last_ask = st["asks"][-1] if st["asks"] else None
@@ -943,7 +943,56 @@ def pick_hint(st: dict, spoken: list[dict] | None = None) -> str:
         return "N1"
     if st["has_real_offer"] and not any("competing_offer" in a.get("reason_words", []) for a in st["asks"]):
         return "N7"
+    if _just_paused(st):
+        return "N5"                                  # they took their pause: now a number with a reason, not another pause
     return "N4"
+
+
+PAUSE_RE = re.compile(r"\b(?:let me think|think (?:about )?(?:it|that)|give me a (?:second|moment|minute)|one (?:second|moment)|"
+                      r"take a (?:second|moment|minute))\b", re.I)
+
+
+def _just_paused(st: dict) -> bool:
+    turns = st["turns"]
+    return bool(turns) and (turns[-1]["cls"] == "pause" or bool(PAUSE_RE.search(turns[-1].get("text", ""))))
+
+
+# After the best card, the next-best for "Another hint": same moment, a different tactic. N9 / N10 (the step-up cards) are
+# offered only as the primary: they make no sense out of their moment.
+_GENERIC_HINTS = ("N4", "N5", "N1", "N6", "N7", "N3", "N8", "N2")
+
+
+def hint_ranking(st: dict, spoken: list[dict] | None = None) -> list[str]:
+    first = _primary_hint(st, spoken)
+    near = ("N2", "N1", "N3") if st["phase"] == "expectations" else ()
+    return drop_just_done(st, list(dict.fromkeys([first, *near, *_GENERIC_HINTS])))
+
+
+def drop_just_done(st: dict, ranked: list[str]) -> list[str]:
+    """No card for what the user has just done: the pause after they paused, an example they have just said."""
+    import difflib
+    turns = st["turns"]
+    if not turns:
+        return ranked
+    last = turns[-1].get("text", "").lower()
+    def done(cid: str) -> bool:
+        if cid == "N4" and _just_paused(st):
+            return True
+        return difflib.SequenceMatcher(None, talk.card(cid)["example"].lower(), last).ratio() >= 0.75
+    kept = [c for c in ranked if not done(c)]
+    return kept or ranked
+
+
+def pick_hint(st: dict, spoken: list[dict] | None = None, exclude: tuple[str, ...] | list[str] = ()) -> str:
+    """The tactic card for this moment. `exclude` = cards already shown at this turn ("Another hint"): the next-best card
+    is returned; when every card was shown, the cycle starts again at the best one."""
+    ranked = hint_ranking(st, spoken)
+    return next((c for c in ranked if c not in exclude), ranked[0])
+
+
+def hints_shown_now(st: dict) -> list[str]:
+    """Cards already shown at this user turn."""
+    return [h["card_id"] for h in st["hints_used"] if h.get("turn") == st["user_turns"]]
 
 
 # ---------- debrief ----------
@@ -1043,7 +1092,8 @@ def debrief(st: dict) -> dict:
                     "line": f"Now {talk.money(now)} → {talk.money(later)} after {n} months ({tail})"}
     shifts = []
     for m in st["moves"]:
-        if m["offer_before"] is not None and m["offer_after"] != m["offer_before"] and m["cause"] != "opening":
+        moved = m["offer_before"] is not None and m["offer_after"] != m["offer_before"] and m["cause"] != "opening"
+        if moved or m["move"] == "step_up":          # an agreed step-up moves the later number even when base stays
             shifts.append({"turn": m["turn"], "from": m["offer_before"], "to": m["offer_after"], "cause": m["cause"],
                            "cause_label": CAUSE_LABEL.get(m["cause"], "Your ask"), "quote": m["quote"]})
     held = [{"turn": m["turn"], "offer": m["offer_before"], "asked": m.get("asked"), "why": m["cause"], "quote": m["quote"]}

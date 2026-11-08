@@ -8,7 +8,7 @@ import s from "./parts.module.css";
 
 type Card = NonNullable<SessionHint["card"]>;
 
-export function HintCard({ hint, onHide }: { hint: SessionHint; onHide?: () => void }) {
+export function HintCard({ hint, onHide, onAnother }: { hint: SessionHint; onHide?: () => void; onAnother?: () => void }) {
   const open = hint.open && Boolean(hint.card);
   const { mounted, leaving } = usePresence(open);
   const box = useRef<HTMLDivElement>(null);
@@ -32,6 +32,8 @@ export function HintCard({ hint, onHide }: { hint: SessionHint; onHide?: () => v
         example={card.example}
         alt={alt ? { title: alt.title, example: alt.example } : undefined}
         onHide={onHide}
+        onAnother={onAnother}
+        anotherState={hint.wait === "pending" ? "pending" : hint.wait === "stalled" ? "stalled" : "idle"}
       />
     </div>
   );

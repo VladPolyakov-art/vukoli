@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ScaledStage } from "../frames";
 import { Scene } from "./TalkScene";
 import {
-  negotiateAcceptedFirst, negotiateNoOffer, negotiateNotInWriting, negotiateStrong, toughModelFailed, toughNormal, toughOne, toughTwo,
+  negotiateCounter, negotiateHomework, negotiateInternship, negotiateRaise, negotiateScreening, negotiateAcceptedFirst, negotiateNoOffer, negotiateNotInWriting, negotiateStrong, toughModelFailed, toughNormal, toughOne, toughTwo,
 } from "./fixtures";
 
 /* Tough talk debriefs (ds/screens/tough-talk.md §5-§6): Negotiate salary (Your result · What moved the offer · Say it
@@ -26,6 +26,15 @@ export const NegotiateStepUpNotInWriting = desk({ record: negotiateNotInWriting 
 export const NegotiateAcceptedFirstOffer = desk({ record: negotiateAcceptedFirst }, 1100);
 /** Ended before any offer: a dash for the figure, an explanation and two tactic tiles. */
 export const NegotiateNoOfferYet = desk({ record: negotiateNoOffer }, 1000);
+/** Negotiation v3: "Before the real talk" (homework with a quote, the repeat note, "Practise again with prep"). */
+export const NegotiateHomework = desk({ record: negotiateHomework }, 2100);
+export const NegotiateHomeworkMobile = phone({ record: negotiateHomework }, 3600);
+/** Negotiation v2: one debrief per scenario. */
+export const NegotiateRaise = desk({ record: negotiateRaise }, 1900);
+export const NegotiateRaiseMobile = phone({ record: negotiateRaise }, 3200);
+export const NegotiateScreening = desk({ record: negotiateScreening }, 1400);
+export const NegotiateCounteroffer = desk({ record: negotiateCounter }, 1300);
+export const NegotiateInternship = desk({ record: negotiateInternship }, 1400);
 export const NegotiateConversation = desk({ record: negotiateStrong, view: "conversation" }, 900);
 export const NegotiateNotSaved = desk({ record: negotiateStrong, storageError: true });
 

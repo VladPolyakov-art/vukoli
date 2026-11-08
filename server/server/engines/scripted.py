@@ -119,6 +119,10 @@ def kind_of(schema: dict | None) -> str:
         return "p2a"
     if "recruiter_line" in props:
         return "p7"
+    if "bargain_line" in props:
+        return "p9"
+    if "intent" in props:
+        return "p10"
     if "shares_personal_info" in props:
         return "p8"
     return "unknown"
@@ -201,6 +205,24 @@ def debrief(text: str) -> dict:
                                                           if spots else "Nothing repeated stood out.")),
             "weak_spots": spots, "strength": "You kept each answer on the question.",
             "next_step": "Practise one answer again, out loud, with a result at the end."}
+
+
+def intent_reader(text: str) -> dict:
+    """Negotiation v2 (p10): no reading, the code falls back on its keywords."""
+    return {"intent": "other", "amounts": [], "months": None, "criteria_named": False, "in_writing_asked": False, "lever": None}
+
+
+def bargain(text: str) -> dict:
+    """Negotiation v2 (p9): a plain line that says only the amount it was given (the guard accepts it)."""
+    amount = _line(text, "AMOUNT_TO_SAY")
+    lever = _line(text, "LEVER_TO_SAY")
+    act = _line(text, "ACT") or "reply"
+    parts = [f"Understood, on the {act.replace('_', ' ')} point."]
+    if amount and amount != "None":
+        parts.append(f"Where we stand is {amount} a year.")
+    if lever and lever != "None":
+        parts.append(f"That would include {lever}.")
+    return {"bargain_line": " ".join(parts)}
 
 
 def recruiter(text: str) -> dict:
@@ -314,7 +336,7 @@ def reply_for(messages: list[Msg], schema: dict | None) -> str:
         return plain_reply(messages)
     builders = {"p1": interviewer, "p2a": content_layer, "p2b": lambda t: {"items": language_items(t)},
                 "p5b": english_corrections, "p3": debrief, "p2c": stronger, "p0": questions,
-                "suggester": suggestion, "p7": recruiter, "p8": tough_check}
+                "suggester": suggestion, "p7": recruiter, "p9": bargain, "p10": intent_reader, "p8": tough_check}
     data = builders[kind](text) if kind in builders else from_schema(schema or {})
     return json.dumps(data, ensure_ascii=False)
 

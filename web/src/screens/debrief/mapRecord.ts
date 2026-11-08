@@ -419,6 +419,7 @@ export function mapRecord(record: SessionRecord, opts: MapOptions): DebriefModel
     // D98: only an interview debrief that has a verdict gets the scorecard and the plan (US-20 AC4, AC6).
     scorecard: !partial && !english && d?.verdict ? scorecard(record) : undefined,
     weakSpots: spots,
+    moneyTalk: !english && d?.money_talk ? d.money_talk : undefined,
     plan: !partial && !english && d?.verdict ? plan(record) : undefined,
     drill: !partial && !english && spots.length ? { points: spots.length } : undefined,
     questions,

@@ -40,7 +40,7 @@ async function pressH(page: Page) {
 }
 
 test.describe("US-70 Negotiate salary: the session", () => {
-  test("hint by the button and by H, then a deal with a step-up in the debrief", async ({ page }) => {
+  test("hint by the button and by H, then the result frames in the debrief", async ({ page }) => {
     const errors = collectPageErrors(page);
     await startTalk(page, NEGOTIATE, "Negotiation · Designer · Friendly");
     const log = conversation(page);
@@ -51,13 +51,19 @@ test.describe("US-70 Negotiate salary: the session", () => {
     await expect(page.getByRole("button", { name: /suggest/i })).toHaveCount(0);
 
     await sendAnswer(page, "I was hoping for around 98k");
-    await expect(log).toContainText("91,000 USD");
+    await expect(log).toContainText("88,000 USD");
 
     // Button: the card opens (Try saying + an example), the button is pressed; the second press hides it.
     await hintButton(page).click();
     const card = page.getByText("Try saying").first();
     await expect(card).toBeVisible();
     await expect(page.getByRole("button", { name: "Hide the hint (H)" })).toHaveAttribute("aria-pressed", "true");
+    // Another hint: the refresh button on the card asks for a different tactic for the same moment.
+    const title = page.getByRole("region", { name: "Hint" }).getByRole("heading");
+    const first = await title.innerText();
+    await page.getByRole("button", { name: "Another hint" }).click();
+    await expect(title).not.toHaveText(first);
+    await expect(page.getByRole("button", { name: "Another hint" })).toBeEnabled();
     await page.getByRole("button", { name: "Hide the hint (H)" }).click();
     await expect(card).toHaveCount(0);
 
@@ -69,8 +75,7 @@ test.describe("US-70 Negotiate salary: the session", () => {
     await page.getByRole("textbox", { name: "Your answer" }).fill("h");
     await expect(page.getByText("Try saying")).toHaveCount(0);
 
-    await sendAnswer(page, "Could we do 91k now and 98k after the 3 month probation, in writing?");
-    await expect(log).toContainText("offer letter");
+    await sendAnswer(page, "Based on my results, I shipped the design system and cut review time in half, so I am asking for 98,000.");
     await sendAnswer(page, "Great, I accept the offer");
     // Mike closes the round: "See your debrief" in the closing card ends the session.
     await expect(page.getByText("That's the end of the round")).toBeVisible();
@@ -78,14 +83,11 @@ test.describe("US-70 Negotiate salary: the session", () => {
     await expect(page).toHaveURL(/\/$/);
     await page.getByRole("button", { name: "Open debrief" }).click();
     await expect(page).toHaveURL(/\/sessions\/s-/);
-    await expect(page.getByRole("heading", { name: "Negotiation · Designer · Friendly", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Salary talk · Offer call · Friendly", level: 1 })).toBeVisible();
     await showDebrief(page);
 
-    // The three frames carry titles (D109); the deal line says what was agreed and that it is in the offer letter.
+    // The frames carry titles (D109). A start without a scenario is the Offer call of Negotiation v2: Mike's first offer is 88,000.
     await expect(page.getByRole("heading", { name: "Your result", level: 2 })).toBeVisible();
-    await expect(page.getByTestId("deal-line")).toContainText(/Now 91,000 → 98,000 after 3 months/);
-    await expect(page.getByTestId("deal-line")).toContainText("In the offer letter");
-    await expect(page.getByRole("heading", { name: "What moved the offer", level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Say it better", level: 2 })).toBeVisible();
     await expect(page.getByText(/Hints you used:/)).toBeVisible();
 
@@ -123,11 +125,64 @@ test.describe("US-70 Negotiate salary: the session", () => {
     await hintButton(page).click();
     await expect(page.getByText("Try saying").first()).toBeVisible();
     await expectNoHorizontalScroll(page);
-    await sendAnswer(page, "Could we do 91k now and 98k after the 3 month probation, in writing?");
+    await sendAnswer(page, "Based on my results, I shipped the design system, so I am asking for 98,000.");
     await (await endSession(page, "End practice")).click();
     await showDebrief(page);
     await expect(page.getByRole("heading", { name: "Your result", level: 2 })).toBeVisible();
     await expectNoHorizontalScroll(page);
+  });
+});
+
+const RAISE = {
+  mode: "negotiate", input: "text", speak: false, suggest: false,
+  negotiate: { scenario: "raise", role: "Designer", current_pay: 60000, ask: 72000, target: 72000, currency: "USD", style: "friendly", has_real_offer: false },
+};
+
+test.describe("Negotiation v2: raise with your lead", () => {
+  test("a raise talk runs to a debrief with the raise frames and the objections Mike raised", async ({ page }) => {
+    const errors = collectPageErrors(page);
+    await startTalk(page, RAISE, "Salary talk · Raise with your lead · Friendly");
+    const log = conversation(page);
+    await expect(log).toContainText("Mike");
+    await sendAnswer(page, "I shipped the onboarding redesign and activation rose 12 percent, so I am asking for 72,000.");
+    await sendAnswer(page, "The redesign also cut support tickets by a quarter, which is why 72,000 is fair.");
+    await (await endSession(page, "End practice")).click();
+    await expect(page).toHaveURL(/\/sessions\/s-/);
+    await expect(page.getByRole("heading", { name: "Salary talk · Raise with your lead · Friendly", level: 1 })).toBeVisible();
+    await showDebrief(page);
+    await expect(page.getByRole("heading", { name: "Your result", level: 2 })).toBeVisible();
+    await expect(page.getByTestId("scenario-facts")).toBeVisible();
+    await expect(page.getByText("May be wrong").first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("Mike checks with the hiring manager: a status shows, the answer box stays usable, then he comes back", async ({ page }) => {
+    // The scripted engine's check depends on its seed, so the web side is driven with the two frames the server sends
+    // (protocol.md §7.3): turn_complete kind "checking", then the come-back line with came_back.
+    await page.routeWebSocket(/\/ws\/session/, (ws) => {
+      const server = ws.connectToServer();
+      let held = false;
+      server.onMessage((m) => ws.send(m));
+      ws.onMessage((m) => {
+        const msg = typeof m === "string" ? (JSON.parse(m) as { type?: string }) : {};
+        if (msg.type !== "user_turn" || held) { server.send(m); return; }
+        held = true;
+        const say = (full_text: string, extra: Record<string, unknown>) => {
+          ws.send(JSON.stringify({ type: "turn_start", speaker: "model" }));
+          ws.send(JSON.stringify({ type: "transcript_delta", speaker: "model", delta: full_text, full_text }));
+          ws.send(JSON.stringify({ type: "turn_complete", speaker: "model", full_text, ...extra }));
+          ws.send(JSON.stringify({ type: "response_complete" }));
+        };
+        say("Let me check with the hiring manager and come back to you.", { kind: "checking", checking: true, check_s: 4 });
+        setTimeout(() => say("I am back. The hiring manager can look at 66,000 from the next quarter.", { kind: "turn", came_back: true }), 2500);
+      });
+    });
+    await startTalk(page, RAISE, "Salary talk · Raise with your lead · Friendly");
+    await sendAnswer(page, "I shipped the onboarding redesign and activation rose 12 percent, so I am asking for 72,000.");
+    await expect(page.getByText("Mike is checking…").first()).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Your answer" })).toBeEnabled();
+    await expect(conversation(page)).toContainText("I am back");
+    await expect(page.getByText("Mike is checking…")).toHaveCount(0);
   });
 });
 
@@ -139,10 +194,12 @@ test.describe("US-69 Tough questions: the session", () => {
     await expect(log).toContainText("Mike");
 
     await hintButton(page).click();
+    await expect(page.getByText("How to build this answer")).toBeVisible();
     await expect(page.getByText("Try saying").first()).toBeVisible();
     await page.getByRole("button", { name: "Hide the hint (H)" }).click();
+    // Owner 08.11: every press moves on to a card not shown yet for this question.
     await pressH(page);
-    await expect(page.getByText("Try saying").first()).toBeVisible();
+    await expect(page.getByText("What they are really checking")).toBeVisible();
     await pressH(page);
 
     for (const text of ["The role changed and I wanted more product ownership.", "I wanted to grow into product work, and I learned a lot there.", "I enjoyed the team and I am ready for a new challenge."]) {

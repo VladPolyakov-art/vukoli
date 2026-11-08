@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NEGOTIATE, CTX_NEGOTIATE_AGAIN, CTX_NO_CV, CTX_RETURNING, CTX_TOUGH, CV_FILE, JOB_FILE,
+  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NEGOTIATE, CTX_NEGOTIATE_AGAIN, CTX_NEGOTIATE_LAST, CTX_NO_CV, CTX_RETURNING, CTX_TOUGH, CV_FILE, JOB_FILE,
   KESTREL_PASTED, PASTED_TEXT,
 } from "./fixtures";
 import { EMPTY_NUMBERS } from "./numbers";
 import { weakFromSession } from "./sessionFocus";
 import {
   attach, begin, change, pick, planFor, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip, submitNumbers,
-  suggestionsFor, tacticOrder, type SetupState,
+  suggestionsFor, splitResults, tacticOrder, type SetupState,
 } from "./script";
 
 const last = <T,>(xs: T[]) => xs[xs.length - 1]!;
@@ -239,7 +239,7 @@ const withRange = { ok: true, low: 85000, high: 98000, currency: "EUR" } as cons
 
 /** The negotiate chat up to the numbers card with Kestrel Pay (range read from the post). */
 function toNumbers(ctx = CTX_NEGOTIATE): SetupState {
-  let s = begin(ctx, { kind: "suggestion", id: "negotiate" });
+  let s = begin(ctx, { kind: "suggestion", id: "negotiate", scenario: "offer" });
   s = pick(ctx, s, last(s.turns).id, "job:v1");
   expect(s.pending?.kind).toBe("range");
   return resolveRange(ctx, s, withRange);
@@ -262,42 +262,42 @@ describe("tough talk: chips", () => {
 
 describe("tough talk: negotiate script", () => {
   it("asks for the role with the three newest jobs and a way to type it", () => {
-    const s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    const s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     expect(s.track).toBe("negotiate");
     expect(s.turns[0]).toMatchObject({ speaker: "user", text: "Negotiate salary" });
     expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Kestrel Pay", "Lumen Health", "Fieldnote", "No job, I'll type it"]);
-    expect(setupModel(CTX_NEGOTIATE, s)).toMatchObject({ stage: "reply", step: { n: 1, of: 3 }, canSkip: true });
+    expect(setupModel(CTX_NEGOTIATE, s)).toMatchObject({ stage: "reply", step: { n: 1, of: 4 }, canSkip: true });
   });
 
   it("reads the post for the range after a job is picked, then shows the numbers card prefilled", () => {
-    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "job:v1");
     expect(s.stage).toBe("pending");
-    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 1, of: 3 });
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 1, of: 4 });
     s = resolveRange(CTX_NEGOTIATE, s, withRange);
     expect(s.turns.some((x) => x.text === "Kestrel Pay, Senior Product Designer. The post says 85,000–98,000 EUR.")).toBe(true);
     const card = last(s.turns).numbers!;
     expect(card).toMatchObject({ fromPost: true, roleField: false });
     expect(card.values).toMatchObject({ low: "85,000", high: "98,000", currency: "EUR", role: "Senior Product Designer" });
     expect(s.stage).toBe("numbers");
-    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 2, of: 3 });
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 2, of: 4 });
   });
 
   it("says so when the post lists no range, and asks for the numbers without a prefill", () => {
-    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "job:v2");
     s = resolveRange(CTX_NEGOTIATE, s, { ok: true, low: null, high: null, currency: null });
     expect(s.turns.some((x) => x.text === "Lumen Health, Product Designer, Design Systems. The post doesn't list a range, so add your numbers.")).toBe(true);
     expect(last(s.turns).numbers).toMatchObject({ fromPost: false });
     expect(last(s.turns).numbers?.values).toMatchObject({ low: "", high: "" });
     // a failed read is the same as no range
-    let f = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    let f = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     f = resolveRange(CTX_NEGOTIATE, pick(CTX_NEGOTIATE, f, last(f.turns).id, "job:v2"), { ok: false });
     expect(last(f.turns).numbers).toBeDefined();
   });
 
   it("takes a typed role (at most 80 characters) and shows the Role field in the numbers card", () => {
-    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "role:type");
     expect(last(s.turns).text).toBe("Type the role, e.g. Product Designer");
     expect(setupModel(CTX_NEGOTIATE, s).placeholder).toBe("Type the role, e.g. Product Designer");
@@ -316,7 +316,7 @@ describe("tough talk: negotiate script", () => {
     expect(s.turns.some((x) => x.speaker === "user" && x.text === "85,000–98,000 EUR · target 96,000 · no competing offer")).toBe(true);
     expect(last(s.turns).text).toBe("How tough should I be? For a first try, Friendly is a good start.");
     expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Friendly · easy", "Firm · medium", "Tight budget · hard", "Surprise me"]);
-    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 3, of: 3 });
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 3, of: 4 });
   });
 
   it("does not send an invalid card", () => {
@@ -341,7 +341,7 @@ describe("tough talk: negotiate script", () => {
     const bad = say(CTX_NEGOTIATE, { ...s }, "no idea");
     expect(last(bad.turns).text).toBe("I didn't catch the style. Pick one:");
     s = say(CTX_NEGOTIATE, s, "go firm please");
-    expect(s.stage).toBe("plan");
+    expect(s.stage).toBe("prep");
     expect(planFor(CTX_NEGOTIATE, s).negotiate?.style).toBe("firm");
   });
 
@@ -349,9 +349,10 @@ describe("tough talk: negotiate script", () => {
     let s = toNumbers();
     s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, filled(s));
     s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:tight");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "prep:no");
     const plan = planFor(CTX_NEGOTIATE, s);
     expect(plan.kind).toBe("negotiate");
-    expect(plan.negotiate).toEqual({ role: "Senior Product Designer", job_low: 85000, job_high: 98000, target: 96000, currency: "EUR", style: "tight", has_real_offer: false, company: "Kestrel Pay" });
+    expect(plan.negotiate).toEqual({ scenario: "offer", role: "Senior Product Designer", job_low: 85000, job_high: 98000, target: 96000, currency: "EUR", style: "tight", has_real_offer: false, company: "Kestrel Pay" });
     expect(plan.minutes).toBe(10);
     expect(plan.tactics?.map((c) => c.id)).toEqual(["N2", "N1", "N3", "N4", "N5", "N6", "N9", "N10", "N8"]);
     expect(setupModel(CTX_NEGOTIATE, s).stage).toBe("plan");
@@ -386,14 +387,14 @@ describe("tough talk: negotiate script", () => {
   });
 
   it("skip: remembered numbers and style fill the plan; without them the numbers card is asked", () => {
-    let s = begin(CTX_NEGOTIATE_AGAIN, { kind: "suggestion", id: "negotiate" });
+    let s = begin(CTX_NEGOTIATE_AGAIN, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     s = pick(CTX_NEGOTIATE_AGAIN, s, last(s.turns).id, "job:v1");
     s = resolveRange(CTX_NEGOTIATE_AGAIN, s, withRange);
     s = skip(CTX_NEGOTIATE_AGAIN, s);
     expect(s.stage).toBe("plan");
     expect(planFor(CTX_NEGOTIATE_AGAIN, s).negotiate).toMatchObject({ style: "firm", target: 96000 });
 
-    let f = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    let f = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "offer" });
     f = skip(CTX_NEGOTIATE, f);
     expect(f.stage).toBe("numbers");
     expect(last(f.turns).numbers?.roleField).toBe(true);
@@ -469,5 +470,201 @@ describe("tough talk: tough questions script", () => {
     let s = begin(ctx, { kind: "suggestion", id: "tough" });
     s = pick(ctx, s, last(s.turns).id, "theme:money");
     expect(planFor(ctx, s)).toMatchObject({ questions: 5, tactics: [] });
+  });
+});
+
+describe("negotiation v2: scenario step", () => {
+  it("asks which kind of call first, with five scenarios", () => {
+    const s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    expect(s.stage).toBe("scenario");
+    expect(last(s.turns).replies?.map((r) => r.id)).toEqual(["scenario:screening", "scenario:offer", "scenario:internship", "scenario:counteroffer", "scenario:raise"]);
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 1, of: 5 });
+  });
+
+  it("a scenario in the link skips the question (v1 links mean offer)", () => {
+    const s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "raise" });
+    expect(s.stage).not.toBe("scenario");
+    expect(s.draft.scenario).toBe("raise");
+  });
+
+  it("raise: no range read, the card has current pay and ask, the plan carries the raise start", () => {
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "raise" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "role:type");
+    s = say(CTX_NEGOTIATE, s, "Product Designer");
+    const card = last(s.turns).numbers!;
+    expect(card.scenario).toBe("raise");
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, { ...card.values, currentPay: "60,000", ask: "72,000", currency: "EUR" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:firm");
+    const plan = planFor(CTX_NEGOTIATE, s);
+    expect(plan.negotiate).toMatchObject({ scenario: "raise", role: "Product Designer", current_pay: 60000, ask: 72000, style: "firm" });
+    expect(plan.tactics?.[0]?.id).toBe("R1");
+  });
+
+  it("does not send a raise whose ask is below the current pay", () => {
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "raise" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "role:type");
+    s = say(CTX_NEGOTIATE, s, "Product Designer");
+    const id = last(s.turns).id;
+    const sent = submitNumbers(CTX_NEGOTIATE, s, id, { ...last(s.turns).numbers!.values, currentPay: "72,000", ask: "60,000" });
+    expect(sent.stage).toBe("numbers");
+  });
+
+  it("the interview plan offers a salary talk, off until numbers are given", () => {
+    const s = begin(CTX_RETURNING, { kind: "text", text: "I want to practise" });
+    let p = pick(CTX_RETURNING, s, last(s.turns).id, "job:v2");
+    p = pick(CTX_RETURNING, p, last(p.turns).id, "round:behavioural");
+    p = pick(CTX_RETURNING, p, last(p.turns).id, "anything:none");
+    const plan = planFor(CTX_RETURNING, p);
+    expect(plan.money?.on).toBe(false);
+    expect(planFor({ ...CTX_RETURNING, moneyTalk: false }, p).money).toBeUndefined();
+  });
+});
+
+/* ---------- Negotiation v3 (D118): prepare first ---------- */
+
+function toPrep(ctx = CTX_NEGOTIATE): SetupState {
+  let s = toNumbers(ctx);
+  s = submitNumbers(ctx, s, last(s.turns).id, filled(s));
+  return pick(ctx, s, last(s.turns).id, "style:firm");
+}
+
+describe("negotiation v3: prepare first", () => {
+  it("asks after the style: Yes · No, and 'Use my case' only when a last case exists", () => {
+    const s = toPrep();
+    expect(s.stage).toBe("prep");
+    expect(last(s.turns).text).toBe("Want to prepare first? About 3 minutes: how bargaining works, then your case.");
+    expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Yes, let's prepare", "No, start now"]);
+    const withLast = toPrep(CTX_NEGOTIATE_LAST);
+    expect(last(withLast.turns).replies?.map((r) => r.label)).toEqual(["Yes, let's prepare", "No, start now", "Use my case from last time"]);
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 4, of: 4 });
+  });
+
+  it("No: straight to the plan, no case, no prep in the start message", () => {
+    let s = toPrep();
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "prep:no");
+    const plan = planFor(CTX_NEGOTIATE, s);
+    expect(s.stage).toBe("plan");
+    expect(plan.case).toBeUndefined();
+    expect(plan.negotiate?.prep).toBeUndefined();
+  });
+
+  it("Yes: five course messages one at a time, then the three case questions, the Your case card and the plan", () => {
+    let s = toPrep();
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "prep:yes");
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 5, of: 8 });
+    for (let i = 1; i <= 5; i += 1) {
+      expect(s.stage).toBe("course");
+      expect(last(s.turns).text).toMatch(new RegExp(`^\\*\\*${i}\\. `));
+      expect(last(s.turns).list?.[0]?.text).toMatch(/^“.+”$/);
+      expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Next", "Skip to my case"]);
+      s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "course:next");
+    }
+    expect(s.stage).toBe("case1");
+    s = say(CTX_NEGOTIATE, s, "Cut onboarding drop-off by a third.\nLed the checkout redesign.\nGrew trial-to-paid by 12%.\nA fourth one.");
+    expect(s.draft.case?.results).toHaveLength(3);
+    expect(s.stage).toBe("case2");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case2:market");
+    expect(s.stage).toBe("case3");
+    const q3 = last(s.turns);
+    expect(q3.replies?.map((r) => r.label)).toEqual(["Step-up after probation", "Sign-on bonus", "Earlier review", "Remote days", "Title", "Done", "Skip"]);
+    s = pick(CTX_NEGOTIATE, s, q3.id, "case3:step_up");
+    s = pick(CTX_NEGOTIATE, s, q3.id, "case3:sign_on");
+    expect(s.turns.find((x) => x.id === q3.id)?.answered).toBeFalsy();
+    expect(s.turns.find((x) => x.id === q3.id)?.replies?.filter((r) => r.selected).map((r) => r.id)).toEqual(["case3:step_up", "case3:sign_on"]);
+    s = pick(CTX_NEGOTIATE, s, q3.id, "case3:done");
+    expect(s.stage).toBe("plan");
+    expect(s.turns.find((x) => x.caseCard)?.caseCard).toMatchObject({ reason: "Market range", fallbacks: ["Step-up after probation", "Sign-on bonus"] });
+    const plan = planFor(CTX_NEGOTIATE, s);
+    expect(plan.case).toMatchObject({ reason: "Market range", fallbacks: ["Step-up after probation", "Sign-on bonus"] });
+    expect(plan.negotiate?.prep).toEqual({
+      course: true, results: ["Cut onboarding drop-off by a third.", "Led the checkout redesign.", "Grew trial-to-paid by 12%."], reason: "Market range", fallbacks: ["step_up", "sign_on"],
+    });
+  });
+
+  it("Skip to my case leaves the course out of nothing: the strip still follows (course shown), every question can be skipped", () => {
+    let s = toPrep();
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "prep:yes");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "course:skip");
+    expect(s.stage).toBe("case1");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case1:skip");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case2:skip");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case3:skip");
+    expect(s.stage).toBe("plan");
+    expect(planFor(CTX_NEGOTIATE, s).case).toBeUndefined();
+    expect(planFor(CTX_NEGOTIATE, s).negotiate?.prep).toEqual({ course: true, results: [], reason: "", fallbacks: [] });
+  });
+
+  it("without course content the course is skipped and the case is asked; the call has no strip", () => {
+    const bare = { ...CTX_NEGOTIATE, talk: { ...CTX_NEGOTIATE.talk!, content: { ...CTX_NEGOTIATE.talk!.content!, course: undefined } } };
+    let s = toPrep(bare);
+    s = pick(bare, s, last(s.turns).id, "prep:yes");
+    expect(s.stage).toBe("case1");
+    s = say(bare, s, "Shipped checkout in 3 months");
+    s = say(bare, s, "Because of my scope");
+    s = say(bare, s, "sign-on bonus and remote days");
+    expect(planFor(bare, s).negotiate?.prep).toMatchObject({ course: false, reason: "Because of my scope", fallbacks: ["sign_on", "remote"] });
+  });
+
+  it("Use my case from last time: case from the API, course follows the saved case", () => {
+    let s = toPrep(CTX_NEGOTIATE_LAST);
+    s = pick(CTX_NEGOTIATE_LAST, s, last(s.turns).id, "prep:last");
+    expect(s.stage).toBe("plan");
+    expect(planFor(CTX_NEGOTIATE_LAST, s).negotiate?.prep).toEqual({
+      course: true, results: ["Cut onboarding drop-off by a third", "Led the checkout redesign for 40k merchants"], reason: "Market range", fallbacks: ["step_up", "sign_on"],
+    });
+    const noCourse = { ...CTX_NEGOTIATE_LAST, talk: { ...CTX_NEGOTIATE_LAST.talk!, lastCases: { offer: { ...CTX_NEGOTIATE_LAST.talk!.lastCases!.offer!, course: false } } } };
+    let t2 = toPrep(noCourse);
+    t2 = pick(noCourse, t2, last(t2.turns).id, "prep:last");
+    expect(planFor(noCourse, t2).negotiate?.prep?.course).toBe(false);
+  });
+
+  it("raise uses the raise wording, levers and course", () => {
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate", scenario: "raise" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "role:type");
+    s = say(CTX_NEGOTIATE, s, "Product Designer");
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, { ...last(s.turns).numbers!.values, currentPay: "60,000", ask: "72,000", currency: "EUR" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:firm");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "prep:yes");
+    expect(last(s.turns).text).toContain("Collect results since your last raise");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "course:skip");
+    expect(last(s.turns).text).toContain("since your last raise");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case1:skip");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case2:skip");
+    expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["A part now", "Dated raise", "Title", "Done", "Skip"]);
+  });
+
+  it("Change on the plan's Your case row asks the three questions again and keeps one plan card", () => {
+    let s = toPrep();
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "prep:yes");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "course:skip");
+    s = say(CTX_NEGOTIATE, s, "Cut churn by 20%");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case2:scope");
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "case3:done");
+    s = change(CTX_NEGOTIATE, s, "case", "");
+    expect(s.stage).toBe("case1");
+    expect(s.turns.filter((x) => x.plan)).toHaveLength(0);
+    s = skip(CTX_NEGOTIATE, s);
+    expect(s.stage).toBe("plan");
+    expect(s.turns.filter((x) => x.plan)).toHaveLength(1);
+  });
+
+  it("Skip questions skips the rest of the prep", () => {
+    let s = toPrep();
+    s = skip(CTX_NEGOTIATE, s);
+    expect(s.stage).toBe("plan");
+    expect(planFor(CTX_NEGOTIATE, s).negotiate?.prep).toBeUndefined();
+  });
+
+  it("splits results by line, else by sentence; at most 3, 200 characters each", () => {
+    expect(splitResults("One.\nTwo.\n- Three.\nFour.")).toEqual(["One.", "Two.", "Three."]);
+    expect(splitResults("Cut churn by 20%. Grew revenue by 5%! Shipped v2?")).toHaveLength(3);
+    expect(splitResults("x".repeat(300))[0]).toHaveLength(200);
+    expect(splitResults("  ")).toEqual([]);
+  });
+
+  it("the tactics strip never lists the in-call objection cards X1 to X6", () => {
+    for (const sc of ["screening", "offer", "internship", "counteroffer", "raise"] as const) {
+      expect(tacticOrder("negotiate", { scenario: sc, hasOffer: true }).some((id) => /^X\d/.test(id))).toBe(false);
+    }
   });
 });

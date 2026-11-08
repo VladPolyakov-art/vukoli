@@ -4,11 +4,11 @@
  * appears once it is ready. No "Test" button: the status is the check, and it re-checks every 5 s while not ready. */
 import { useEffect, useState, type ReactNode } from "react";
 import { EngineLogo } from "./EngineLogo";
-import { Badge, Button, Callout, Disclosure, Icon, IconButton, SettingGroup, Skeleton } from "../../ds";
+import { Badge, Button, Callout, Disclosure, Icon, IconButton, Select, SettingGroup, SettingRow, Skeleton } from "../../ds";
 import { t } from "../../i18n";
 import { useInterval } from "../../lib/hooks";
 import { errorMessage, useApp } from "../../lib/store";
-import type { EngineId, EngineInfo } from "../../lib/types";
+import type { DebriefEngine, EngineId, EngineInfo } from "../../lib/types";
 import { AntigravityBody, ClaudeBody, CodexBody, DisconnectButton, DisconnectedBody, GeminiBody, OllamaBody, OllamaModelPicker, OpenAiBody } from "./bodies";
 import { EngineStatus, engineStatusWord } from "./EngineStatus";
 import { LimitFacts, PlanLimit } from "./PlanLimit";
@@ -21,7 +21,7 @@ export interface EngineSettingsProps {
 }
 
 export function EngineSettings({ initialOpen }: EngineSettingsProps) {
-  const { engines, refreshEngines, enginesLoading, updateSettings } = useApp();
+  const { engines, refreshEngines, enginesLoading, updateSettings, settings } = useApp();
   const [open, setOpen] = useState<EngineId | null>(initialOpen ?? null);
   const [switching, setSwitching] = useState<EngineId | null>(null);
   const [error, setError] = useState("");
@@ -50,6 +50,23 @@ export function EngineSettings({ initialOpen }: EngineSettingsProps) {
       setSwitching(null);
     }
   };
+
+  const saveDebrief = async (value: string) => {
+    setError("");
+    try {
+      await updateSettings({ debrief_engine: value as DebriefEngine });
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  // D117: every engine but Gemini Live (it only talks). A not-ready one stays choosable; the server falls back to the conversation engine.
+  const debriefOptions = [
+    { value: "", label: t("engines.settings.debriefSame") },
+    ...engines.engines.filter((e) => e.id !== "gemini_live").map((e) => ({
+      value: e.id,
+      label: e.status.ready ? engineName(e) : `${engineName(e)} · ${engineStatusWord(e)}`,
+    })),
+  ];
 
   const recheck = <IconButton icon="refresh" size="sm" label={t("common.checkAgain")} data-track="engine-recheck" disabled={enginesLoading} onClick={() => void refreshEngines()} />;
   const others = engines.engines.filter((e) => e.id !== selected?.id);
@@ -123,6 +140,14 @@ export function EngineSettings({ initialOpen }: EngineSettingsProps) {
               </div>
             );
           })}
+        </SettingGroup>
+      </div>
+      <div data-review-id="Engine/Debrief" data-review-section="AI engine · Feedback after the call" data-comment-target>
+        <SettingGroup title={t("engines.settings.debriefTitle")} id="engine-debrief">
+          <SettingRow id="debrief-engine" label={t("engines.settings.debriefLabel")} description={t("engines.settings.debriefHint")}>
+            <Select track="settings-debrief-engine" label={t("engines.settings.debriefLabel")} hideLabel width="content"
+              value={settings?.debrief_engine ?? ""} onChange={(v) => void saveDebrief(v)} options={debriefOptions} />
+          </SettingRow>
         </SettingGroup>
       </div>
     </div>

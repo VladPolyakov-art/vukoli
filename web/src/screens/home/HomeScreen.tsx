@@ -21,17 +21,18 @@ import { useInstallOffer } from "../../lib/installApp";
 import { prefs } from "../../lib/prefs";
 import { useApp } from "../../lib/store";
 import { homeUtScreen, useUtScreen } from "../../lib/utScreen";
-import type { Vacancy } from "../../lib/types";
+import type { NegotiatePrep, NegotiateScenario, Vacancy } from "../../lib/types";
 import { buildSessionConfig } from "../../session/startConfig";
 import { homePrefs, shortDate } from "./homePrefs";
 import { quickStartFor } from "./quickStart";
 import { HomeView } from "./HomeView";
 import {
   attach, begin, change, pick, planFor, removeNote, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip,
-  submitNumbers, suggestionsFor, updateJob,
+  scenarioOf, submitNumbers, suggestionsFor, updateJob,
   type ScriptContext, type SetupState,
 } from "./script";
 import { talkPrefs } from "./talkPrefs";
+import { isScenario } from "./numbers";
 import { lowerFirstWord, weakFromSession } from "./sessionFocus";
 import { trackFromParam, type EnglishTopic, type JobItem, type PlanModel, type Track, type WeakItem } from "./types";
 
@@ -86,6 +87,18 @@ export function HomeScreen() {
   }, []);
 
   const [setup, setSetup] = useState<SetupState | null>(null);
+  /* Negotiation v3: the case saved with the newest record of the scenario (null = none). Asked once the scenario is known;
+     if the server cannot answer, "Use my case from last time" is simply not offered. */
+  const [lastCases, setLastCases] = useState<Partial<Record<NegotiateScenario, NegotiatePrep | null>>>({});
+  const caseScenario = setup?.track === "negotiate" ? scenarioOf(setup.draft) : null;
+  useEffect(() => {
+    if (!caseScenario || caseScenario in lastCases) return;
+    let cancelled = false;
+    api.lastCase(caseScenario)
+      .then((r) => { if (!cancelled) setLastCases((m) => ({ ...m, [caseScenario]: r.case ?? null })); })
+      .catch(() => { if (!cancelled) setLastCases((m) => ({ ...m, [caseScenario]: null })); });
+    return () => { cancelled = true; };
+  }, [caseScenario, lastCases]);
   const [composer, setComposer] = useState<{ text: string; file?: { name: string; size: string } }>({ text: "" });
   const dictation = useDictation(stt.data, (text) => setComposer((c) => ({ ...c, text: c.text.trim() ? `${c.text.trimEnd()} ${text}` : text })));
   const fileRef = useRef<File | null>(null);
@@ -143,16 +156,18 @@ export function HomeScreen() {
       weakSessions: memoryData?.sessions_considered ?? 0,
       level: (sessionList ?? []).some((x) => x.mode === "english") ? settings?.level ?? null : null,
       phrases: [],
+      moneyTalk: selectedEngine?.id !== "gemini_live",
       talk: {
         content: talkContent.data ?? null,
         lastStyle: talkPrefs.lastStyle(),
         numbers: talkPrefs.numbers(),
         tacticsHidden: { tough: prefs.tacticsHidden("tough"), negotiate: prefs.tacticsHidden("negotiate") },
+        lastCases,
       },
     };
     // prefsTick: the stored "hide tactics" choice changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, prep, sessionList, memoryData, hasCv, settings, track, talkContent.data, prefsTick]);
+  }, [list, prep, sessionList, memoryData, hasCv, settings, track, talkContent.data, prefsTick, selectedEngine?.id, lastCases]);
 
   /* "Drill these weak spots" in a debrief arrives as /?drill=1&session=<id>&job=<id>: open the drill plan with that
      debrief's own weak spots (C1), once, after the data has loaded. Without a session (or when it cannot be read, or has
@@ -172,8 +187,9 @@ export function HomeScreen() {
   useEffect(() => {
     if (talkAsked.current || (track !== "tough" && track !== "negotiate") || !talkReady) return;
     talkAsked.current = true;
-    setSetup(begin(ctx, { kind: "suggestion", id: track }));
-  }, [track, talkReady, ctx, location.key]);
+    const scenario = new URLSearchParams(location.search).get("scenario");
+    setSetup(begin(ctx, { kind: "suggestion", id: track, scenario: track === "negotiate" && isScenario(scenario) ? scenario : undefined }));
+  }, [track, talkReady, ctx, location.key, location.search]);
 
   /* Questions from a job: the plan's Job row shows "Preparing questions…" and Start waits until the call returns
    * (QA-02: a session started meanwhile would ask a general question). A failure or the timeout says that general
@@ -280,8 +296,14 @@ export function HomeScreen() {
     if (plan.kind === "negotiate" && plan.negotiate) {
       const n = plan.negotiate;
       // US-63 AC6 / US-64 AC2: the next visit starts from these numbers and this style.
-      talkPrefs.remember(n.style, plan.job?.id ?? null, { role: n.role, low: n.job_low, high: n.job_high, target: n.target, currency: n.currency, hasOffer: n.has_real_offer });
-      const config = buildSessionConfig({ mode: "negotiate", answer, negotiate: plan.negotiate, vacancyId: plan.job?.id }, settings, stt.data);
+      // Only the calls with a salary target of their own leave numbers behind (a raise or a counteroffer has none).
+      talkPrefs.rememberStyle(n.style);
+      if (n.scenario !== "raise" && n.scenario !== "counteroffer") {
+        talkPrefs.remember(n.style, plan.job?.id ?? null, { role: n.role, low: n.job_low, high: n.job_high, target: n.target, currency: n.currency, hasOffer: n.has_real_offer });
+      }
+      const negotiate = { ...plan.negotiate, company: undefined };
+      delete negotiate.company;
+      const config = buildSessionConfig({ mode: "negotiate", answer, negotiate, vacancyId: plan.job?.id }, settings, stt.data);
       const title = t("session.negotiate.title", { role: plan.negotiate.role });
       leave(() => navigate("/session", { state: { config, title } }));
       return;
@@ -308,6 +330,7 @@ export function HomeScreen() {
     const config = buildSessionConfig({
       mode: "interview", answer, roundType, strictness: plan.strictness, questions: plan.questions, vacancyId: plan.job?.id,
       drill: plan.kind === "drill", focus: plan.kind === "drill" ? plan.focus?.tags : undefined,
+      moneyTalk: plan.money?.on ? plan.money.start : undefined,
     }, settings, stt.data);
     const title = sessionName(list.find((v) => v.id === plan.job?.id)?.title ?? "", plan.kind === "drill");
     const focus = plan.kind === "drill" ? plan.focus?.spots : undefined;

@@ -23,6 +23,14 @@ describe("talkResult", () => {
   it("reads no offer", () => {
     expect(talkResult(neg({ no_offer: true, opening: null, final_offer: null, gain_now: null, captured_now_pct: null }))).toBe("No offer yet");
   });
+  it("reads a screening call", () => {
+    expect(talkResult(neg({ scenario: "screening", first_number: 90000, vs_band: "inside" }))).toBe("First number 90,000 EUR · inside the band");
+    expect(talkResult(neg({ scenario: "screening", first_number: null }))).toBe("No number named");
+  });
+  it("reads a raise or counteroffer without a result", () => {
+    expect(talkResult(neg({ scenario: "raise", no_offer: true, final_offer: null }))).toBe("No change agreed");
+    expect(talkResult(neg({ scenario: "raise" }))).toBe("+3,000 EUR now · 30%");
+  });
   it("ignores other modes", () => {
     expect(talkResult(null)).toBeNull();
     expect(talkResult(undefined)).toBeNull();

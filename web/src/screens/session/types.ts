@@ -4,6 +4,7 @@
  * a button the backend can't honour. */
 import type { CaptionTurn, IconName } from "../../ds";
 import type { EngineId } from "../../lib/types";
+import type { TalkStepsModel } from "./talkSteps";
 
 /** `tough` (uncomfortable questions) counts questions like an interview; `negotiate` counts turns like English. */
 export type SessionVariant = "interview" | "drill" | "english" | "tough" | "negotiate";
@@ -43,9 +44,15 @@ export interface SessionHint {
   alt?: { id: string; title: string; example: string };
   /** Hints asked so far. */
   used: number;
+  /** A press is waiting for its card (`pending`), or waited too long (`stalled`: Try again). Fixtures leave it out. */
+  wait?: "idle" | "pending" | "stalled";
 }
 
 export interface SessionData {
+  /** Negotiation v2: Mike is checking with the hiring manager (the input stays usable). */
+  checking?: boolean;
+  /** Interview with a salary talk: the salary part has begun (Hint takes the suggester's place; the progress says so). */
+  moneyPart?: boolean;
   /** "Kestrel Pay · Senior Product Designer" */
   title: string;
   /** "Behavioural · Standard" (interview) */
@@ -74,6 +81,8 @@ export interface SessionData {
   suggestOn?: boolean;
   /** Tough talk (`tough`, `negotiate`): the Hint button and card. Absent: the mode has no hint (the island draws no button). */
   hint?: SessionHint;
+  /** Negotiation v3 (P7): the step strip. Absent until the server sends `talk_step` (the course was not taken). */
+  talkSteps?: TalkStepsModel;
   /** Seconds of quiet that end a voice answer; 0 = manual. */
   pauseSec: number;
   /** Notices from the app that don't change the layout (live container only). */
@@ -112,6 +121,8 @@ export interface SessionHandlers {
   onToggleHint?: () => void;
   /** Tough talk: the × on the hint card. */
   onHideHint?: () => void;
+  /** Tough talk: the refresh button on the hint card, and Try again (a different card for the same moment). */
+  onAnotherHint?: () => void;
   onDismissBanner?: () => void;
   onUseText?: () => void;
   onFixSettings?: () => void;

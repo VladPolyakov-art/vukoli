@@ -168,16 +168,75 @@ def _next(st: dict, lead: str) -> dict:
     return {"kind": kind, "line": f"{L['move_on'] if lead == 'move_on' else L['next']} {nxt['text']}", "advance": True}
 
 
-def pick_hint(st: dict) -> dict:
-    """The tactic card for the moment: personal question -> T1; after a pressure line -> T2; else the question's own card."""
+def _hint_turn(st: dict) -> int:
+    """How many answers and pushes the log holds: a hint belongs to the moment between two of them."""
+    return sum(len(e["answers"]) + len(e["pushes"]) for e in st["log"])
+
+
+# Per-question cards built from the question itself (not in the card list): how to build this answer, what they check.
+SHAPE_CARD, CHECK_CARD = "TS", "TC"
+VIRTUAL_TITLES = {SHAPE_CARD: "How to build this answer", CHECK_CARD: "What they are really checking"}
+PAUSE_RE = re.compile(r"\b(?:let me think|give me a (?:second|moment|minute)|one (?:second|moment)|good question)\b", re.I)
+
+
+def hint_title(cid: str) -> str:
+    return VIRTUAL_TITLES.get(cid) or talk.card(cid)["title"]
+
+
+def _last_answer(st: dict) -> str:
+    for e in reversed(st["log"]):
+        texts = [a["text"] for a in e["answers"] if a.get("text")]
+        if texts:
+            return texts[-1]
+    return ""
+
+
+def hint_ranking(st: dict) -> tuple[list[str], dict]:
+    """Cards for the moment, best first. Personal question -> T1; after a push -> T2 ("fair point, shorter"); then this
+    question's own two cards (how to build the answer, what they check); a pause only if the user has not just paused.
+    Owner 08.11: with one shared card for 20 questions "Another hint" kept showing the same card."""
     q = current(st) or talk.question(st["ids"][-1])
+    ranked = []
     if q["personal"]:
-        card = "T1"
+        ranked.append("T1")
     elif st["stage"] == "pressed":
-        card = "T2"
+        ranked.append("T2")
+    ranked += [SHAPE_CARD, CHECK_CARD]
+    if not PAUSE_RE.search(_last_answer(st)):
+        ranked.append("N4")
+    return list(dict.fromkeys(ranked)), q
+
+
+def pick_hint(st: dict, another: bool = False) -> dict:
+    """The next card for this moment: every press (the H key or "Another hint") moves on to a card not shown yet here,
+    then cycles. `another` is kept for the protocol; a press after a card was shown now means "show me something else"."""
+    ranked, q = hint_ranking(st)
+    turn = _hint_turn(st)
+    on_q = [h for h in st["hints_used"] if h.get("question_id") == q["id"]]
+    shown = [h["card_id"] for h in on_q if h.get("turn") == turn]
+    seen_before = {h["card_id"] for h in on_q}
+    fresh = [c for c in ranked if c not in shown]
+    # A new moment of the same question (Mike followed up) leads with a card not seen on this question yet.
+    fresh = [c for c in fresh if c not in seen_before] + [c for c in fresh if c in seen_before]
+    if fresh:
+        card = fresh[0]
     else:
-        card = q["card"]
-    return {"card_id": card, "shape": q["shape"], "question_id": q["id"]}
+        last = shown[-1] if shown else ranked[-1]
+        card = ranked[(ranked.index(last) + 1) % len(ranked)] if last in ranked else ranked[0]
+    return {"card_id": card, "shape": q["shape"], "question_id": q["id"], "turn": turn}
+
+
+def hint_payload(st: dict, h: dict, n: int) -> dict:
+    """What the hint card shows. The question's own cards carry its shape or what it checks, with an example to fill in."""
+    q = talk.question(h["question_id"])
+    cid = h["card_id"]
+    if cid == SHAPE_CARD:
+        return {"mode": "tough", "card_id": cid, "title": VIRTUAL_TITLES[cid], "text": q["shape"], "shape": q["shape"],
+                "example": q.get("hint_example") or "", "n": n}
+    if cid == CHECK_CARD:
+        rule = f"{q['checking']} Avoid: {q['trap'][0].lower()}{q['trap'][1:]}"
+        return {"mode": "tough", "card_id": cid, "title": VIRTUAL_TITLES[cid], "text": rule, "shape": rule, "example": "", "n": n}
+    return talk.hint_payload(cid, "tough", n)
 
 
 # ---------- after the call ----------
@@ -260,12 +319,13 @@ def debrief(st: dict) -> dict:
         hurt_most = None
         verdict = f"Handled calmly {calm} of {len(rows)}. No clear stumbles." if show_counts else "No clear stumbles in your answers."
     any_model = any(r["model_checked"] for r in rows)
-    hints = [{"card_id": h["card_id"], "title": talk.card(h["card_id"])["title"], "turn": h.get("question_id")} for h in st["hints_used"]]
+    hints = [{"card_id": h["card_id"], "title": hint_title(h["card_id"]), "turn": h.get("question_id")} for h in st["hints_used"]]
     return {"kind": "tough", "verdict": verdict, "practice_note": d["notes"]["tough_practice"], "theme": st["theme"],
             "theme_name": st["theme_name"], "summary": {"answered": len(rows), "calm": calm, "show_counts": show_counts,
                                                          "hurt_most": hurt_most},
             "questions": rows, "hints_used": hints,
-            "cards": list(dict.fromkeys([c for r in rows for c in r["card_ids"]] + [h["card_id"] for h in hints])),
+            "cards": list(dict.fromkeys([c for r in rows for c in r["card_ids"]]
+                                        + [h["card_id"] for h in hints if h["card_id"] not in VIRTUAL_TITLES])),
             "source": "code+model" if any_model else "code"}
 
 

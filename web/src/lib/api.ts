@@ -3,7 +3,7 @@ import type {
   Debrief, EngineId, EngineLimits, EngineStatus, EnginesResponse, EngineConnectResult, EngineTestResult, Health, MemorySummary, OllamaModelsResponse, OllamaPull,
   Profile, Question, SessionRecord, SessionSummary, Settings, SettingsPatch, SttInfo, StrongerVersion, TelemetryInfo, VoiceCheckResult,
   TrashItem, SearchResult, Vacancy, FeedbackBody, FeedbackConfig, SessionFinished, VacancySummary, VoicesResponse, LanguageItem, LanguageLayer, FeedbackRecord, TranscriptTurn,
-  ToughTalkContent, SalaryRange,
+  ToughTalkContent, SalaryRange, NegotiatePrep,
 } from "./types";
 
 export class ApiError extends Error {
@@ -93,6 +93,8 @@ export const api = {
   deleteProfile: () => request<{ ok: boolean }>("/profile", { method: "DELETE" }),
   vacancies: () => request<{ vacancies: VacancySummary[] }>("/vacancies"),
   toughTalkContent: () => request<ToughTalkContent>("/tough-talk/content"),
+  /** Negotiation v3: the case saved with the newest negotiate record of this scenario (null: none). */
+  lastCase: (scenario: string) => request<{ case: NegotiatePrep | null }>(`/talk/last-case?scenario=${encodeURIComponent(scenario)}`),
   salaryRange: (vacancyId: string) => request<SalaryRange>(`/vacancies/${encodeURIComponent(vacancyId)}/salary-range`),
   vacancy: (id: string) => request<Vacancy>(`/vacancies/${encodeURIComponent(id)}`),
   createVacancy: (body: { title?: string; text?: string; url?: string; file?: { name: string; data: string } }) =>

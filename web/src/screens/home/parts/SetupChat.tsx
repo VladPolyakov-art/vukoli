@@ -6,7 +6,7 @@
  *   message (TextShimmer) only while real work runs.
  * The bottom composer lives in HomeView (it is the same object as the start composer, moved by FLIP). */
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { Button, ChatLog, ChatMessage, Chip, ChipGroup, Icon } from "../../../ds";
+import { Button, Card, ChatLog, ChatMessage, Chip, ChipGroup, Icon } from "../../../ds";
 import { durationMs, scrollBehavior, usePresence } from "../../../ds/motion";
 import { t } from "../../../i18n";
 import type { HomeViewProps, SetupReply, SetupTurn } from "../types";
@@ -75,7 +75,7 @@ function Replies({ turn, fresh, onReply }: { turn: SetupTurn; fresh: boolean; on
     <div className={leaving ? s.repliesOut : fresh ? s.repliesIn : undefined} data-review-id="Home/Setup/Replies">
       <ChipGroup label={t("chat.setup.replies")} hideLabel>
         {last.current.map((r, i) => (
-          <Chip key={r.id} icon={r.icon} data-track={replyTrack(r.id)} style={{ "--i": i } as CSSProperties} disabled={leaving} onClick={() => onReply?.(turn.id, r.id)}>
+          <Chip key={r.id} icon={r.icon} selected={r.selected} data-track={replyTrack(r.id)} style={{ "--i": i } as CSSProperties} disabled={leaving} onClick={() => onReply?.(turn.id, r.id)}>
             {r.label}
           </Chip>
         ))}
@@ -114,6 +114,37 @@ function UserBody({ turn }: { turn: SetupTurn }) {
     );
   }
   return <p className={s.linkText}>{turn.text}</p>;
+}
+
+/** "Your case" at the end of the prep questions: results, reason, fallbacks. The plan card's row frame, no new look. */
+export function CaseCard({ card }: { card: NonNullable<SetupTurn["caseCard"]> }) {
+  return (
+    <Card as="section" aria-label={t("home.talk.prep.card.title")} className={s.caseCard} data-review-id="Home/Setup/CaseCard">
+      <h2 className={s.caseTitle}>{t("home.talk.prep.card.title")}</h2>
+      <dl className={s.termList}>
+        {card.results.length ? (
+          <div className={s.termItem}>
+            <dt className={s.termName}>{t("home.talk.prep.card.results")}</dt>
+            <dd className={s.termText}>
+              <ul className={s.caseBullets}>{card.results.map((r, i) => <li key={i}>{r}</li>)}</ul>
+            </dd>
+          </div>
+        ) : null}
+        {card.reason ? (
+          <div className={s.termItem}>
+            <dt className={s.termName}>{t("home.talk.prep.card.reason")}</dt>
+            <dd className={s.termText}>{card.reason}</dd>
+          </div>
+        ) : null}
+        {card.fallbacks.length ? (
+          <div className={s.termItem}>
+            <dt className={s.termName}>{t("home.talk.prep.card.fallbacks")}</dt>
+            <dd className={s.termText}>{card.fallbacks.join(", ")}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </Card>
+  );
 }
 
 export interface SetupChatProps extends HomeViewProps {
@@ -194,9 +225,22 @@ export function SetupChat(props: SetupChatProps) {
                 <>
                   <p className={s.text}>{rich(turn.text)}</p>
                   {turn.aside ? <p className={s.aside}>{turn.aside}</p> : null}
+                  {turn.list?.length ? (
+                    <dl className={s.termList} data-review-id="Home/Setup/Scenarios">
+                      {turn.list.map((x) => (
+                        <div key={x.term} className={s.termItem}>
+                          <dt className={s.termName}>{x.term}</dt>
+                          <dd className={s.termText}>{x.text}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
                 </>
               ) : null}
             </ChatMessage>
+            {turn.caseCard ? (
+              <div className={isFresh ? "motion-card" : undefined}><CaseCard card={turn.caseCard} /></div>
+            ) : null}
             {turn.example ? (
               <div className={isFresh ? "motion-card" : undefined}><ExampleCard order={props.layerOrder} /></div>
             ) : null}
@@ -208,6 +252,7 @@ export function SetupChat(props: SetupChatProps) {
                   fromPost={turn.numbers.fromPost}
                   currencies={turn.numbers.currencies}
                   showErrors={turn.numbers.showErrors}
+                  scenario={turn.numbers.scenario}
                   onSubmit={(values) => props.onNumbers?.(turn.id, values)}
                 />
               </div>

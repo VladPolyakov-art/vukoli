@@ -11,7 +11,7 @@ from server.engines.base import EngineError, EngineStatus
 
 SAME = {"Origin": "http://testserver"}
 NEG = {"role": "Designer", "job_low": 80000, "job_high": 100000, "target": 98000, "currency": "USD",
-       "style": "friendly", "has_real_offer": False}
+       "style": "friendly", "has_real_offer": False, "seed": 7}
 
 
 @pytest.fixture
@@ -81,7 +81,8 @@ def test_parse_start_accepts_valid_blocks_and_defaults():
     s = load_settings()
     opts = ws.parse_start({"mode": "negotiate", "input": "text", "negotiate": {"role": " PM ", "target": 90000.4}}, s)
     assert opts["negotiate"] == {"role": "PM", "job_low": None, "job_high": None, "target": 90000, "currency": "USD",
-                                 "style": "friendly", "has_real_offer": False}
+                                 "style": "friendly", "has_real_offer": False, "scenario": "offer", "seed": None,
+                                 "prep": None}
     assert opts["suggest"] is False
     assert ws.parse_start({"mode": "tough", "input": "text"}, s)["tough"] == {"theme": "mix"}
     assert ws.parse_start({"mode": "negotiate", "input": "text", "negotiate": {**NEG, "target": 120000}}, s)   # above the range is fine
@@ -103,73 +104,81 @@ def recruiter_reply(messages):
     return {"recruiter_line": "Thanks for that." if amount in ("None", "") else f"Here is where we are: {amount} a year."}
 
 
+def bargain_reply(messages):
+    text = messages[-1]["content"]
+    amount = next((ln.split(": ", 1)[1] for ln in text.splitlines() if ln.startswith("AMOUNT_TO_SAY: ")), "None")
+    act = next((ln.split(": ", 1)[1] for ln in text.splitlines() if ln.startswith("ACT: ")), "x")
+    return {"bargain_line": f"Noted on the {act}." if amount in ("None", "") else f"Noted on the {act}: {amount} a year."}
+
+
 def test_negotiation_end_to_end(client, patch_llm, fake_llm):
-    llm = patch_llm(fake_llm({"p7": recruiter_reply}))
+    """v2 (changed from v1): the call opens with Mike's offer, the first counter meets an objection, a plain accept closes."""
+    llm = patch_llm(fake_llm({"p9": bargain_reply}))
     with client.websocket_connect("/ws/session") as s:
         s.send_json({"type": "start", "mode": "negotiate", "input": "text", "negotiate": NEG})
         started, _ = receive_until(s, "session_started")
         assert started["talk"] is True and started["hint_available"] is True and started["suggester_available"] is False
         assert started["negotiate"]["style"] == "friendly" and started["negotiate"]["target"] == 98000
+        assert started["negotiate"]["scenario"] == "offer" and started["negotiate"]["scenario_name"] == "Offer call"
         assert started["questions"] == [] and "floor" not in str(started) and "ceiling" not in str(started)
         opening = line_of(s)
         assert opening["speaker"] == "model" and opening["kind"] == "turn"
 
         seen = say(s, "I was hoping for around 98k")
         line = mike(seen)[-1]
-        assert "91,000 USD" in line["full_text"] and line["kind"] == "turn"
+        assert line["kind"] == "turn"
         assert not any(m["type"] in ("feedback", "suggestion_pending") for m in seen)      # no feedback records
 
         s.send_json({"type": "hint"})
         hint, _ = receive_until(s, "hint")
         assert hint["card_id"] and hint["title"] and hint["text"] and hint["example"] and hint["mode"] == "negotiate"
+        s.send_json({"type": "hint", "another": True})
+        other, _ = receive_until(s, "hint")
+        assert other["card_id"] != hint["card_id"] and other["title"] and other["n"] == hint["n"] + 1
 
-        seen = say(s, "Could we do 91k now and 98k after the 3 month probation, in writing?", 2)
-        assert "offer letter" in mike(seen)[-1]["full_text"]          # the scripted in-writing line follows the model's
         seen = say(s, "Great, I accept the offer", 3)
         closing = mike(seen)[-1]
         assert closing["kind"] == "closing" and closing["outcome"] == "accepted"
         s.send_json({"type": "end_session"})
         debrief, seen = receive_until(s, "debrief")
     d = debrief["debrief"]
-    assert d["kind"] == "negotiate" and d["outcome"] == "accepted" and d["deal"]["after_months"] == 3
-    assert d["deal"]["in_writing"] and d["summary"]["year_one"] and d["hidden_range"]["floor"] == 80000
+    assert d["kind"] == "negotiate" and d["version"] == 2 and d["outcome"] == "accepted" and d["scenario"] == "offer"
     assert not any(m["type"] == "feedback_progress" for m in seen)
-    assert llm.calls and all(c["key"] == "p7" for c in llm.calls)       # only recruiter lines, no feedback layers
-    # saved record, History, recompute
+    assert llm.calls and all(c["key"] in ("p9", "p10", "p11") for c in llm.calls)  # bargaining lines and hint lines, no feedback layers
     [record] = storage.list_records("sessions")
     assert record["mode"] == "negotiate" and record["negotiation"]["outcome"] == "accepted"
-    assert record["title"] == "Negotiation · Designer · Friendly" and record["feedback"] == []
+    assert record["negotiation"]["version"] == 2 and record["negotiation"]["seed"] == 7
+    assert record["title"] == "Salary talk · Offer call · Friendly" and record["feedback"] == []
     assert record["negotiation"]["hints_used"]
     listing = client.get("/api/sessions", headers=SAME).json()["sessions"][0]
     assert listing["mode"] == "negotiate" and listing["verdict"] == d["verdict"]
     again = client.post(f"/api/sessions/{record['id']}/debrief", headers=SAME).json()
-    assert again["kind"] == "negotiate" and again["summary"]["captured_pct"] == d["summary"]["captured_pct"]
+    assert again["kind"] == "negotiate" and again["version"] == 2
     page = client.get(f"/api/sessions/{record['id']}", headers=SAME).json()
     assert page["debrief"]["kind"] == "negotiate"
 
 
 def test_model_line_with_a_wrong_number_is_replaced_by_the_scripted_line(client, patch_llm, fake_llm):
-    patch_llm(fake_llm({"p7": {"recruiter_line": "We can go to 95,000 USD, our budget allows it."}}))
+    patch_llm(fake_llm({"p9": {"bargain_line": "We can go to 95,000 USD, our budget allows it."}}))
     with client.websocket_connect("/ws/session") as s:
         s.send_json({"type": "start", "mode": "negotiate", "input": "text", "negotiate": NEG})
         receive_until(s, "session_started")
         line_of(s)
         line = mike(say(s, "98k"))[-1]["full_text"]
-        assert "95,000" not in line and "budget" not in line and "91,000 USD" in line
+        assert "95,000" not in line and "budget" not in line
         s.send_json({"type": "end_session"})
         receive_until(s, "debrief")
-    assert storage.list_records("sessions")[0]["negotiation"]["guard_replacements"] == 1
+    neg = storage.list_records("sessions")[0]["negotiation"]
+    assert neg["guard_replacements"] >= 1 and "number" in neg["guard_reasons"]
 
 
 def test_negotiation_finishes_with_no_model_at_all(client, patch_llm, fake_llm):
-    class Down(EngineError):
-        pass
-    patch_llm(fake_llm({"p7": EngineError("down", "model down")}))
+    patch_llm(fake_llm({"p9": EngineError("down", "model down")}))
     with client.websocket_connect("/ws/session") as s:
         s.send_json({"type": "start", "mode": "negotiate", "input": "text", "negotiate": NEG})
         receive_until(s, "session_started")
         line_of(s)
-        assert "91,000 USD" in mike(say(s, "98k"))[-1]["full_text"]
+        assert mike(say(s, "98k"))[-1]["full_text"]
         assert mike(say(s, "I need a few days to think", 2))[-1]["kind"] == "closing"
         s.send_json({"type": "end_session"})
         d = receive_until(s, "debrief")[0]["debrief"]
@@ -253,7 +262,7 @@ def test_tough_round_end_to_end(client, patch_llm, fake_llm):
             if kinds[-1] == "closing":
                 break
         assert kinds[-1] == "closing" and kinds.count("question") == 4
-        assert not llm.calls                                           # no model in the call
+        assert all(c["key"] == "p12" for c in llm.calls)               # D117: only the follow-up wording in the call
         s.send_json({"type": "hint"})
         hint = receive_until(s, "hint")[0]
         assert hint["card_id"] and hint["mode"] == "tough"
@@ -285,7 +294,7 @@ def test_tough_model_failure_leaves_code_signals_only(client, patch_llm, fake_ll
 
 
 def test_redo_answer_restores_the_state(client, patch_llm, fake_llm):
-    patch_llm(fake_llm({"p7": recruiter_reply}))
+    patch_llm(fake_llm({"p9": bargain_reply}))
     with client.websocket_connect("/ws/session") as s:
         s.send_json({"type": "start", "mode": "negotiate", "input": "text", "negotiate": NEG})
         receive_until(s, "session_started")
@@ -296,7 +305,7 @@ def test_redo_answer_restores_the_state(client, patch_llm, fake_llm):
         receive_until(s, "answer_reset")
         receive_until(s, "response_complete")
         seen = say(s, "I want 98,000 because of my experience leading teams", 3)
-        assert "USD" in mike(seen)[-1]["full_text"]
+        assert mike(seen)[-1]["full_text"]
         s.send_json({"type": "end_session"})
         d = receive_until(s, "debrief")[0]["debrief"]
     assert d["outcome"] != "accepted"
@@ -395,14 +404,13 @@ def test_scripted_engine_routes_the_new_schemas():
 
 
 def test_sessions_list_has_a_structured_talk_result(client, patch_llm, fake_llm):
-    patch_llm(fake_llm({"p7": recruiter_reply}))
+    patch_llm(fake_llm({"p9": bargain_reply}))
     with client.websocket_connect("/ws/session") as s:
         s.send_json({"type": "start", "mode": "negotiate", "input": "text", "negotiate": NEG})
         receive_until(s, "session_started")
         line_of(s)
         say(s, "98k")
-        say(s, "Could we do 91k now and 98k after the 3 month probation, in writing?", 2)
-        say(s, "I accept", 3)
+        say(s, "I accept", 2)
         s.send_json({"type": "end_session"})
         receive_until(s, "debrief")
     with client.websocket_connect("/ws/session") as s:
@@ -415,8 +423,32 @@ def test_sessions_list_has_a_structured_talk_result(client, patch_llm, fake_llm)
     rows = {r["mode"]: r for r in client.get("/api/sessions", headers=SAME).json()["sessions"]}
     neg = rows["negotiate"]["talk_result"]
     assert neg["kind"] == "negotiate" and neg["outcome"] == "accepted" and neg["currency"] == "USD"
-    assert neg["opening"] == 91000 and neg["final_offer"] >= 91000 and neg["gain_now"] == neg["final_offer"] - 91000
-    assert neg["step_up"] == {"later": 98000, "after_months": 3, "in_writing": True} and neg["no_offer"] is False
+    assert neg["version"] == 2 and neg["scenario"] == "offer"
+    assert neg["opening"] >= 80000 and neg["final_offer"] >= neg["opening"] and neg["gain_now"] == neg["final_offer"] - neg["opening"]
+    assert neg["step_up"] is None and neg["no_offer"] is False
     assert "captured_now_pct" in neg
     t = rows["tough"]["talk_result"]
     assert t["kind"] == "tough" and t["total"] >= 1 and 0 <= t["calm"] <= t["total"]
+
+
+def test_tough_follow_up_is_written_from_the_answer(client, patch_llm, fake_llm):
+    """D117: code decides a follow-up comes; the model words it from the answer. A bad line keeps the fixed one."""
+    asked = "You said you led the redesign. What exactly was your part in it?"
+    llm = patch_llm(fake_llm({"p8": check_reply, "p12": {"follow_up": asked}}))
+    with client.websocket_connect("/ws/session") as s:
+        s.send_json({"type": "start", "mode": "tough", "input": "text", "tough": {"theme": "weakness"}})
+        receive_until(s, "session_started")
+        line_of(s)
+        follow = None
+        for i in range(1, 12):
+            seen = say(s, "I led the redesign of our onboarding and learned to ask for feedback earlier.", i)
+            last = mike(seen)[-1]
+            if last["kind"] == "follow_up":
+                follow = seen
+                break
+        assert follow is not None
+        assert any(asked in str(m) for m in follow)
+        p12 = [c for c in llm.calls if c["key"] == "p12"][-1]["messages"][1]["content"]
+        assert "I led the redesign" in p12
+        s.send_json({"type": "end_session"})
+        receive_until(s, "debrief")

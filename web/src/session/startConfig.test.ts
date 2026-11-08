@@ -35,3 +35,18 @@ describe("buildSessionConfig: quick start (D111)", () => {
     expect(buildSessionConfig({ mode: "english", answer: "text" }, null, null).start.mode).toBe("english");
   });
 });
+
+describe("buildSessionConfig: negotiate prep (D118)", () => {
+  const base = { scenario: "offer", role: "Product Designer", target: 62000, currency: "EUR", style: "firm", has_real_offer: false } as const;
+
+  it("carries negotiate.prep exactly as the plan has it", () => {
+    const prep = { course: true, results: ["Cut onboarding drop-off by a third"], reason: "Market range", fallbacks: ["step_up", "sign_on"] };
+    const { start } = buildSessionConfig({ mode: "negotiate", answer: "text", negotiate: { ...base, prep } }, null, null);
+    expect(start.negotiate).toMatchObject({ prep });
+  });
+
+  it("sends no prep key when the person did not prepare", () => {
+    const { start } = buildSessionConfig({ mode: "negotiate", answer: "text", negotiate: { ...base } }, null, null);
+    expect(start.negotiate && "prep" in start.negotiate).toBe(false);
+  });
+});

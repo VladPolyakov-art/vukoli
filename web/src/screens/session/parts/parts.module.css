@@ -63,3 +63,9 @@
 .keyRow { display: contents; }
 .keyRow dt, .keyRow dd { margin: 0; }
 .keysHint { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+
+/* ---------- steps of the talk (Negotiation v3, P7): quiet, one line, current step in primary text ---------- */
+.talkSteps { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1) var(--space-4); margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); line-height: var(--leading-tight); }
+.talkStep { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; transition: color var(--duration-base) var(--ease-standard); }
+.talkStepDone { color: var(--color-text-secondary); }
+.talkStepCurrent { color: var(--color-text-primary); font-weight: var(--weight-semibold); }

@@ -23,6 +23,9 @@ const panel = (engines: ReturnType<typeof makeEngines>, props: EnginePanelProps,
 });
 
 export const SettingsOllama: Story = panel(makeEngines(), {}, { ...SETTINGS, ollama: { ...SETTINGS.ollama, model: "qwen3:8b" } });
+/** D117: "Feedback after the call" set to an engine that is not ready (the server falls back to the conversation engine). */
+export const SettingsDebriefOtherEngine: Story = panel(makeEngines({ claude_cli: "ready" }), {}, { ...SETTINGS, debrief_engine: "claude_cli" });
+export const SettingsDebriefNotReady: Story = panel(makeEngines({ codex_cli: "not_installed" }), {}, { ...SETTINGS, debrief_engine: "codex_cli" });
 export const SettingsNotReady: Story = panel(NONE_READY, {});
 export const SettingsOllamaNotInstalled: Story = panel(makeEngines({ ollama: "not_installed" }), {});
 export const SettingsOllamaNoModel: Story = panel(makeEngines({ ollama: "no_model" }), {});

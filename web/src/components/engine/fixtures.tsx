@@ -123,7 +123,7 @@ export const SETTINGS: Settings = {
   codex_cli: { model: "" },
   antigravity_cli: { model: "" },
   gemini_live: { model: "", text_model: "", voice: "", has_api_key: false },
-  voice: "", kokoro_speed: 1, stt: { backend: "auto", model: "" }, answer_suggester: true, telemetry_opt_in: false, feedback_ask: true,
+  voice: "", kokoro_speed: 1, stt: { backend: "auto", model: "" }, answer_suggester: true, telemetry_opt_in: false, feedback_ask: true, debrief_engine: "",
   obsidian_dir: "", layer_order: "content-first", level: "B2", strictness: 2, questions_per_session: 5,
 };
 
@@ -230,6 +230,7 @@ export function EngineFixture({ engines, settings = SETTINGS, pull, limits, chil
           ...(patch.engine ? { engine: patch.engine } : {}),
           ...(patch.voice !== undefined ? { voice: patch.voice } : {}),
           ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.debrief_engine !== undefined ? { debrief_engine: patch.debrief_engine } : {}),
           ollama: { ...cfg.ollama, ...patch.ollama },
           openai_compatible: { ...cfg.openai_compatible, base_url: patch.openai_compatible?.base_url ?? cfg.openai_compatible.base_url, model: patch.openai_compatible?.model ?? cfg.openai_compatible.model },
           gemini_live: { ...cfg.gemini_live, has_api_key: patch.gemini_live?.api_key ? true : cfg.gemini_live.has_api_key },

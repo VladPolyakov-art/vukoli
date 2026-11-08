@@ -176,6 +176,8 @@ export interface DebriefModel {
   /** Interview with a verdict only (D98): seven rows in a fixed order. Absent: old session or server, no section. */
   scorecard?: ScoreRowModel[];
   weakSpots: WeakSpotModel[];
+  /** Interview that ended with a salary talk: its debrief, shown as the "Salary talk" frame. */
+  moneyTalk?: NegotiateDebrief;
   /** Up to three steps (D98). Absent or empty: no section, and the drill action stays in the Actions block. */
   plan?: PlanStepModel[];
   /** `questions` and `minutes` are absent when the server does not tell them (live data). */

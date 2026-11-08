@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from . import (DATA_VERSION, __version__, config, content, debrief_view, engines, feedback, feedback_form, memory, planner,
+from . import (DATA_VERSION, __version__, bargain, config, content, debrief_view, engines, feedback, feedback_form, memory, planner,
                postcall, search, storage, stt, talk, telemetry, tts, usage)
 from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
@@ -216,6 +216,7 @@ async def engine_test(engine_id: str, request: Request) -> dict:
 class SettingsPatch(BaseModel):
     model_config = {"extra": "forbid"}
     engine: Optional[str] = None
+    debrief_engine: Optional[str] = None           # D117: "" = same as the conversation
     ollama: Optional[dict] = None
     openai_compatible: Optional[dict] = None
     claude_cli: Optional[dict] = None
@@ -246,6 +247,8 @@ async def post_settings(patch: SettingsPatch, request: Request) -> dict:
     check_origin(request)
     data = patch.model_dump(exclude_none=True)
     if "engine" in data and data["engine"] not in config.ENGINES:
+        raise fail(422, "unknown_engine", "Unknown engine.")
+    if "debrief_engine" in data and data["debrief_engine"] not in config.DEBRIEF_ENGINES:
         raise fail(422, "unknown_engine", "Unknown engine.")
     if data.get("obsidian_dir"):
         from pathlib import Path
@@ -430,6 +433,23 @@ def _vacancy_or_404(vacancy_id: str) -> dict:
 async def tough_talk_content() -> dict:
     """Tactic cards, themes, styles and notes for the Tough talk screens (static content, no model)."""
     return talk.public_content()
+
+
+@router.get("/talk/last-case")
+async def talk_last_case(scenario: str = "offer") -> dict:
+    """D118: the prepared case from the newest saved negotiation of this scenario (results, reason, fallbacks), or null."""
+    if scenario not in bargain.SCENARIOS:
+        raise fail(422, "bad_scenario", "Unknown scenario.")
+    best = None
+    for rec in storage.list_records("sessions"):
+        neg = rec.get("negotiation") if rec.get("mode") == "negotiate" else None
+        case = (neg or {}).get("case")
+        if not case or neg.get("scenario") != scenario:
+            continue
+        key = str(rec.get("started_at") or rec.get("id") or "")
+        if best is None or key > best[0]:
+            best = (key, case)
+    return {"case": best[1] if best else None}
 
 
 @router.get("/vacancies/{vacancy_id}/salary-range")
@@ -677,6 +697,7 @@ async def rerun_debrief(session_id: str, request: Request) -> dict:
     past = memory.past_weak_spots_text(session_id)
     session["debrief"] = await feedback.debrief(llm, session.get("feedback", []),
                                                 layer_order=settings["layer_order"], past=past)
+    talk.attach_money(session, session["debrief"])
     storage.save_session(session)
     return _shown_debrief(session)
 

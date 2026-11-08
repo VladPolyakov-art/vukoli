@@ -1,0 +1,2151 @@
+{
+ "version": 2,
+ "styles": {
+  "friendly": {
+   "opening_frac": 0.4,
+   "first_step": 0.22,
+   "decay": 0.75,
+   "max_conc": 3,
+   "reach": 0.85,
+   "raise_now": 0.6,
+   "obj": [
+    1,
+    1
+   ],
+   "obj_p2": 0.0,
+   "patience": 4,
+   "min_final": 5,
+   "check_frac": 0.15,
+   "check_kind": "base",
+   "deadline": [
+    8,
+    10
+   ],
+   "lever_obj": 0,
+   "sign_on_pct": 5,
+   "min_note": 3,
+   "time_text": "until the end of the week",
+   "manner": "Warm, uses the candidate's name now and then, explains why, says things like 'I'd love to make this work'."
+  },
+  "firm": {
+   "opening_frac": 0.25,
+   "first_step": 0.15,
+   "decay": 0.7,
+   "max_conc": 3,
+   "reach": 0.7,
+   "raise_now": 0.3,
+   "obj": [
+    1,
+    2
+   ],
+   "obj_p2": 0.3,
+   "patience": 3,
+   "min_final": 7,
+   "check_frac": 0.1,
+   "check_kind": "base",
+   "deadline": [
+    5,
+    8
+   ],
+   "lever_obj": 1,
+   "sign_on_pct": 3,
+   "min_note": 4,
+   "time_text": "three days",
+   "manner": "Brisk and polite, asks for evidence, short sentences, no small talk."
+  },
+  "tight": {
+   "opening_frac": 0.1,
+   "first_step": 0.1,
+   "decay": 0.6,
+   "max_conc": 2,
+   "reach": 0.45,
+   "raise_now": 0.0,
+   "obj": [
+    2,
+    2
+   ],
+   "obj_p2": 0.0,
+   "patience": 2,
+   "min_final": 7,
+   "check_frac": 0.0,
+   "check_kind": "lever",
+   "deadline": [
+    3,
+    5
+   ],
+   "lever_obj": 1,
+   "sign_on_pct": 3,
+   "min_note": 4,
+   "time_text": "48 hours",
+   "manner": "Hurried and by the book, cites policy and finance, pushes for a quick yes."
+  }
+ },
+ "scenarios": [
+  {
+   "id": "screening",
+   "name": "Screening call",
+   "blurb": "A recruiter asks for your salary expectations at the first screen. Do not anchor low.",
+   "mike_role": "Recruiter at the first screen",
+   "opens": "mike",
+   "fields": [
+    {
+     "id": "role",
+     "label": "Role",
+     "kind": "text",
+     "required": true
+    },
+    {
+     "id": "target",
+     "label": "Your target",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "job_range",
+     "label": "Posted range",
+     "kind": "range",
+     "required": false
+    }
+   ],
+   "levers": []
+  },
+  {
+   "id": "offer",
+   "name": "Offer call",
+   "blurb": "You have an offer. Raise the base, then the package.",
+   "mike_role": "Recruiter closing the hire",
+   "opens": "mike",
+   "fields": [
+    {
+     "id": "role",
+     "label": "Role",
+     "kind": "text",
+     "required": true
+    },
+    {
+     "id": "target",
+     "label": "Your target",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "job_range",
+     "label": "Posted range",
+     "kind": "range",
+     "required": false
+    },
+    {
+     "id": "has_real_offer",
+     "label": "I have a real competing offer",
+     "kind": "bool",
+     "required": false
+    }
+   ],
+   "levers": [
+    "sign_on",
+    "perf_bonus",
+    "review",
+    "pto",
+    "remote",
+    "title",
+    "step_up"
+   ]
+  },
+  {
+   "id": "internship",
+   "name": "Internship to full-time",
+   "blurb": "Your internship is ending and they want to keep you. Ask for the right level and a fair base.",
+   "mike_role": "Your manager or HR at the internship company",
+   "opens": "mike",
+   "fields": [
+    {
+     "id": "role",
+     "label": "Role",
+     "kind": "text",
+     "required": true
+    },
+    {
+     "id": "target",
+     "label": "Full-time target",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "job_range",
+     "label": "Full-time range",
+     "kind": "range",
+     "required": false
+    },
+    {
+     "id": "current_pay",
+     "label": "Intern pay",
+     "kind": "money",
+     "required": false
+    }
+   ],
+   "levers": [
+    "title",
+    "step_up",
+    "training",
+    "sign_on"
+   ]
+  },
+  {
+   "id": "counteroffer",
+   "name": "Counteroffer",
+   "blurb": "You gave notice and your manager wants to keep you. Decide calmly: why you are leaving, what is on paper.",
+   "mike_role": "Your current manager",
+   "opens": "you",
+   "fields": [
+    {
+     "id": "role",
+     "label": "Role",
+     "kind": "text",
+     "required": true
+    },
+    {
+     "id": "current_pay",
+     "label": "Current pay",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "new_offer",
+     "label": "New offer",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "leave_reason",
+     "label": "Main reason you are leaving",
+     "kind": "choice",
+     "required": true,
+     "options": "leave_reasons"
+    }
+   ],
+   "levers": [
+    "step_up",
+    "title",
+    "scope",
+    "remote"
+   ]
+  },
+  {
+   "id": "raise",
+   "name": "Raise with your lead",
+   "blurb": "Ask your lead for a raise: a number, your results, and a date if the answer is not now.",
+   "mike_role": "Your team lead",
+   "opens": "you",
+   "fields": [
+    {
+     "id": "role",
+     "label": "Role",
+     "kind": "text",
+     "required": true
+    },
+    {
+     "id": "current_pay",
+     "label": "Current pay",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "ask",
+     "label": "Your ask",
+     "kind": "money",
+     "required": true
+    },
+    {
+     "id": "review_month",
+     "label": "Next review (month)",
+     "kind": "month",
+     "required": false
+    },
+    {
+     "id": "has_real_offer",
+     "label": "I have a real outside offer",
+     "kind": "bool",
+     "required": false
+    }
+   ],
+   "levers": [
+    "step_up",
+    "title",
+    "scope",
+    "perf_bonus",
+    "training"
+   ]
+  }
+ ],
+ "leave_reasons": [
+  {
+   "id": "money",
+   "name": "Money"
+  },
+  {
+   "id": "growth",
+   "name": "Growth"
+  },
+  {
+   "id": "manager",
+   "name": "My manager"
+  },
+  {
+   "id": "remote",
+   "name": "Remote work"
+  },
+  {
+   "id": "other",
+   "name": "Something else"
+  }
+ ],
+ "objections": [
+  {
+   "id": "OF1",
+   "scenario": "offer",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "The budget for this role was signed off before we met you. I can't reopen it lightly.",
+   "idea": "the numbers for this role were set before you and I met",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value",
+    "package",
+    "bonus",
+    "benefit"
+   ]
+  },
+  {
+   "id": "OF3",
+   "scenario": "offer",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "You're a bit light on a couple of the requirements compared to what we planned for.",
+   "idea": "you are a bit light on some requirements compared to the plan",
+   "answer_words": [
+    "example",
+    "project",
+    "when i",
+    "in my last",
+    "experience",
+    "shipped",
+    "led"
+   ]
+  },
+  {
+   "id": "OF4",
+   "scenario": "offer",
+   "styles": [
+    "tight",
+    "firm"
+   ],
+   "tag": "pressure",
+   "line": "We've had people accept less for this role.",
+   "idea": "other people have accepted less for this role",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "OF5",
+   "asks_reason": true,
+   "scenario": "offer",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "I'd need a reason I can take to the hiring manager.",
+   "idea": "you need to give me a reason I can take to the hiring manager",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "OF6",
+   "scenario": "offer",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "That would put you above people already on the team.",
+   "idea": "that would put you above people already on the team",
+   "answer_words": [
+    "scope",
+    "responsib",
+    "lead",
+    "own",
+    "result",
+    "impact",
+    "level",
+    "senior"
+   ]
+  },
+  {
+   "id": "OF9",
+   "asks_reason": true,
+   "scenario": "offer",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "Help me understand what's behind that number, so I can explain it upstairs.",
+   "idea": "help me explain your number to the people upstairs",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "OF10",
+   "scenario": "offer",
+   "styles": [
+    "friendly"
+   ],
+   "tag": "process",
+   "line": "You're a great fit, but I do have to stay inside the structure for this level.",
+   "idea": "I like you but have to stay inside the structure for your level",
+   "answer_words": [
+    "level",
+    "scope",
+    "package",
+    "bonus",
+    "responsib",
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "OF11",
+   "scenario": "offer",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "I have three more calls after this one, so I need to wrap this up quickly.",
+   "idea": "you are short on time and have more calls waiting",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "OF12",
+   "scenario": "offer",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Finance gave me one shot at this, so every move I make has to be justified.",
+   "idea": "finance gave you only one shot, so every move needs a justification",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "OF2",
+   "scenario": "offer",
+   "styles": [
+    "friendly",
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "That's above what we can do for this level.",
+   "idea": "that ask is above what is possible for this level",
+   "answer_words": [
+    "scope",
+    "package",
+    "bonus",
+    "level",
+    "responsib",
+    "other",
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ],
+   "cond": "over_ceiling"
+  },
+  {
+   "id": "SC1",
+   "scenario": "screening",
+   "styles": [
+    "friendly",
+    "firm",
+    "tight"
+   ],
+   "tag": "process",
+   "line": "I need a number to move you to the next stage.",
+   "idea": "I need your number to move you to the next stage",
+   "answer_words": [
+    "k",
+    "thousand",
+    "range",
+    "usd",
+    "eur",
+    "number",
+    "between",
+    "around",
+    "looking"
+   ]
+  },
+  {
+   "id": "SC2",
+   "scenario": "screening",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Our system won't let me submit you without an expected salary.",
+   "idea": "the system will not let me submit you without an expected salary",
+   "answer_words": [
+    "k",
+    "thousand",
+    "range",
+    "number",
+    "between",
+    "around",
+    "role",
+    "scope"
+   ]
+  },
+  {
+   "id": "SC3",
+   "scenario": "screening",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "Just a ballpark is fine, nothing binding.",
+   "idea": "a ballpark is fine and nothing is binding",
+   "answer_words": [
+    "range",
+    "between",
+    "around",
+    "k",
+    "thousand",
+    "depending"
+   ]
+  },
+  {
+   "id": "SC4",
+   "scenario": "screening",
+   "styles": [
+    "friendly",
+    "firm",
+    "tight"
+   ],
+   "tag": "process",
+   "line": "What are you on at the moment?",
+   "idea": "I ask what you earn at the moment",
+   "answer_words": [
+    "role",
+    "scope",
+    "prefer",
+    "rather",
+    "focus",
+    "position",
+    "researched",
+    "market",
+    "expect"
+   ]
+  },
+  {
+   "id": "SC6",
+   "scenario": "screening",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "Would you be flexible on that?",
+   "idea": "I ask whether you would be flexible on the number",
+   "answer_words": [
+    "package",
+    "scope",
+    "depends",
+    "bonus",
+    "benefit",
+    "total",
+    "flexible",
+    "role"
+   ]
+  },
+  {
+   "id": "SC7",
+   "scenario": "screening",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Other people at this stage are coming in lower.",
+   "idea": "other people at this stage are coming in lower",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value",
+    "comfortable",
+    "stand",
+    "research"
+   ]
+  },
+  {
+   "id": "SC8",
+   "scenario": "screening",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "I can't hold this slot much longer, so I need something I can put in the form.",
+   "idea": "you cannot hold the slot much longer and need something for the form",
+   "answer_words": [
+    "k",
+    "thousand",
+    "range",
+    "number",
+    "between",
+    "around"
+   ]
+  },
+  {
+   "id": "SC5",
+   "scenario": "screening",
+   "styles": [
+    "firm",
+    "tight",
+    "friendly"
+   ],
+   "tag": "evidence",
+   "line": "That's above what we usually see for this level.",
+   "idea": "that is above what you usually see for the level",
+   "answer_words": [
+    "scope",
+    "package",
+    "flexible",
+    "role",
+    "level",
+    "responsib",
+    "experience"
+   ],
+   "cond": "over_ceiling"
+  },
+  {
+   "id": "IN1",
+   "scenario": "internship",
+   "styles": [
+    "friendly",
+    "firm",
+    "tight"
+   ],
+   "tag": "process",
+   "line": "We usually convert interns at the standard junior level.",
+   "idea": "interns are usually converted at the standard junior level",
+   "answer_words": [
+    "level",
+    "mid",
+    "result",
+    "shipped",
+    "ownership",
+    "title",
+    "scope"
+   ]
+  },
+  {
+   "id": "IN2",
+   "scenario": "internship",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "You've done well, but you're still learning the ropes.",
+   "idea": "you did well but you are still learning the ropes",
+   "answer_words": [
+    "shipped",
+    "result",
+    "project",
+    "owned",
+    "led",
+    "delivered",
+    "feedback",
+    "launched"
+   ]
+  },
+  {
+   "id": "IN3",
+   "scenario": "internship",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Pay for next year was planned months ago.",
+   "idea": "pay for next year was planned months ago",
+   "answer_words": [
+    "review",
+    "month",
+    "step",
+    "goal",
+    "criteria",
+    "writing",
+    "later"
+   ]
+  },
+  {
+   "id": "IN4",
+   "scenario": "internship",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "Everyone in your intern group gets the same offer.",
+   "idea": "everyone in the intern group gets the same offer",
+   "answer_words": [
+    "different",
+    "owned",
+    "shipped",
+    "result",
+    "led",
+    "unlike",
+    "my project",
+    "beyond"
+   ]
+  },
+  {
+   "id": "IN5",
+   "scenario": "internship",
+   "styles": [
+    "friendly"
+   ],
+   "tag": "process",
+   "line": "Think of what you'll learn here. That's worth a lot early on.",
+   "idea": "what you learn here is worth a lot early on",
+   "answer_words": [
+    "agree",
+    "grateful",
+    "learn",
+    "level",
+    "fair",
+    "still",
+    "result",
+    "scope"
+   ]
+  },
+  {
+   "id": "IN8",
+   "scenario": "internship",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "Let's keep the first year simple. We can look at it again later.",
+   "idea": "keep the first year simple and revisit later",
+   "answer_words": [
+    "review",
+    "month",
+    "later",
+    "date",
+    "criteria",
+    "writing",
+    "step"
+   ]
+  },
+  {
+   "id": "IN9",
+   "scenario": "internship",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "I'd love to say yes today. Help me by being realistic about what HR will sign.",
+   "idea": "you would like to say yes but need a realistic ask HR can sign",
+   "answer_words": [
+    "because",
+    "experience",
+    "result",
+    "scope",
+    "led",
+    "built",
+    "shipped",
+    "delivered",
+    "launched",
+    "impact",
+    "worth",
+    "value"
+   ]
+  },
+  {
+   "id": "CO1",
+   "scenario": "counteroffer",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "I didn't see this coming. What would it take for you to stay?",
+   "idea": "you are surprised and ask what it would take to stay",
+   "answer_words": [
+    "growth",
+    "money",
+    "pay",
+    "manager",
+    "remote",
+    "reason",
+    "because",
+    "role",
+    "learn"
+   ]
+  },
+  {
+   "id": "CO2",
+   "scenario": "counteroffer",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "The team really needs you right now, with the launch coming.",
+   "idea": "the team needs you right now with a launch coming",
+   "answer_words": [
+    "understand",
+    "appreciate",
+    "team",
+    "decision",
+    "open",
+    "thank",
+    "still"
+   ]
+  },
+  {
+   "id": "CO3",
+   "scenario": "counteroffer",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "We can match the money. Let's not overthink it.",
+   "idea": "you can match the money and want to keep it simple",
+   "answer_words": [
+    "writing",
+    "fix",
+    "reason",
+    "growth",
+    "not only",
+    "money",
+    "why",
+    "role",
+    "date"
+   ]
+  },
+  {
+   "id": "CO4",
+   "scenario": "counteroffer",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "There's a promotion for you next cycle. I just can't put it on paper yet.",
+   "idea": "a promotion is coming next cycle but cannot be on paper yet",
+   "answer_words": [
+    "writing",
+    "date",
+    "paper",
+    "criteria",
+    "when",
+    "email",
+    "in the offer"
+   ]
+  },
+  {
+   "id": "CO6",
+   "scenario": "counteroffer",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "Is this really about money?",
+   "idea": "you ask whether it is really about money",
+   "answer_words": [
+    "growth",
+    "manager",
+    "remote",
+    "role",
+    "learn",
+    "not only",
+    "because",
+    "reason",
+    "scope"
+   ]
+  },
+  {
+   "id": "CO8",
+   "scenario": "counteroffer",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "I need to know where we stand today, or I have to start planning your replacement.",
+   "idea": "you need to know today and otherwise must plan a replacement",
+   "answer_words": [
+    "time",
+    "day",
+    "writing",
+    "thursday",
+    "friday",
+    "tomorrow",
+    "monday",
+    "reason"
+   ]
+  },
+  {
+   "id": "CO9",
+   "scenario": "counteroffer",
+   "styles": [
+    "friendly"
+   ],
+   "tag": "process",
+   "line": "We've built a lot together. I'd hate to lose that.",
+   "idea": "you have built a lot together and would hate to lose it",
+   "answer_words": [
+    "appreciate",
+    "thank",
+    "grateful",
+    "value",
+    "decision",
+    "reason",
+    "still"
+   ]
+  },
+  {
+   "id": "CO10",
+   "scenario": "counteroffer",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Everyone is getting offers right now. This one is a good one.",
+   "idea": "everyone gets offers these days and this one is good",
+   "answer_words": [
+    "writing",
+    "reason",
+    "growth",
+    "money",
+    "date",
+    "fix"
+   ]
+  },
+  {
+   "id": "RA1",
+   "scenario": "raise",
+   "styles": [
+    "friendly",
+    "firm",
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Raises for this year are already set. It's out of my hands.",
+   "idea": "raises for this year are already set and out of your hands",
+   "answer_words": [
+    "date",
+    "criteria",
+    "review",
+    "later",
+    "goal",
+    "part",
+    "now",
+    "writing",
+    "next"
+   ]
+  },
+  {
+   "id": "RA2",
+   "scenario": "raise",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "Let's talk about it at your review in {month}.",
+   "idea": "suggest talking about it at the next review",
+   "answer_words": [
+    "criteria",
+    "writing",
+    "goal",
+    "now",
+    "date",
+    "before",
+    "what do i need"
+   ]
+  },
+  {
+   "id": "RA3",
+   "asks_reason": true,
+   "scenario": "raise",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "Show me the impact. What's changed since your last raise?",
+   "idea": "ask what has changed since the last raise",
+   "answer_words": [
+    "shipped",
+    "led",
+    "result",
+    "launched",
+    "reduced",
+    "increased",
+    "grew",
+    "saved",
+    "owned",
+    "delivered",
+    "%"
+   ]
+  },
+  {
+   "id": "RA4",
+   "scenario": "raise",
+   "styles": [
+    "friendly",
+    "firm"
+   ],
+   "tag": "process",
+   "line": "I could look at a title change, but money is harder.",
+   "idea": "a title change may be possible but money is harder",
+   "answer_words": [
+    "title",
+    "money",
+    "both",
+    "also",
+    "salary",
+    "still",
+    "number"
+   ]
+  },
+  {
+   "id": "RA5",
+   "scenario": "raise",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "If I do this for you, the whole team will want the same.",
+   "idea": "if I do this for you the whole team will want the same",
+   "answer_words": [
+    "scope",
+    "responsib",
+    "result",
+    "led",
+    "owned",
+    "impact",
+    "level",
+    "beyond",
+    "different"
+   ]
+  },
+  {
+   "id": "RA6",
+   "scenario": "raise",
+   "styles": [
+    "firm",
+    "tight"
+   ],
+   "tag": "evidence",
+   "line": "You're already paid inside the range for your level.",
+   "idea": "you are already paid inside the range for your level",
+   "answer_words": [
+    "scope",
+    "level",
+    "beyond",
+    "responsib",
+    "led",
+    "owned",
+    "result",
+    "above"
+   ]
+  },
+  {
+   "id": "RA8",
+   "scenario": "raise",
+   "styles": [
+    "tight"
+   ],
+   "tag": "pressure",
+   "line": "Things are tight this quarter. Can we revisit later?",
+   "idea": "things are tight this quarter and it could be revisited later",
+   "answer_words": [
+    "date",
+    "criteria",
+    "when",
+    "writing",
+    "goal",
+    "specific",
+    "month"
+   ]
+  },
+  {
+   "id": "RA9",
+   "asks_reason": true,
+   "scenario": "raise",
+   "styles": [
+    "friendly"
+   ],
+   "tag": "process",
+   "line": "I'd love to do more for you. Walk me through what changed this year.",
+   "idea": "you would love to help and ask what changed this year",
+   "answer_words": [
+    "shipped",
+    "led",
+    "result",
+    "launched",
+    "reduced",
+    "increased",
+    "grew",
+    "saved",
+    "owned",
+    "delivered"
+   ]
+  }
+ ],
+ "fallback_objection": {
+  "friendly": [
+   "I hear you. I'd love to help, but I need something I can take upstairs. What else can you tell me?",
+   "That's helpful. Help me understand it a bit more, so I can make the case for you."
+  ],
+  "firm": [
+   "I need something more concrete to move on that.",
+   "Give me one more reason I can use, and be specific."
+  ],
+  "tight": [
+   "Without something new I can't move.",
+   "I need a reason that fits how we plan, and I need it quickly."
+  ]
+ },
+ "check_lines": {
+  "offer": {
+   "friendly": [
+    "Let me check with the hiring manager and come back to you.",
+    "That's a bigger ask. Give me a moment to check with the hiring manager."
+   ],
+   "firm": [
+    "I'll check with the hiring manager and come back to you.",
+    "Let me check with the hiring manager. One moment."
+   ],
+   "tight": [
+    "Let me check with finance and come back to you.",
+    "I'll have to ask finance. One moment."
+   ]
+  },
+  "internship": {
+   "friendly": [
+    "Let me talk to HR about the level and get back to you.",
+    "Give me a moment to talk to HR about that."
+   ],
+   "firm": [
+    "I'll talk to HR about the level and get back to you.",
+    "Let me check with HR. One moment."
+   ],
+   "tight": [
+    "Let me ask HR and get back to you.",
+    "I'll have to check with HR. One moment."
+   ]
+  },
+  "counteroffer": {
+   "friendly": [
+    "Let me see what I can get approved.",
+    "Give me a moment to see what I can get approved."
+   ],
+   "firm": [
+    "Let me see what I can get approved.",
+    "I'll go and check what's possible. One moment."
+   ],
+   "tight": [
+    "Let me see what I can get approved. One moment.",
+    "I'll need sign-off. One moment."
+   ]
+  },
+  "raise": {
+   "friendly": [
+    "I'll need to take this to my director. Give me a moment.",
+    "Let me talk to my director and come back to you."
+   ],
+   "firm": [
+    "I'll need to take this to my director.",
+    "Let me check with my director. One moment."
+   ],
+   "tight": [
+    "I'll have to run this by my director and finance. One moment.",
+    "I need to check with my director. One moment."
+   ]
+  },
+  "screening": {
+   "friendly": [
+    "Let me check with the hiring manager and come back to you.",
+    "That's a bigger ask. Give me a moment to check with the hiring manager."
+   ],
+   "firm": [
+    "I'll check with the hiring manager and come back to you.",
+    "Let me check with the hiring manager. One moment."
+   ],
+   "tight": [
+    "Let me check with finance and come back to you.",
+    "I'll have to ask finance. One moment."
+   ]
+  }
+ },
+ "deadline_lines": {
+  "offer": {
+   "friendly": [
+    "We'd like to have your answer this week if we can.",
+    "It would help us a lot to hear back by the end of this week."
+   ],
+   "firm": [
+    "We'd need your answer by Friday to hold this offer.",
+    "I can hold this offer until Friday."
+   ],
+   "tight": [
+    "We'd need your answer today to hold this offer.",
+    "I can only hold this offer until the end of today."
+   ]
+  },
+  "internship": {
+   "friendly": [
+    "It would help to hear back this week so HR can plan.",
+    "If you can tell us this week, HR can plan the start."
+   ],
+   "firm": [
+    "We need an answer by Friday, or the place goes to the next person.",
+    "I need your answer by Friday."
+   ],
+   "tight": [
+    "We need an answer today, or the place goes to the next person.",
+    "I need your answer by the end of today."
+   ]
+  },
+  "counteroffer": {
+   "friendly": [
+    "I'd love to know where you stand by the end of the week.",
+    "It would help me to know by the end of this week."
+   ],
+   "firm": [
+    "I need to know by Friday so I can go to HR.",
+    "I need your decision by Friday."
+   ],
+   "tight": [
+    "I need to know by tomorrow morning so I can go to HR.",
+    "I need your decision by tomorrow morning."
+   ]
+  },
+  "raise": {
+   "friendly": [
+    "The budget meeting is next week, so it would help to settle this soon.",
+    "It helps if we settle this before the next planning meeting."
+   ],
+   "firm": [
+    "Planning closes on Friday, so I need to know by then.",
+    "Planning closes on Friday. After that it's much harder."
+   ],
+   "tight": [
+    "Planning closes today, so after today it's much harder.",
+    "Planning closes this afternoon."
+   ]
+  },
+  "screening": {
+   "friendly": [
+    "I'd like to get your details in today if I can.",
+    "It would help to submit this today."
+   ],
+   "firm": [
+    "I need to submit this by the end of today.",
+    "The form closes today."
+   ],
+   "tight": [
+    "I need to submit this in the next few minutes.",
+    "The slot closes in a few minutes."
+   ]
+  }
+ },
+ "lines": {
+  "*": {
+   "state_offer": {
+    "friendly": [
+     "Thanks for sharing. Here is where we are: we can offer {num}. How does that sound?",
+     "I appreciate that. What I can offer is {num}. How does that feel to you?"
+    ],
+    "firm": [
+     "Here is what I can offer: {num}. What do you think?",
+     "The offer is {num}. What are your thoughts?"
+    ],
+    "tight": [
+     "Our offer is {num}. That's standard for the role. What do you think?",
+     "We can offer {num}. I'd like to wrap this up quickly. Thoughts?"
+    ]
+   },
+   "confirm_number": {
+    "*": [
+     "That fits what we planned. We can offer {num}. Shall we go ahead?",
+     "That's in line with what we planned: {num}. Shall we go ahead?"
+    ]
+   },
+   "ask_figure": {
+    "*": [
+     "Sorry, I didn't catch a figure. What number would work for you?",
+     "I missed a number in that. What figure do you have in mind?"
+    ]
+   },
+   "ask_number": {
+    "friendly": [
+     "I'd love to hear a number from you. What are you looking for?",
+     "Go on, I'm curious. What do you have in mind?"
+    ],
+    "firm": [
+     "What number do you have in mind?",
+     "Give me a number to work with."
+    ],
+    "tight": [
+     "I need a number to move on. What are you looking for?",
+     "A number, please. What are you looking for?"
+    ]
+   },
+   "press_number": {
+    "friendly": [
+     "I'd like a number to work with. What are you looking for?",
+     "A rough number would really help me. What are you looking for?"
+    ],
+    "firm": [
+     "I need a number to move on. What are you looking for?",
+     "I can't go further without a number. What are you looking for?"
+    ],
+    "tight": [
+     "I need a number to move on. What are you looking for?",
+     "Number, please. What are you looking for?"
+    ]
+   },
+   "concede": {
+    "friendly": [
+     "That's a fair point. I can move to {num}.",
+     "You've made your case. Let me see what I can do: {num}."
+    ],
+    "firm": [
+     "Okay. I can stretch to {num}.",
+     "All right. {num}. That's a real move."
+    ],
+    "tight": [
+     "I can move a little, to {num}.",
+     "I can get to {num}. That's what I can do."
+    ]
+   },
+   "concede_final": {
+    "friendly": [
+     "That's a fair point. I can move to {num}, and that's the best I can do on base.",
+     "You've earned it. {num}, and that's where base stays."
+    ],
+    "firm": [
+     "I can stretch to {num}. That is as far as base goes.",
+     "{num}. That's final on base."
+    ],
+    "tight": [
+     "I can move to {num}. That is final on base.",
+     "{num} is it. Base won't move after this."
+    ]
+   },
+   "hold": {
+    "friendly": [
+     "I hear you. For now I'm at {num}. Tell me more about what's behind that.",
+     "I understand. I'm still at {num} right now. What else can you tell me?"
+    ],
+    "firm": [
+     "I need something new to move on that. The offer is {num}.",
+     "That doesn't change much for me. I'm at {num}."
+    ],
+    "tight": [
+     "Without something new I can't move. The offer is {num}.",
+     "I'm at {num}. I need something I can use."
+    ]
+   },
+   "hold_none": {
+    "*": [
+     "I hear you. Tell me more about what's behind that.",
+     "Help me understand that a bit more."
+    ]
+   },
+   "say_final": {
+    "friendly": [
+     "I've gone as far as I can on base. {num} is where it stays.",
+     "I wish I could do more. {num} is where base stays."
+    ],
+    "firm": [
+     "{num} is final on base.",
+     "I've reached the limit on base. It stays at {num}."
+    ],
+    "tight": [
+     "{num} is final. Base won't move.",
+     "That's final on base: {num}."
+    ]
+   },
+   "hold_final": {
+    "friendly": [
+     "I understand. {num} is where base stays.",
+     "I hear you, and I'm sorry. {num} is where base stays."
+    ],
+    "firm": [
+     "{num} is final on base.",
+     "Base stays at {num}. That's final."
+    ],
+    "tight": [
+     "{num} is final. Base won't move.",
+     "Base is final at {num}."
+    ]
+   },
+   "hold_confirm": {
+    "*": [
+     "Happy to confirm {num}. Shall we go ahead?",
+     "We can confirm {num} right now. Shall we go ahead?"
+    ]
+   },
+   "take_lower": {
+    "*": [
+     "Thank you, that's closer to what we had in mind.",
+     "That's closer. Let me note that."
+    ]
+   },
+   "give_lever": {
+    "friendly": [
+     "I can add {lever}. Would that help?",
+     "What about {lever}? I can do that."
+    ],
+    "firm": [
+     "I can offer {lever}.",
+     "One thing I can do is {lever}."
+    ],
+    "tight": [
+     "One thing I can do is {lever}.",
+     "I can add {lever}. That's it."
+    ]
+   },
+   "lever_object": {
+    "friendly": [
+     "I'd have to see if I can do that. What makes it important to you?",
+     "Let me think about how to make that work. Why does it matter to you?"
+    ],
+    "firm": [
+     "That's not standard. Why does it matter to you?",
+     "I'd have to justify that. What's the reason?"
+    ],
+    "tight": [
+     "That's outside the standard package. What's the reason?",
+     "That's not standard. Why do you need it?"
+    ]
+   },
+   "lever_unavailable": {
+    "*": [
+     "I'm not able to change that right now.",
+     "That one isn't something I can offer."
+    ]
+   },
+   "lever_deferred": {
+    "friendly": [
+     "Let's settle base first, and then we can look at the rest.",
+     "Base first, then I'm happy to look at the package."
+    ],
+    "firm": [
+     "Let's settle base first. Then we can talk about the rest.",
+     "Base first. Then the rest."
+    ],
+    "tight": [
+     "Let's settle base first. The rest comes after.",
+     "Base first, please."
+    ]
+   },
+   "lever_repeat": {
+    "*": [
+     "We've already covered that one.",
+     "That one is already on the table."
+    ]
+   },
+   "equity": {
+    "*": [
+     "Equity is set by level and isn't part of this conversation.",
+     "Equity isn't something I can discuss here."
+    ]
+   },
+   "agree_written": {
+    "*": [
+     "Of course. Anything we agree will go in writing.",
+     "Yes, I'll put whatever we settle in writing."
+    ]
+   },
+   "ask_date": {
+    "friendly": [
+     "I'd love to give you time. What day can you give me an answer by?",
+     "Of course. Which day can you get back to me?"
+    ],
+    "firm": [
+     "What day can you give me?",
+     "I need a day. When can you answer?"
+    ],
+    "tight": [
+     "What day exactly? I need a date.",
+     "I need a date. When can you answer?"
+    ]
+   },
+   "grant_time": {
+    "*": [
+     "Of course. Take {time}, and I'll send the terms in writing. Where we are: {num}.",
+     "Of course. Take {time}, and I'll send everything in writing. The current number is {num}."
+    ]
+   },
+   "grant_time_noamount": {
+    "*": [
+     "Of course. Take {time}, and I'll send the terms in writing.",
+     "Of course. Take {time}. I'll send what we have in writing."
+    ]
+   },
+   "decline_first": {
+    "*": [
+     "Is there anything that would make this work for you?",
+     "Before you decide, is there anything that would change your mind?"
+    ]
+   },
+   "close_declined": {
+    "*": [
+     "Understood. Thank you for your time. I'll leave it there.",
+     "I understand. Thank you for being straight with me."
+    ]
+   },
+   "close_accepted": {
+    "*": [
+     "Wonderful. I'll send the offer letter with {num}{extras}. Welcome aboard.",
+     "Great. I'll send the offer letter with {num}{extras}. Welcome aboard."
+    ]
+   },
+   "close_cap": {
+    "*": [
+     "I have to wrap up now. Where we are: {num}, and I'd need your answer by the end of the week.",
+     "I'm out of time, I'm afraid. We're at {num}, and I'd need your answer by the end of the week."
+    ],
+    "none": [
+     "I have to wrap up now. Please send me your number by the end of the week."
+    ]
+   },
+   "answer_other": {
+    "*": [
+     "Thanks. To keep us on track, we're at {num}. What would you like to change?",
+     "Understood. For reference, we're at {num}. What would you like to change?"
+    ]
+   },
+   "answer_other_none": {
+    "*": [
+     "Thanks. What number would work for you?",
+     "Understood. What number do you have in mind?"
+    ]
+   },
+   "wait_ack": {
+    "*": [
+     "Of course, take a moment.",
+     "Sure, take your time."
+    ]
+   },
+   "closed_again": {
+    "*": [
+     "We've wrapped up. You can end the session now to see your debrief."
+    ]
+   },
+   "restate_offer": {
+    "*": [
+     "Sorry about that, we got cut off. Where we left it: {num}.",
+     "Sorry, we got cut off. Where we left it: {num}."
+    ],
+    "none": [
+     "Sorry about that, we got cut off. What number would work for you?"
+    ]
+   },
+   "come_back": {
+    "friendly": [
+     "Thanks for waiting. I spoke to them, and I can move to {num}.",
+     "I'm back. Good news: I can get to {num}."
+    ],
+    "firm": [
+     "I checked. I can get to {num}.",
+     "I'm back. They'll allow {num}."
+    ],
+    "tight": [
+     "I checked. {num}. That's what they'll sign.",
+     "I'm back. {num}, no more."
+    ]
+   },
+   "come_back_lever": {
+    "friendly": [
+     "Thanks for waiting. Base can't move, but I can add {lever}.",
+     "I'm back. Base is tight, but they'll agree to {lever}."
+    ],
+    "firm": [
+     "I checked. Base stays. I can offer {lever}.",
+     "I'm back. Base can't move, but {lever} is possible."
+    ],
+    "tight": [
+     "I checked. Base stays. They'll approve {lever}.",
+     "Base stays. They'll approve {lever}."
+    ]
+   },
+   "come_back_none": {
+    "friendly": [
+     "Thanks for waiting. I'm sorry, they couldn't move on this one. We stay at {num}.",
+     "I'm back. I tried, but nothing more this time. We stay at {num}."
+    ],
+    "firm": [
+     "I checked. No change. We stay at {num}.",
+     "I'm back. They said no. We stay at {num}."
+    ],
+    "tight": [
+     "I checked. No change. We stay at {num}.",
+     "No. We stay at {num}."
+    ]
+   },
+   "step_up_grant": {
+    "friendly": [
+     "Yes, that's something we can do: {now} now and {later} {when}. What would you want to have shown by then?",
+     "I like that. {now} now and {later} {when}. What would you want to have shown by then?"
+    ],
+    "firm": [
+     "We can look at that: {now} now and {later} {when}. What would you want to have shown by then?",
+     "That could work: {now} now and {later} {when}. What goals would you want to hit by then?"
+    ],
+    "tight": [
+     "That's the one thing I can work with: {now} now and {later} {when}. What would you want to have shown by then?",
+     "I can do that: {now} now and {later} {when}. What would you want to have shown by then?"
+    ]
+   },
+   "step_up_months_counter": {
+    "*": [
+     "Six months, not three. {now} now and {later} after six months. What would you want to have shown by then?",
+     "Make it six months, not three: {now} now and {later} after six months. What would you want to have shown by then?"
+    ]
+   },
+   "step_up_ask_criteria": {
+    "*": [
+     "I can only consider that with clear goals. What would you want to have shown by then?",
+     "I'd need clear goals for that. What would you want to have shown by then?"
+    ]
+   },
+   "step_up_not_yet": {
+    "*": [
+     "Let's settle base first, then we can talk about later.",
+     "Base first. Later comes after."
+    ]
+   },
+   "step_up_detail": {
+    "*": [
+     "Good, that is clear. I'll note those goals.",
+     "That's clear. I'll write those goals down."
+    ]
+   },
+   "step_up_writing": {
+    "*": [
+     "Yes. I'll put {later} {when}{goals} in the offer letter.",
+     "Yes, I'll write {later} {when}{goals} into the offer letter."
+    ]
+   },
+   "step_up_writing_raise": {
+    "*": [
+     "Yes. I'll put {later} {when}{goals} in writing.",
+     "Yes, I'll confirm {later} {when}{goals} by email."
+    ]
+   },
+   "step_up_rejected": {
+    "*": [
+     "I can't do a later raise on that figure. We're at {num}.",
+     "That later figure doesn't work. We're at {num}."
+    ]
+   },
+   "step_up_rejected_none": {
+    "*": [
+     "I can't do that later figure."
+    ]
+   },
+   "note_number": {
+    "*": [
+     "Thank you. I've noted {amount} and I'll pass it on. We'll be in touch.",
+     "Thanks, that helps. I've noted {amount} for the next stage. We'll be in touch."
+    ]
+   },
+   "share_range": {
+    "friendly": [
+     "Sure. The posted range is {low} to {high} a year. Where do you see yourself in it?",
+     "Happy to. The range on the posting is {low} to {high}. What's your number?"
+    ],
+    "firm": [
+     "The posted range is {low} to {high} a year. What's your number?",
+     "The posting says {low} to {high}. Where do you see yourself?"
+    ],
+    "tight": [
+     "The posted range is {low} to {high}. What's your number?"
+    ]
+   },
+   "deflect_range": {
+    "friendly": [
+     "I'd rather hear your view first. What are you looking for?",
+     "I don't have a firm number to share yet. What are you looking for?"
+    ],
+    "firm": [
+     "I can't go into internal ranges. I need your number to move on.",
+     "I can't share that. What's your number?"
+    ],
+    "tight": [
+     "I can't discuss internal ranges. I need your number.",
+     "No ranges from me. What's your number?"
+    ]
+   },
+   "time_text": {
+    "*": [
+     "x"
+    ]
+   }
+  },
+  "internship": {
+   "opening": {
+    "friendly": [
+     "{hi} I'm Mike, from HR. We'd love to keep you after the internship. The standard junior offer is {num}. What do you think?"
+    ],
+    "firm": [
+     "{hi} I'm Mike, from HR. We want to keep you. The standard junior offer is {num}. What do you think?"
+    ],
+    "tight": [
+     "{hi} I'm Mike, from HR. I have a short window today. The standard junior offer is {num}. What do you think?"
+    ]
+   },
+   "close_accepted": {
+    "*": [
+     "Great, I'm glad you're staying with us. I'll send the details with {num}{extras}. Welcome to the team."
+    ]
+   }
+  },
+  "counteroffer": {
+   "opening": {
+    "friendly": [
+     "{hi} I read your note. I didn't see this coming. Can we talk?"
+    ],
+    "firm": [
+     "{hi} I read your note. I didn't expect this. Can we talk?"
+    ],
+    "tight": [
+     "{hi} I read your note. I only have a few minutes, but let's talk."
+    ]
+   },
+   "state_offer": {
+    "friendly": [
+     "Thank you for telling me. I'd really like to keep you. What I can do is {num}. Does that change things for you?",
+     "I hear you. What I can offer is {num}. Does that change things for you?"
+    ],
+    "firm": [
+     "I can match part of it: {num}. Does that change things?",
+     "I can offer {num}. Does that change anything for you?"
+    ],
+    "tight": [
+     "I can offer {num}. That's what I can get approved. Does that change things?",
+     "{num}. That's the number. Does that change things?"
+    ]
+   },
+   "close_accepted": {
+    "*": [
+     "I'm glad you're staying. I'll send it in an email today with {num}{extras}. Thank you.",
+     "That makes me happy. I'll confirm {num}{extras} in an email today."
+    ]
+   },
+   "close_declined": {
+    "*": [
+     "I understand, and I respect that. Thank you for being straight with me.",
+     "I'm sorry to lose you, but I respect it. Thank you for telling me."
+    ]
+   },
+   "decline_first": {
+    "*": [
+     "Is there anything that would make you stay?",
+     "Before you decide, is there anything that would change your mind?"
+    ]
+   },
+   "close_cap": {
+    "*": [
+     "I have to go to my next meeting. Where we are: {num}, and I'd need your decision by the end of the week."
+    ],
+    "none": [
+     "I have to go to my next meeting. I'd need your decision by the end of the week."
+    ]
+   },
+   "answer_other_none": {
+    "*": [
+     "Thank you. Help me understand what you need from this."
+    ]
+   },
+   "ask_number": {
+    "*": [
+     "I'd like to understand what you need. Tell me about it.",
+     "Tell me what's behind this. What are you looking for?"
+    ]
+   }
+  },
+  "raise": {
+   "opening": {
+    "friendly": [
+     "{hi} You wanted to chat. What's on your mind?"
+    ],
+    "firm": [
+     "{hi} You wanted to talk. What's up?"
+    ],
+    "tight": [
+     "{hi} You asked for a few minutes. What's up?"
+    ]
+   },
+   "state_offer": {
+    "*": [
+     "Let's talk about it. What do you have in mind?"
+    ]
+   },
+   "ask_number": {
+    "*": [
+     "What exactly are you asking for?",
+     "Tell me what you have in mind."
+    ]
+   },
+   "answer_other": {
+    "*": [
+     "Okay. So that I'm clear, what exactly are you asking for?"
+    ]
+   },
+   "answer_other_none": {
+    "*": [
+     "Okay. So that I'm clear, what exactly are you asking for?",
+     "Tell me more. What do you have in mind?"
+    ]
+   },
+   "close_accepted": {
+    "*": [
+     "Thank you. Let's put that in writing: {num}{extras}. I'm glad we talked.",
+     "Good. I'll confirm {num}{extras} in writing. I'm glad you raised it."
+    ]
+   },
+   "close_cap": {
+    "*": [
+     "I have to run to another meeting. Where we are: {num}. Send me what you'd like to change by the end of the week."
+    ],
+    "none": [
+     "I have to run to another meeting. Send me what you'd like by the end of the week."
+    ]
+   },
+   "hold_confirm": {
+    "*": [
+     "I can confirm that: {num}. Anything else you'd like to raise?"
+    ]
+   },
+   "restate_offer": {
+    "*": [
+     "Sorry, we got cut off. Where we left it: {num}."
+    ],
+    "none": [
+     "Sorry, we got cut off. What were you asking for?"
+    ]
+   }
+  },
+  "screening": {
+   "opening": {
+    "friendly": [
+     "{hi} I'm Mike, from the recruiting team. Thanks for making time. Before we go on, what are your salary expectations?"
+    ],
+    "firm": [
+     "{hi} I'm Mike, from recruiting. Before we go further, what are your salary expectations?"
+    ],
+    "tight": [
+     "{hi} I'm Mike, from recruiting. I have a short window today. What are your salary expectations?"
+    ]
+   },
+   "close_cap": {
+    "*": [
+     "I have to wrap up now. Please send me your number by the end of the week."
+    ],
+    "none": [
+     "I have to wrap up now. Please send me your number by the end of the week."
+    ]
+   },
+   "answer_other": {
+    "*": [
+     "Thanks. To move you on, I need a number or a range. What would work for you?"
+    ]
+   },
+   "answer_other_none": {
+    "*": [
+     "Thanks. To move you on, I need a number or a range. What would work for you?"
+    ]
+   },
+   "restate_offer": {
+    "*": [
+     "Sorry about that, we got cut off. What are your salary expectations?"
+    ],
+    "none": [
+     "Sorry about that, we got cut off. What are your salary expectations?"
+    ]
+   },
+   "close_declined": {
+    "*": [
+     "Understood. Thank you for your time. We'll leave it there."
+    ]
+   }
+  },
+  "offer": {
+   "opening": {
+    "friendly": [
+     "{hi} I'm Mike, from the recruiting team. We'd love to move forward on the {role} role. Before I share details, what are you expecting for the salary?"
+    ],
+    "firm": [
+     "{hi} I'm Mike, from recruiting. We're ready to talk about the {role} role. What salary are you expecting?"
+    ],
+    "tight": [
+     "{hi} I'm Mike, from recruiting. I have a short window today for the {role} role. What salary are you looking for?"
+    ]
+   }
+  }
+ },
+ "phrases": {
+  "offer": "{amount} base per year",
+  "internship": "{amount} base per year",
+  "counteroffer": "{amount} base per year",
+  "raise": "{amount} a year",
+  "screening": "{amount} a year"
+ },
+ "money_talk": {
+  "style_by_strictness": {
+   "1": "friendly",
+   "2": "firm",
+   "3": "tight"
+  },
+  "extra_minutes": 3,
+  "max_user_turns": 6,
+  "start_line": "One last thing before we wrap up: what are your salary expectations?"
+ },
+ "caps": {
+  "turn_cap": 12,
+  "screening_cap": 8,
+  "money_cap": 6
+ },
+ "act_brief": {
+  "state_offer": "State the base offer (AMOUNT_TO_SAY) and ask what the candidate thinks. Do not say it is negotiable or final.",
+  "confirm_number": "The candidate named a number that fits what you planned. Say you can offer that amount (AMOUNT_TO_SAY) and ask if they want to go ahead.",
+  "ask_number": "Ask the candidate what number they have in mind. Say no number yourself.",
+  "press_number": "You still need a number. Ask for it again, politely but clearly. Say no number yourself.",
+  "ask_figure": "You did not catch a figure. Ask what number they mean.",
+  "object": "Voice ONE concern (OBJECTION_IDEA) about what the candidate asked. Do not give anything yet and do not name a new offer.",
+  "concede": "You have heard the candidate's reasons. Move the base to AMOUNT_TO_SAY, a small step, and say it is a real move. Do not say it is final.",
+  "concede_final": "Move the base to AMOUNT_TO_SAY and say clearly that this is as far as base goes.",
+  "hold": "You need something new before you can move. Keep the current base (AMOUNT_TO_SAY) and say what you need. Do not name a new number.",
+  "hold_none": "You need to understand more. Ask the candidate to tell you more about what is behind their ask. Name no amount.",
+  "say_final": "Say plainly that base stays at AMOUNT_TO_SAY and cannot move any further.",
+  "hold_final": "Base stays at AMOUNT_TO_SAY and is final. Say it kindly and do not argue again.",
+  "hold_confirm": "The candidate asked for less than or equal to your current offer. Happily confirm AMOUNT_TO_SAY and ask if they want to go ahead.",
+  "give_lever": "Offer the extra item in LEVER_TO_SAY (not base pay). Say it briefly.",
+  "lever_object": "The candidate asked for something outside the base. Say it is not standard and ask why it matters to them. Offer nothing yet.",
+  "lever_unavailable": "Say you cannot offer that one.",
+  "lever_deferred": "Say base comes first, then the rest of the package.",
+  "lever_repeat": "Say that one is already on the table.",
+  "equity": "Say equity is set by level and is not part of this conversation.",
+  "agree_written": "Say you will put whatever is agreed in writing.",
+  "ask_date": "The candidate wants time. Ask for the exact day they can answer by.",
+  "wait_ack": "The candidate is thinking. Say to take a moment.",
+  "take_lower": "The candidate named a number lower than you expected. Say it is closer to what you had in mind, without celebrating.",
+  "share_range": "Share the posted range given in the amounts and ask where they see themselves.",
+  "deflect_range": "You cannot share internal ranges. Ask for their number instead.",
+  "answer_other": "Answer briefly and steer back to the candidate's number or ask.",
+  "come_back": "You are back from checking. Say what you can do now (AMOUNT_TO_SAY or LEVER_TO_SAY, or that nothing changed).",
+  "step_up_ask_criteria": "Ask what goals or results they would want to have shown by then."
+ },
+ "wrong_final_ok": [
+  "concede_final",
+  "say_final",
+  "hold_final",
+  "hold_confirm",
+  "close_accepted",
+  "step_up_grant",
+  "step_up_writing",
+  "step_up_months_counter",
+  "grant_time",
+  "grant_time_noamount",
+  "close_cap"
+ ],
+ "repeat_noticed": {
+  "friendly": [
+   "You've told me that already, and I hear you. Is there anything else I can take to the hiring manager?",
+   "I think you mentioned that. Help me with something new I can use for you."
+  ],
+  "firm": [
+   "You've said that already. What else do you have?",
+   "That's the same reason as before. Give me something new."
+  ],
+  "tight": [
+   "I've heard that. Without something new, I can't move.",
+   "Same reason again. I need something different."
+  ]
+ },
+ "repeat_noticed_idea": "you have heard that reason already and need something new to take to the hiring manager",
+ "course": {
+  "offer": [
+   {
+    "title": "Know your number and why",
+    "rule": "Pick a number a little above your target, and one reason for it: results, scope or market.",
+    "example": "Based on the scope and two launches I led, I'm looking at 62,000."
+   },
+   {
+    "title": "Say it first, with the reason",
+    "rule": "The first number anchors the talk. Say it calmly, with the reason in the same sentence.",
+    "example": "For this role I'm looking at 62,000, because I'd own onboarding end to end."
+   },
+   {
+    "title": "Answer the objection with a new fact",
+    "rule": "Mike will push back. Answer that exact concern and bring a fact you have not said yet. Repeating the same reason sounds stuck.",
+    "example": "Fair point. Last year I cut onboarding drop-off by a third, so 60,000 still feels right."
+   },
+   {
+    "title": "If base is stuck, trade",
+    "rule": "Ask for a step-up after probation, a sign-on bonus or an earlier review.",
+    "example": "If 55,500 is the limit today, could we agree on 60,000 after the three-month probation?"
+   },
+   {
+    "title": "Close it in writing",
+    "rule": "Amount, date and goals, in the offer letter. A promise said aloud is not a deal.",
+    "example": "Great. Could you put the 60,000 at three months and the goals in the offer?"
+   }
+  ],
+  "raise": [
+   {
+    "title": "Collect results since your last raise",
+    "rule": "Two or three results with a number: what you did and what changed for the team.",
+    "example": "Since my last raise I led the migration and cut support tickets by a third."
+   },
+   {
+    "title": "Open with the number and two results",
+    "rule": "Say the raise you want and why, in the first minute.",
+    "example": "I'd like to discuss a raise to 72,000. Here's what changed this year: the migration and the new onboarding."
+   },
+   {
+    "title": "Turn \"not now\" into a date and criteria",
+    "rule": "If the answer is \"not now\", ask when, and what you need to show by then.",
+    "example": "I understand. Could we agree on June, and what I'd need to show by then?"
+   },
+   {
+    "title": "Trade: a part now, a title or a dated raise",
+    "rule": "If the full raise is not possible, ask for part of it now, a title, or the rest on a date.",
+    "example": "Could we do 68,000 now and 72,000 in June if I hit those two goals?"
+   },
+   {
+    "title": "Get it in writing",
+    "rule": "The amount, the date and the goals, in an email after the talk.",
+    "example": "Thanks. Could you send me that in an email, so we're aligned?"
+   }
+  ]
+ }
+}

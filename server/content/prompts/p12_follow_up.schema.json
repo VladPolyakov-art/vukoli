@@ -1,0 +1,1 @@
+{"type":"object","required":["follow_up"],"properties":{"follow_up":{"type":"string"}}}

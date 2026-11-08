@@ -1,7 +1,7 @@
 /* Builds the `start` message (PROTOCOL.md) from the Home choices and per-browser preferences. */
 import { browserSttSupported } from "../audio/browserStt";
 import { prefs } from "../lib/prefs";
-import type { FocusSpot, Level, NegotiateStart, Settings, StartMessage, SttInfo, ToughTheme } from "../lib/types";
+import type { FocusSpot, Level, MoneyTalkStart, NegotiateStart, Settings, StartMessage, SttInfo, ToughTheme } from "../lib/types";
 import type { SessionConfig } from "./useSession";
 
 export interface StartChoices {
@@ -19,6 +19,8 @@ export interface StartChoices {
   focus?: FocusSpot[];
   /** `negotiate`: the numbers card (the server checks `role`, `target`, the range and the currency). */
   negotiate?: NegotiateStart;
+  /** `interview`: end with a salary talk (protocol.md §7.5). The style follows the strictness. */
+  moneyTalk?: MoneyTalkStart;
   /** `tough`: the theme (default `mix`). `strictness` as in an interview (3 adds "That sounds rehearsed"). */
   toughTheme?: ToughTheme;
 }
@@ -51,6 +53,10 @@ export function buildSessionConfig(choices: StartChoices, settings: Settings | n
     start.strictness = choices.strictness ?? settings?.strictness ?? 2;
     start.questions = choices.questions ?? settings?.questions_per_session ?? 5;
     if (choices.vacancyId) start.vacancy_id = choices.vacancyId;
+    if (choices.moneyTalk && choices.mode === "interview" && !choices.drill) {
+      start.money_talk = true;
+      start.negotiate = choices.moneyTalk;
+    }
     if (choices.drill) {
       start.drill = true;
       if (choices.focus?.length) start.focus = choices.focus.slice(0, MAX_FOCUS);

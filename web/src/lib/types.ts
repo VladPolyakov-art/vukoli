@@ -96,7 +96,12 @@ export interface Settings {
   name: string;
   /** D102: ask "How did it go?" after the 1st finished session and then every 5th (Settings → Privacy and data). */
   feedback_ask: boolean;
+  /** D117: which engine writes the feedback and debrief after the call; "" = the conversation engine. */
+  debrief_engine: DebriefEngine;
 }
+
+/** "" = same as the conversation. Gemini Live is not an option (it only talks). */
+export type DebriefEngine = "" | Exclude<EngineId, "gemini_live">;
 
 export interface SettingsPatch {
   engine?: EngineId;
@@ -115,6 +120,7 @@ export interface SettingsPatch {
   layer_order?: LayerOrder;
   name?: string;
   feedback_ask?: boolean;
+  debrief_engine?: DebriefEngine;
   level?: Level;
   strictness?: number;
   questions_per_session?: number;
@@ -170,6 +176,9 @@ export type TalkResult =
     kind: "negotiate"; outcome: string | null; currency: string | null; opening: number | null; final_offer: number | null;
     gain_now: number | null; captured_now_pct: number | null;
     step_up: { later: number; after_months: number; in_writing: boolean } | null; no_offer: boolean;
+    /** Negotiation v2 (protocol.md §7.6); absent on v1 rows. */
+    version?: 2; scenario?: NegotiateScenario; objections?: number; answered?: number;
+    first_number?: number | null; vs_band?: "below" | "inside" | "above" | null;
   };
 /** D105: one hit of `GET /sessions/search`. `match.q` is the question number the Debrief shows it under (`?q=n`). */
 export interface SearchResult {
@@ -384,6 +393,8 @@ export interface Debrief {
   next_step: string;
   source: "model" | "template" | string;
   too_short?: boolean;
+  /** Interview with a salary talk at the end (protocol.md §7.5): the screening-shaped debrief of that part. */
+  money_talk?: NegotiateDebrief | null;
 }
 
 /* ---------- WebSocket: client -> server ---------- */
@@ -416,8 +427,10 @@ export interface StartMessage {
   engine?: EngineId;
   /** US-13 AC5: continue this saved session (after a dropped connection) instead of starting a new one. */
   resume_session_id?: string;
-  /** `mode: "negotiate"` (protocol.md §1). */
-  negotiate?: NegotiateStart;
+  /** `mode: "negotiate"` (protocol.md §1); in an interview with `money_talk`: role, target, range, currency. */
+  negotiate?: NegotiateStart | MoneyTalkStart;
+  /** Interview only: end with a salary talk (protocol.md §7.5). */
+  money_talk?: boolean;
   /** `mode: "tough"`. */
   tough?: { theme: ToughTheme };
 }
@@ -433,7 +446,8 @@ export type ClientMessage =
   | { type: "redo_answer" }
   | { type: "suggest"; on: boolean }
   /** Tough talk: ask for a tactic card for this moment (works offline on the server, no model). */
-  | { type: "hint" }
+  /** `another`: a different card for the same moment (the server skips the cards already shown at this turn). */
+  | { type: "hint"; another?: boolean }
   | { type: "request_stronger"; feedback_id: string }
   | { type: "recheck"; feedback_id: string; text: string; flag_id?: string }
   | { type: "flag_action"; feedback_id: string; flag_id: string; action: "confirm" | "dismiss" | "restore" }
@@ -448,7 +462,9 @@ export type ClientMessage =
 export type TurnKind =
   | "question" | "follow_up" | "wait" | "repeat" | "closing" | "ack" | "turn" | "quick_choice"
   /** Tough: a pushback line, and the neutral line for a personal question. */
-  | "pressure" | "move_on";
+  | "pressure" | "move_on"
+  /** Negotiation v2: Mike checks with the hiring manager; and the interview's switch to the salary part. */
+  | "checking" | "money_start";
 
 export interface ServerError {
   type: "error";
@@ -481,7 +497,9 @@ export type ServerMessage =
       talk?: boolean;
       hint_available?: boolean;
       /** `negotiate`: what the call is about. `style` stays "surprise" while hidden. Never any hidden number. */
-      negotiate?: NegotiateStart & { period: "year" };
+      negotiate?: Partial<NegotiateStart> & { period: "year"; scenario?: NegotiateScenario; scenario_name?: string; user_opens?: boolean };
+      /** Interview with a salary talk at the end (protocol.md §7.5). */
+      money_talk?: { enabled: boolean; style: NegotiateStyle; role: string; currency: string; target: number; job_low: number | null; job_high: number | null } | null;
       /** `tough`: the theme and how many questions (ids only in `questions`, text is empty). */
       tough?: { theme: ToughTheme; theme_name: string; total: number };
     }
@@ -504,6 +522,12 @@ export type ServerMessage =
       index?: number;
       total?: number;
       outcome?: NegotiateOutcome;
+      /** Negotiation v2: the "let me check" line (`check_s` seconds) and the come-back line. */
+      checking?: boolean;
+      check_s?: number;
+      came_back?: boolean;
+      /** Negotiation v3 (D118): 1..5, Mike's turns in a negotiate call when the course was taken. */
+      talk_step?: number;
     }
   | { type: "response_complete" }
   /** Speech: Mike's reply is cut off. `turn_id`: the voice turn that proved to be speech (none: all open turns). */
@@ -532,6 +556,8 @@ export type ServerMessage =
   | { type: "suggestion_unavailable"; question: string; code: string; message: string }
   /** Tough talk: the answer to `{type:"hint"}`. */
   | ({ type: "hint" } & HintCard)
+  /** D117: ~1 s after a `hint`, the model's own-words example for that card. Applies only if `n` and `card_id` still match the card shown; may never come. */
+  | { type: "hint_update"; n: number; card_id: string; example: string }
   | { type: "saving" }
   | { type: "session_saved"; session_id: string }
   | { type: "debrief_pending"; session_id: string }
@@ -560,11 +586,20 @@ export interface SessionFinished { count: number; ask: boolean; configured: bool
 /** Every practice mode a session can have. `quick` is only a start message; the session turns into one of these. */
 export type PracticeMode = "interview" | "english" | "tough" | "negotiate";
 export type NegotiateStyle = "friendly" | "firm" | "tight" | "surprise";
-export type NegotiateOutcome = "accepted" | "time" | "declined" | "turn_cap";
+export type NegotiateOutcome = "accepted" | "time" | "declined" | "turn_cap" | "noted";
+export type NegotiateScenario = "screening" | "offer" | "internship" | "counteroffer" | "raise";
+export type LeaveReason = "money" | "growth" | "manager" | "remote" | "other";
 export type ToughTheme = "money" | "leaving" | "weakness" | "fit" | "english" | "personal" | "mix";
 
 /** `start.negotiate` (protocol.md §1). Amounts are plain integers in the form currency. */
 export interface NegotiateStart {
+  /** Negotiation v2; a start without it is the offer call. */
+  scenario?: NegotiateScenario;
+  current_pay?: number;
+  ask?: number;
+  review_month?: number;
+  new_offer?: number;
+  leave_reason?: LeaveReason;
   role: string;
   job_low?: number;
   job_high?: number;
@@ -572,7 +607,16 @@ export interface NegotiateStart {
   currency: string;
   style: NegotiateStyle;
   has_real_offer: boolean;
+  /** Negotiation v3 (D118): only when the person chose to prepare (or reused their last case). */
+  prep?: NegotiatePrep;
 }
+
+/** The person's case (prd-v3-prep §5, §6). Lever ids: step_up, sign_on, review, remote, title, part_now, dated_raise. */
+export interface NegotiateCase { results: string[]; reason: string; fallbacks: string[] }
+export interface NegotiatePrep extends NegotiateCase { course: boolean }
+
+/** `start.negotiate` of an interview with `money_talk` (the style follows the interview strictness). */
+export interface MoneyTalkStart { role: string; target: number; job_low?: number; job_high?: number; currency: string }
 
 /** A tactic card from `GET /api/tough-talk/content` (N1..N10 for negotiate, T1, T2, N3 for tough). */
 export interface TacticCardData {
@@ -583,9 +627,16 @@ export interface TacticCardData {
   example: string;
   modes: Array<"negotiate" | "tough">;
 }
+/** One step of the mini-course (prd-v3-prep §4). */
+export interface CourseStep { title: string; rule: string; example: string }
 export interface ToughTalkContent {
   cards: TacticCardData[];
+  /** Negotiation v3: the 5-step mini-course per scenario family. Absent on an older server: the setup skips the course. */
+  course?: { offer?: CourseStep[]; raise?: CourseStep[] };
   themes: Array<{ id: ToughTheme; name: string; count: number; personal: boolean }>;
+  /** Negotiation v2: the five scenarios in menu order. */
+  scenarios?: Array<{ id: NegotiateScenario; name: string; blurb: string; mike_role?: string; opens?: string; fields?: string[]; levers?: string[] }>;
+  leave_reasons?: Array<{ id: LeaveReason; name: string }>;
   styles: Array<{ id: NegotiateStyle; name: string; difficulty: string; blurb: string }>;
   currencies: string[];
   notes: { no_data: string; practice: string; personal: string };
@@ -608,6 +659,7 @@ export interface HintCard {
 export interface HintUsed { card_id: string; turn: number; n?: number }
 /** Saved `negotiation` block; only the fields the web reads are typed. Hidden numbers stay unread until the debrief. */
 export interface NegotiationRecord {
+  scenario?: NegotiateScenario;
   style: NegotiateStyle;
   surprise?: boolean;
   currency: string;
@@ -631,8 +683,34 @@ export interface ToughRecord {
   [key: string]: unknown;
 }
 
+/** Negotiation v2 additions (protocol.md §7.4); all optional so v1 records still type. */
+export interface NegotiateObjection { id: string; turn: number; mike_line: string; user_reply: string | null; answered: boolean; may_be_wrong: boolean }
+export interface NegotiateSection {
+  first_number?: number | null; first_turn?: number | null; vs_band?: "below" | "inside" | "above" | null;
+  asked_range?: boolean; got_range?: boolean; range_given?: boolean; revealed_current?: boolean; tied_to_scope?: boolean; flexible_on_package?: boolean;
+  level_asked?: boolean; level_won?: boolean; step_up_line?: string | null; results_named?: boolean;
+  reason_named?: boolean; reason?: string | null; counter_matched?: boolean; counter_in_writing?: boolean; time_asked?: boolean;
+  unwritten_promise_accepted?: boolean; deadline_accepted?: boolean; decision?: "stay" | "leave" | "time" | null; note?: string;
+  asked?: number; current?: number;
+  raise_now?: { amount: number; pct_of_current: number } | null;
+  dated?: { amount: number; after_months: number; criteria: boolean; in_writing: boolean } | null;
+  other_levers?: string[]; threat_without_offer?: boolean; captured_now_pct?: number | null; captured_later_pct?: number | null;
+}
+/** Negotiation v3: one line of "Before the real talk". `id` "prep_skipped" adds "Practise again with prep". */
+export interface HomeworkItem { id: string; text: string; quote: string | null; card_id: string | null }
 export interface NegotiateDebrief {
   kind: "negotiate";
+  version?: 2;
+  homework?: HomeworkItem[];
+  repeats?: { count: number; quote: string } | null;
+  case?: (NegotiateCase & { course: boolean }) | null;
+  scenario?: NegotiateScenario;
+  scenario_name?: string;
+  objections?: NegotiateObjection[];
+  who_moved?: { mike: Array<{ turn?: number; label?: string }>; you: Array<{ turn?: number; label?: string }>; mike_total: number; you_total: number };
+  check?: { used: boolean; turn: number; result: { kind: string; from: number | null; to: number | null; lever: string | null } | null } | null;
+  deadline?: { said: boolean; turn: number; asked_time: boolean; label: string } | null;
+  section?: NegotiateSection;
   verdict: string;
   practice_note: string;
   source: string;
@@ -672,7 +750,7 @@ export interface NegotiateDebrief {
   } | null;
   levers_won: Array<{ lever: string; label: string; value: string; by: "ask" | "offered"; turn: number }>;
   missed_levers: Array<{ lever: string; label: string }>;
-  say_it_better: Array<{ id: string; title: string; what_happened: string; you_said: string | null; try: string; card_id: string }>;
+  say_it_better: Array<{ id: string; title: string; what_happened: string; you_said: string | null; try: string; card_id: string; why?: string }>;
   signals: Array<{ id: string; label: string; good: boolean; quote: string | null }>;
   pressure_notes: string[];
   flags: string[];

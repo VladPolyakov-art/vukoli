@@ -12,7 +12,7 @@ import { t } from "../../i18n";
 import { CV_FILE, DICTATED, JOB_FILE, KESTREL_PASTED, PASTED_TEXT } from "./fixtures";
 import {
   attach, begin, change, pick, removeNote, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip,
-  submitNumbers, suggestionsFor, updateJob,
+  planFor, submitNumbers, suggestionsFor, updateJob,
   type JobResult, type RangeResult, type ScriptContext, type SetupState,
 } from "./script";
 import { quickStartFor } from "./quickStart";
@@ -96,7 +96,10 @@ export function replay(ctx: ScriptContext, inputs: SceneInput[]): SetupState | n
     else if (step.do === "resolveCv") st = resolveCv(ctx, st, step.result);
     else if (step.do === "resolveRange") st = resolveRange(ctx, st, step.result);
     else if (step.do === "tactics") st = setTacticsHidden(st, step.hidden);
-    else if (step.do === "numbers") {
+    else if (step.do === "moneyNumbers") {
+      const base = planFor(ctx, st).money?.values;
+      if (base) st = submitNumbers(ctx, st, null, { ...base, ...step.values });
+    } else if (step.do === "numbers") {
       const card = [...st.turns].reverse().find((x) => x.numbers);
       if (card?.numbers) st = submitNumbers(ctx, st, card.id, { ...card.numbers.values, ...step.values });
     }

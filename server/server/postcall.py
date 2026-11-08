@@ -63,11 +63,13 @@ class Superseded(Exception):
 class Budget:
     """Working time left. Each stage waits for a free machine first (not counted), then runs against the time left."""
 
-    def __init__(self, total_s: float) -> None:
+    def __init__(self, total_s: float, shares_machine: bool = True) -> None:
         self.left = total_s
+        self.shares_machine = shares_machine        # False: the debrief engine is not the local model a new call uses
 
     async def run(self, make: Callable[[], Awaitable]):
-        await machine_free()
+        if self.shares_machine:
+            await machine_free()
         if self.left <= 0:
             raise asyncio.TimeoutError
         started = time.monotonic()
@@ -94,6 +96,7 @@ class Context:
     owner_ok: Callable[[], bool] = lambda: True
     language_llm: LLMEngine | None = None                # D106: a larger model for the English corrections, if any
     language_chosen: bool = False
+    own_engine: bool = False                             # D117: the debrief engine is not the live one (Claude CLI, an API)
     save: Callable[[int], Awaitable[bool]] = None        # type: ignore[assignment]
 
 
@@ -189,37 +192,58 @@ async def process_answer(record: dict, transcript: Transcript | None, ctx: Conte
                      feedback_ms=round((time.perf_counter() - started) * 1000))
 
 
+PARALLEL_ANSWERS = 3          # D117: a cloud or CLI debrief engine takes several answers at once (one local model cannot)
+
+
 async def run_answers(items: list[tuple[dict, Transcript | None]], ctx: Context) -> bool:
-    """Work through the queued answers in order; save and report after each. False if the job was superseded."""
+    """Work through the queued answers; save and report after each. False if the job was superseded.
+    The live engine: in order, one at a time. A separate debrief engine that can take parallel calls (Claude CLI, an API):
+    up to PARALLEL_ANSWERS at once, so a five-answer debrief takes about two calls' time instead of five."""
     total = len(items)
-    budget = Budget(budget_s(total))
-    done = 0
+    budget = Budget(budget_s(total), shares_machine=not ctx.own_engine)
     await choose_language_llm(ctx)
     ctx.emit("feedback_progress", done=0, total=total)
-    try:
-        for record, transcript in items:
-            if record["id"] in ctx.dropped:
-                done += 1
-                continue
-            try:
-                await process_answer(record, transcript, ctx, budget)
-            except asyncio.TimeoutError:
-                pass
-            except (asyncio.CancelledError, Superseded):
-                raise
-            except Exception as exc:
-                log.warning("Feedback failed: %s", type(exc).__name__)
-                ctx.emit("feedback_unavailable", feedback_id=record["id"], code="internal",
-                         message="Feedback is not available for this answer. Your answer is still saved.")
-            if not record.get("complete"):
-                settle(record, ctx.mode, "timeout" if budget.left <= 0 else "internal")
-                ctx.emit("feedback", feedback=public(record))
-            if transcript is not None:
-                transcript.audio = None
-            done += 1
-            if not await ctx.save(done):
+    parallel = ctx.own_engine and ctx.llm is not None and not ctx.llm.single_worker and total > 1
+    gate = asyncio.Semaphore(PARALLEL_ANSWERS if parallel else 1)
+    saving = asyncio.Lock()
+    count = {"done": 0}
+
+    async def one(record: dict, transcript: Transcript | None) -> None:
+        async with gate:
+            if record["id"] not in ctx.dropped:
+                try:
+                    await process_answer(record, transcript, ctx, budget)
+                except asyncio.TimeoutError:
+                    pass
+                except (asyncio.CancelledError, Superseded):
+                    raise
+                except Exception as exc:
+                    log.warning("Feedback failed: %s", type(exc).__name__)
+                    ctx.emit("feedback_unavailable", feedback_id=record["id"], code="internal",
+                             message="Feedback is not available for this answer. Your answer is still saved.")
+                if not record.get("complete"):
+                    settle(record, ctx.mode, "timeout" if budget.left <= 0 else "internal")
+                    ctx.emit("feedback", feedback=public(record))
+                if transcript is not None:
+                    transcript.audio = None
+        async with saving:
+            count["done"] += 1
+            if not await ctx.save(count["done"]):
                 raise Superseded
-            ctx.emit("feedback_progress", done=done, total=total)
+            ctx.emit("feedback_progress", done=count["done"], total=total)
+
+    try:
+        if parallel:
+            tasks = [asyncio.ensure_future(one(r, t)) for r, t in items]
+            try:
+                await asyncio.gather(*tasks)
+            except BaseException:
+                for t in tasks:
+                    t.cancel()
+                raise
+        else:
+            for record, transcript in items:
+                await one(record, transcript)
     except Superseded:
         return False
     return True

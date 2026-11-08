@@ -75,6 +75,20 @@ def hint_payload(card_id: str, mode: str, n: int, shape: str | None = None, exam
     return out
 
 
+_FALLBACK_HINT = {"negotiate": ("N4", "Pause before you answer"), "tough": ("T2", "Pushed back: say \"fair point\", then go shorter")}
+
+
+def fallback_hint(mode: str) -> dict:
+    """What a hint press gets when the picker or the card content fails: a plain pause card. Built from the file when it can
+    be, from literals when it cannot, so the answer never fails."""
+    cid, title = _FALLBACK_HINT.get(mode, _FALLBACK_HINT["negotiate"])
+    try:
+        return hint_payload(cid, mode, 0)
+    except Exception:
+        return {"mode": mode, "card_id": cid, "title": title, "text": "Take a breath and answer in your own words.",
+                "example": "Let me think about that for a second.", "n": 0}
+
+
 def public_content() -> dict:
     d = data()
     counts = {}
@@ -82,8 +96,9 @@ def public_content() -> dict:
         counts[q["theme"]] = counts.get(q["theme"], 0) + 1
     themes_out = [{"id": t["id"], "name": t["name"], "count": counts.get(t["id"], 5 if t["id"] == "mix" else 0),
                    "personal": t["id"] == "personal"} for t in d["themes"]]
+    from . import bargain
     return {"cards": d["cards"], "themes": themes_out, "styles": d["styles"], "currencies": d["currencies"],
-            "notes": d["notes"], "tough_total": 5}
+            "notes": d["notes"], "tough_total": 5, **bargain.public_content()}
 
 
 _SIGN = {"$": "USD", "\u20ac": "EUR", "\u00a3": "GBP"}
@@ -124,7 +139,10 @@ def salary_range(text: str) -> tuple[int | None, int | None, str | None]:
     return None, None, None
 
 
-def start_title(mode: str, *, role: str = "", style: str = "", theme: str = "") -> str:
+def start_title(mode: str, *, role: str = "", style: str = "", theme: str = "", scenario: str = "") -> str:
+    if mode == "negotiate" and scenario:
+        from . import bargain
+        return f"Salary talk \u00b7 {bargain.scenario_info(scenario)['name']} \u00b7 {style_name(style)}"
     if mode == "negotiate":
         return f"Negotiation \u00b7 {role.strip() or 'Salary'} \u00b7 {style_name(style)}"
     return f"Tough questions \u00b7 {theme_name(theme or 'mix')}"
@@ -132,10 +150,21 @@ def start_title(mode: str, *, role: str = "", style: str = "", theme: str = "") 
 
 def debrief_for(session: dict) -> dict:
     """The saved debrief of a tough / negotiate session, computed in code from the saved state (no model)."""
-    from . import negotiation, tough
+    from . import bargain, negotiation, tough
     if session.get("mode") == "negotiate":
+        if bargain.is_v2(session["negotiation"]):
+            return bargain.debrief(session["negotiation"])
         return negotiation.debrief(session["negotiation"])
     return tough.debrief(session["tough"])
+
+
+def attach_money(session: dict, debrief: dict) -> dict:
+    """An interview debrief gets a `money_talk` key (the screening debrief) when the salary part had a user turn."""
+    mt = session.get("money_talk")
+    if session.get("mode") == "interview" and mt and mt.get("user_turns"):
+        from . import bargain
+        debrief["money_talk"] = bargain.debrief(mt)
+    return debrief
 
 
 def talk_result(session: dict) -> dict | None:
@@ -149,6 +178,17 @@ def talk_result(session: dict) -> dict | None:
     sm = d.get("summary") or {}
     deal = d.get("deal")
     final, opening = sm.get("final_offer"), sm.get("opening")
+    if d.get("version") == 2:
+        objs = d.get("objections") or []
+        sec = d.get("section") or {}
+        screening = d.get("scenario") == "screening"
+        return {"kind": "negotiate", "version": 2, "scenario": d.get("scenario"), "outcome": d.get("outcome"),
+                "currency": d.get("currency"), "opening": opening, "final_offer": final,
+                "gain_now": final - opening if final is not None and opening is not None else None,
+                "captured_now_pct": sm.get("captured_now_pct"),
+                "step_up": {"later": deal["later"], "after_months": deal["after_months"], "in_writing": deal["in_writing"]} if deal else None,
+                "no_offer": bool(d.get("no_offer")), "objections": len(objs), "answered": sum(1 for o in objs if o.get("answered")),
+                "first_number": sec.get("first_number") if screening else None, "vs_band": sec.get("vs_band") if screening else None}
     return {"kind": "negotiate", "outcome": d.get("outcome"), "currency": d.get("currency"), "opening": opening,
             "final_offer": final, "gain_now": final - opening if final is not None and opening is not None else None,
             "captured_now_pct": sm.get("captured_now_pct"),

@@ -15,6 +15,9 @@ import { t } from "../i18n";
 import { initialState, sessionReducer } from "./reducer";
 import type { RecheckEdit } from "./recheck";
 
+/** How long a hint press may wait for its card before the UI offers Try again. */
+export const HINT_WAIT_MS = 3000;
+
 export interface SessionConfig {
   start: StartMessage;
   /** Voice input recognised by the browser (Web Speech) instead of the server's local STT. */
@@ -59,6 +62,16 @@ export function useSession(config: SessionConfig) {
     const socket = ws.current;
     if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
   }, []);
+
+  /** Ask for a hint card; if none comes back within HINT_WAIT_MS the card (or a notice) offers Try again instead of hanging. */
+  const hintTimer = useRef<number | undefined>(undefined);
+  const askHint = useCallback((another: boolean) => {
+    dispatch({ type: "local/hint_requested" });
+    send(another ? { type: "hint", another: true } : { type: "hint" });
+    window.clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(() => dispatch({ type: "local/hint_stalled" }), HINT_WAIT_MS);
+  }, [send]);
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
 
   const endRef = useRef<() => void>(() => {});
   /** C2: "redo_answer" is sent and the server's `answer_reset` has not come back. Another redo in that time (a double
@@ -332,7 +345,11 @@ export function useSession(config: SessionConfig) {
     /** Tough talk: H / the Hint button. An open card is hidden; otherwise the server is asked for the card of this moment. */
     toggleHint() {
       if (stateRef.current.hint) { dispatch({ type: "local/hint_hide" }); return; }
-      send({ type: "hint" });
+      askHint(false);
+    },
+    /** "Another hint" (and Try again): a different card for the same moment. */
+    anotherHint() {
+      askHint(true);
     },
     hideHint() {
       dispatch({ type: "local/hint_hide" });
@@ -399,7 +416,7 @@ export function useSession(config: SessionConfig) {
       dispatch({ type: "local/dismiss_error" });
     },
     end,
-  }), [send, stopMic, startMic, ensureAudio, openSocket, end, muted]);
+  }), [send, stopMic, startMic, ensureAudio, openSocket, end, muted, askHint]);
 
   const getLevel = useCallback(() => level.current, []);
 

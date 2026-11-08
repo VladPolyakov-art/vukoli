@@ -14,6 +14,7 @@ import { t } from "../../i18n";
 import { Banners } from "./parts/Banners";
 import { FirstTime } from "./parts/FirstTime";
 import { HintCard } from "./parts/HintCard";
+import { TalkSteps } from "./parts/TalkSteps";
 import { Interrupted } from "./parts/Interrupted";
 import { islandModel, SessionIsland } from "./parts/Island";
 import { MicHelpDialog } from "./parts/MicHelpDialog";
@@ -85,7 +86,7 @@ export function SessionView(props: SessionViewProps) {
   const voice = input === "voice";
   const interrupted = phase === "interrupted" || overlay === "interrupted-engine" || overlay === "interrupted-voice";
   const stage = stageFor({ ...props, phase: interrupted ? "interrupted" : phase });
-  const thinking = phase === "thinking";
+  const thinking = phase === "thinking" || Boolean(data.checking);
   const lastTurn = data.transcript.at(-1);
 
   /* ---------- transcript follow (transcriptScroll.ts): the newest line stays in view unless the user scrolled up.
@@ -272,7 +273,7 @@ export function SessionView(props: SessionViewProps) {
               {interrupted ? <Interrupted kind={overlay === "interrupted-voice" ? "voice" : "engine"} handlers={handlers} info={data.interrupted} /> : null}
               {showTips ? <FirstTime input={input} pauseSec={data.pauseSec} english={countsTurns(variant)} variant={variant} /> : null}
               {showSuggester && suggestOn && !interrupted ? <Suggester suggestion={data.suggestion} /> : null}
-              {data.hint && !interrupted ? <HintCard hint={data.hint} onHide={handlers?.onHideHint} /> : null}
+              {data.hint && !interrupted ? <HintCard hint={data.hint} onHide={handlers?.onHideHint} onAnother={handlers?.onAnotherHint} /> : null}
             </div>
           </div>
           {showJump(followState) ? (
@@ -284,6 +285,7 @@ export function SessionView(props: SessionViewProps) {
           ) : null}
           <div className={`${s.islandWrap}`} data-input={input}>
             <div ref={islandRef} className={s.dock}>
+              {data.talkSteps && !interrupted ? <TalkSteps model={data.talkSteps} /> : null}
               <Banners overlay={overlay} browser={props.banners?.browser} storage={props.banners?.storage} typing={Boolean(props.banners?.browser) && input === "text"} notices={data.notices} handlers={handlers} />
               {showIsland ? (
                 <div ref={islandBoxRef} className={s.islandBox} data-input={input} data-stacked={islandLayout === "stacked" || undefined}>

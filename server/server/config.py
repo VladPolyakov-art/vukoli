@@ -90,6 +90,9 @@ FEEDBACK_URL = "https://formspree.io/f/xgaarepw"
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "engine": "ollama",                       # ollama | openai_compatible | claude_cli | codex_cli | antigravity_cli | gemini_live
+    # D117: who writes the feedback and debrief after the call. "" = the same engine as the conversation. The owner's
+    # setup: talk on Ollama (fast), write the debrief with Claude (better wording, nobody is waiting turn by turn).
+    "debrief_engine": "",
     # "" url = env OLLAMA_URL or localhost; "" model = chosen by RAM; "" voice_model = qwen3:4b-instruct
     "ollama": {"url": "", "model": "", "voice_model": ""},
     "openai_compatible": {"base_url": "", "api_key": "", "model": ""},
@@ -119,6 +122,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 }
 SECRET_PATHS = [("openai_compatible", "api_key"), ("gemini_live", "api_key")]
 ENGINES = ("ollama", "openai_compatible", "claude_cli", "codex_cli", "antigravity_cli", "gemini_live")
+DEBRIEF_ENGINES = ("", "ollama", "openai_compatible", "claude_cli", "codex_cli", "antigravity_cli")   # no Gemini Live: a call, not a writer
 # Engines found on this computer: Disconnect only switches them off in the app (the key engines forget the key).
 LOCAL_ENGINES = ("ollama", "claude_cli", "codex_cli", "antigravity_cli")
 LEVELS = ("A2", "B1", "B2", "C1")
@@ -148,6 +152,8 @@ def normalize_level(level: str | None) -> str:
 def _validate(settings: dict) -> dict:
     if settings.get("engine") not in ENGINES:
         settings["engine"] = "ollama"
+    if settings.get("debrief_engine") not in DEBRIEF_ENGINES:
+        settings["debrief_engine"] = ""
     if settings.get("layer_order") not in ("content-first", "delivery-first"):
         settings["layer_order"] = "content-first"
     settings["level"] = normalize_level(settings.get("level"))

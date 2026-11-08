@@ -179,9 +179,159 @@
    "title": "Pushed back: say \"fair point\", then go shorter",
    "rule": "Restate the core of your answer with one result.",
    "evidence": "Common advice",
-   "example": "Fair point. In short: I cut release time by a third.",
+   "example": "Fair point. In short: [your main point, with one number].",
    "modes": [
     "tough"
+   ]
+  },
+  {
+   "id": "O1",
+   "title": "Answer the objection, then restate",
+   "rule": "When Mike raises a concern, answer that concern in one or two sentences with a fact, then say your number again. Do not just repeat the number.",
+   "evidence": "Interest-based negotiation: addressing the other side's stated concern moves the talk forward.",
+   "example": "I hear the budget concern. I led the launch that the team now builds on, so I'm still asking for the number I gave.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "O2",
+   "title": "Wait while he checks",
+   "rule": "When Mike goes to check, do not fill the silence or lower your ask. Say you will wait, or stay quiet.",
+   "evidence": "Silence after an ask is a common tactic; talking into it often leads to concessions.",
+   "example": "Of course. I'll wait.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "S1",
+   "title": "Ask for the range first",
+   "rule": "At a first screen, it is fair to ask what range they planned for the role before you name a number.",
+   "evidence": "Common advice; knowing the range lowers the risk of anchoring too low.",
+   "example": "Before I give a number, what range did you plan for this role?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "S2",
+   "title": "Put your number at the bottom of the band",
+   "rule": "If you name a number, make it the lowest you would accept, not the middle of your hope.",
+   "evidence": "Anchoring research: the first number frames the talk, and a low first number is hard to move up.",
+   "example": "Based on the scope, I'm looking at 95,000 to 105,000.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "I1",
+   "title": "Ask for the level, not just the pay",
+   "rule": "As an intern, ask for the title and level you have already worked at, and tie it to results you shipped.",
+   "evidence": "Level sets the pay band for years; it is easier to fix at conversion than later.",
+   "example": "I've owned the onboarding project end to end, so I'd like to be hired at mid level.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "C1",
+   "title": "Name the reason before the number",
+   "rule": "When you got an outside offer, say the real reason you are leaving. If it is not only money, a match on money will not solve it.",
+   "evidence": "Counteroffers often fail when the reason for leaving is not pay.",
+   "example": "It's partly money, but mostly the growth path I don't see here.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "C2",
+   "title": "Get the counter in writing",
+   "rule": "If the counter is fine, ask for it in writing with the date before you decide. A verbal promise is hard to hold.",
+   "evidence": "Written terms are the only terms you can check later.",
+   "example": "Could you send that in writing, with the date the promotion starts?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "R1",
+   "title": "Bring results and a number",
+   "rule": "Open a raise talk with two or three results since your last raise and the number you ask for.",
+   "evidence": "Raises are easier to approve when the manager can repeat your case to their own boss.",
+   "example": "Since March I led the migration and cut support tickets by a third. I'm asking for 72,000.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "R2",
+   "title": "If it is not now, ask for a date and the goals",
+   "rule": "When the answer is not now, ask for a specific date and the goals that unlock the raise, and ask for them in writing.",
+   "evidence": "A dated, written commitment turns 'later' into a plan.",
+   "example": "What would I need to show by the June review for a raise to 72,000? Could you confirm it by email?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "X1",
+   "title": "Budget is set: ask what can move",
+   "rule": "Agree the base is set, then ask which part of the package can move.",
+   "evidence": "Common negotiation advice: answer the concern behind the objection, then bring new information or a trade.",
+   "example": "I understand the base is set. What can move: a sign-on, the review date or a step-up after probation?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "X2",
+   "title": "Talk about your scope, not their pay",
+   "rule": "Don't argue about others' pay. Show your scope with one result.",
+   "evidence": "Common negotiation advice: answer the concern behind the objection, then bring new information or a trade.",
+   "example": "I can't speak to others' pay. My scope includes [your result], so I'm asking for the level that matches it.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "X3",
+   "title": "They want a reason: give one new result",
+   "rule": "One result with a number that you have not said yet. Repeating the same reason sounds stuck.",
+   "evidence": "Common negotiation advice: answer the concern behind the objection, then bring new information or a trade.",
+   "example": "Fair question. [A result with a number], and that's the scope I'd bring here.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "X4",
+   "title": "Others take less: hold calmly",
+   "rule": "No argument. Restate your value in one line and keep the number.",
+   "evidence": "Common negotiation advice: answer the concern behind the objection, then bring new information or a trade.",
+   "example": "That may be true. Given [your result], [your number] is right for me.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "X5",
+   "title": "Light on a skill: give one example",
+   "rule": "One short example where you used that skill, with the result.",
+   "evidence": "Common negotiation advice: answer the concern behind the objection, then bring new information or a trade.",
+   "example": "In my last role I [used that skill] and [the result].",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "X6",
+   "title": "They said no to a lever: explain, then offer another",
+   "rule": "Say in one line why it matters, then offer a different trade.",
+   "evidence": "Common negotiation advice: answer the concern behind the objection, then bring new information or a trade.",
+   "example": "It matters because [your reason]. If a sign-on is hard, could we do a review at six months?",
+   "modes": [
+    "negotiate"
    ]
   }
  ],
@@ -225,7 +375,8 @@
    "trap": "Naming a low number, or refusing flatly.",
    "shape": "Give the context, ask for their range, and if pressed give a number tied to the role. Say you are flexible on the whole package.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "It depends on the full package. What range did you plan for this role? For this scope I'm looking at around [your number]."
   },
   {
    "id": "M2",
@@ -236,7 +387,8 @@
    "trap": "Telling them, or making a number up.",
    "shape": "Decline kindly, move to what this role is worth, and ask for their range.",
    "card": "N3",
-   "personal": false
+   "personal": false,
+   "hint_example": "I'd rather focus on what this role is worth. What range did you plan for it?"
   },
   {
    "id": "M3",
@@ -247,7 +399,8 @@
    "trap": "An instant yes, or visible disappointment.",
    "shape": "Pause, thank them, ask what the package includes, and say what would make it work.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "Thank you for being open. What does the full package include? [Bonus, review date or remote] would help make it work."
   },
   {
    "id": "M4",
@@ -258,7 +411,8 @@
    "trap": "Saying yes only to show enthusiasm.",
    "shape": "Show interest, then ask for the offer in writing and a little time.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I'm very interested. Could you send the offer in writing? I'll give you my answer by [day]."
   },
   {
    "id": "M8",
@@ -269,7 +423,8 @@
    "trap": "A bitter or apologetic reply.",
    "shape": "Acknowledge it, talk about the value of the whole role, and offer to look for a package that works.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I understand. The role itself matters a lot to me. Could we look at the whole package, like [bonus or a review at six months]?"
   },
   {
    "id": "L1",
@@ -280,7 +435,8 @@
    "trap": "Criticising your employer.",
    "shape": "One neutral reason, the pull toward this role, and one line about what you learned.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I've learned a lot at [company], especially [one skill]. Now I want [what this role gives], and that's why I'm here."
   },
   {
    "id": "L2",
@@ -291,7 +447,8 @@
    "trap": "A defensive or very long story.",
    "shape": "State the fact plainly, say how big the event was (team or company), and say what you did next.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "Yes, [company] cut [the whole team / a share of staff]. Since then I've [course, project or freelance work]."
   },
   {
    "id": "L3",
@@ -302,7 +459,8 @@
    "trap": "Over-apologising or staying vague.",
    "shape": "A short reason, what you did in that time (learning, projects), and why you are ready now.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I took six months for [reason]. In that time I [built / learned something concrete], and I'm ready to start full time."
   },
   {
    "id": "L6",
@@ -313,7 +471,8 @@
    "trap": "Bluffing about offers.",
    "shape": "Answer truthfully and in general terms. Say your interest in this role is high.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I'm talking to a couple of other companies, but this role is the one I'm most interested in."
   },
   {
    "id": "W1",
@@ -324,7 +483,8 @@
    "trap": "A fake weakness such as working too hard.",
    "shape": "A real weakness that is not core to the job, one thing you do about it, and a sign of progress.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I used to [a real weakness, not core to the job]. Now I [one thing you do about it], and [a sign of progress]."
   },
   {
    "id": "W3",
@@ -335,7 +495,8 @@
    "trap": "Vague praise.",
    "shape": "One specific point from real feedback, and what you did about it.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "My manager said I should [one point from real feedback]. Since then I [what you changed]."
   },
   {
    "id": "W4",
@@ -346,7 +507,8 @@
    "trap": "Blaming the team.",
    "shape": "The context, your decision, the impact, the lesson, and how it changed your later work.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "On [project], I decided to [your decision]. It [the impact]. I learned [the lesson], and now I [what you do differently]."
   },
   {
    "id": "W2",
@@ -357,7 +519,8 @@
    "trap": "Blaming the circumstances.",
    "shape": "The fact, your share of it, and what you changed.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "In a [meeting / review] I said [what you got wrong]. That part was mine. Since then I [what you changed]."
   },
   {
    "id": "F1",
@@ -368,7 +531,8 @@
    "trap": "A defensive tone.",
    "shape": "Say what you want from this role, how it fits your plan, and how you will use the extra experience.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I want [what this role gives you]. It fits my plan to [goal], and my experience helps the team with [one thing]."
   },
   {
    "id": "F2",
@@ -379,7 +543,8 @@
    "trap": "Bluffing or panicking.",
    "shape": "Admit the gap, give the nearest evidence, and offer a concrete 30-day plan.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I haven't done [the gap] yet. The closest is [your nearest evidence]. In my first 30 days I would [a concrete plan]."
   },
   {
    "id": "F4",
@@ -390,7 +555,8 @@
    "trap": "General praise only.",
    "shape": "Two specifics about their product or team, and one honest difference.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I like [a specific about their product] and [a specific about their team]. Compared to [competitor], you [one honest difference]."
   },
   {
    "id": "F5",
@@ -401,7 +567,8 @@
    "trap": "Escaping the old field.",
    "shape": "The pull toward the new field, what you already bring, and proof that you committed (a project, a course).",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I want to move to [new field] because [the pull]. I already bring [skill], and I [project or course you finished]."
   },
   {
    "id": "F6",
@@ -412,7 +579,8 @@
    "trap": "Putting other people down.",
    "shape": "Two strengths tied to this role, evidence for each, and how fast you learn.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "I bring [strength 1], for example [evidence], and [strength 2], for example [evidence]. And I learn fast."
   },
   {
    "id": "E1",
@@ -423,7 +591,8 @@
    "trap": "Apologising too much, or denying any difficulty.",
    "shape": "A calm fact, evidence that you work in English, and how you handle an unclear moment.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "Yes. I work in English every day at [company]. If something is unclear, I ask a short question to check."
   },
   {
    "id": "E2",
@@ -434,7 +603,8 @@
    "trap": "Hiding it.",
    "shape": "A direct answer, your current status, and a rough timeline.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "[No, I'm allowed to work here / Yes, I'll need sponsorship]. My status is [status], and the timeline is about [time]."
   },
   {
    "id": "E3",
@@ -445,7 +615,8 @@
    "trap": "Freezing.",
    "shape": "Say it again in two short sentences.",
    "card": "T2",
-   "personal": false
+   "personal": false,
+   "hint_example": "Sure. In short: [your main point]. And [one result, with a number]."
   },
   {
    "id": "I1",
@@ -456,7 +627,8 @@
    "trap": "Answering, or showing offence.",
    "shape": "Acknowledge, stay calm, and go back to your experience and what you would bring.",
    "card": "T1",
-   "personal": true
+   "personal": true,
+   "hint_example": "I'd rather focus on what I bring: [years] of experience in [area], most recently [result]."
   },
   {
    "id": "I2",
@@ -467,7 +639,8 @@
    "trap": "Telling them, or answering with hostility.",
    "shape": "Say your plans will not affect your commitment, then offer facts about your availability.",
    "card": "T1",
-   "personal": true
+   "personal": true,
+   "hint_example": "My plans won't affect my work here. I'm available [your hours or start date]."
   },
   {
    "id": "I4",
@@ -478,7 +651,8 @@
    "trap": "Sharing too much.",
    "shape": "Say you can do the essential duties and ask if something specific about the role worries them.",
    "card": "T1",
-   "personal": true
+   "personal": true,
+   "hint_example": "I can do everything the role needs. Is there something specific about the role you're thinking of?"
   },
   {
    "id": "I7",
@@ -489,7 +663,8 @@
    "trap": "Mixing it up with the unlawful questions.",
    "shape": "Answer directly: you are authorised to work here, or you will need sponsorship.",
    "card": "T1",
-   "personal": true
+   "personal": true,
+   "hint_example": "[Yes, I'm allowed to work here without sponsorship / I'll need sponsorship, and here's the timeline]."
   }
  ],
  "tough_lines": {
@@ -796,7 +971,8 @@
   "equity": [
    "equity",
    "stock",
-   "\\bshares?\\b",
+   "\\bshares\\b(?! with)",
+   "\\bshare (?:grant|options?|units?|package)",
    "options",
    "\\brsus?\\b"
   ],
@@ -808,6 +984,16 @@
    "other (?:parts|things|elements)",
    "anything else",
    "non[- ]salary"
+  ],
+  "scope": [
+   "(?:bigger|larger|expanded|wider|more) scope",
+   "more responsibilit"
+  ],
+  "training": [
+   "training budget",
+   "learning budget",
+   "conference budget",
+   "education budget"
   ]
  },
  "lever_labels": {
@@ -817,6 +1003,8 @@
   "pto": "Extra days off",
   "remote": "Remote days",
   "title": "Title",
-  "step_up": "Step-up after probation"
+  "step_up": "Step-up after probation",
+  "scope": "Bigger scope",
+  "training": "Training budget"
  }
 }

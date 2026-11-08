@@ -514,3 +514,22 @@ def test_step_up_writing_line_is_scripted_with_the_step_up_numbers():
     line = n.scripted_line(st, r, base_only=True)
     assert line == "Yes. I'll put 98,000 USD after 6 months and the goals in the offer letter."
     assert f"{st['offer']:,}" not in line.replace("98,000", "")
+
+
+def test_another_hint_gives_a_different_card_then_cycles():
+    st = state("firm")
+    first = n.pick_hint(st)
+    seen = [first]
+    for _ in range(len(n.hint_ranking(st)) - 1):
+        nxt = n.pick_hint(st, exclude=seen)
+        assert nxt not in seen
+        seen.append(nxt)
+    assert n.pick_hint(st, exclude=seen) == first                     # all shown at this turn: back to the best card
+    st["hints_used"].append({"card_id": first, "turn": st["user_turns"]})
+    st["hints_used"].append({"card_id": "N3", "turn": st["user_turns"] + 1})
+    assert n.hints_shown_now(st) == [first]                           # only cards of this turn count
+
+
+def test_another_hint_never_offers_step_up_cards_out_of_moment():
+    st = state("firm")
+    assert not {"N9", "N10"} & set(n.hint_ranking(st))

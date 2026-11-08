@@ -356,7 +356,11 @@
       "use": "Use",
       "setUp": "Set up",
       "hide": "Hide",
-      "connection": "Connection"
+      "connection": "Connection",
+      "debriefTitle": "After the call",
+      "debriefLabel": "Feedback after the call",
+      "debriefHint": "Mike talks with the conversation engine. This one writes your feedback and debrief after the call.",
+      "debriefSame": "Same as the conversation"
     },
     "choice": {
       "title": "Pick an engine"
@@ -654,7 +658,17 @@
         "noOffer": "no competing offer",
         "hasOffer": "real competing offer",
         "engineOff": "The AI model is off. Mike will use his scripted lines.",
-        "length": "Up to 12 of your turns, about 10 minutes."
+        "length": "Up to 12 of your turns, about 10 minutes.",
+        "numbersFor": {
+          "screening": "What numbers are we working with? Your target is the yearly base you'd be happy to sign for. The range is optional.",
+          "offer": "What numbers are we working with? Your target is the yearly base you'd be happy to sign for.",
+          "internship": "What numbers are we working with? Your full-time target is the yearly base you'd be happy to sign for. Your intern pay is optional.",
+          "counteroffer": "What are the numbers on the table? Your pay now, the new offer, and why you are leaving.",
+          "raise": "What are the numbers? Your pay now and what you will ask for. The review month is optional."
+        },
+        "answerRaise": "Now {current} {currency} · asking {ask}",
+        "answerCounter": "Now {current} {currency} · new offer {offer} · reason: {reason}",
+        "roleNow": "What's your role now? Pick a saved job or type it."
       },
       "style": {
         "friendly": {
@@ -693,7 +707,17 @@
         "use": "Use these numbers",
         "need": "Add the role and your target to continue.",
         "dialogTitle": "Change your numbers",
-        "save": "Save"
+        "save": "Save",
+        "internPay": "Intern pay, per year (optional)",
+        "currentPay": "Your pay now, per year",
+        "newOffer": "New offer, per year",
+        "ask": "What you will ask for, per year",
+        "targetFullTime": "Full-time target",
+        "reason": "Why you are leaving",
+        "reasonPick": "Pick a reason",
+        "month": "Next review month (optional)",
+        "monthNone": "Not sure",
+        "moneyTitle": "Salary talk numbers"
       },
       "plan": {
         "typeRole": "Type a role",
@@ -708,7 +732,22 @@
         "offerNo": "None. If you mention one, Mike won't count it.",
         "length": "Length",
         "theme": "Theme",
-        "afterCall": "After the call"
+        "afterCall": "After the call",
+        "scenario": "Scenario",
+        "numbersRaise": "Now {current} {currency} · you ask {ask} · per year",
+        "numbersCounter": "Now {current} {currency} · new offer {offer} · leaving for: {reason}",
+        "numbersIntern": "Full-time target {target} {currency} · per year",
+        "money": "Salary talk",
+        "moneyOff": "Off. The interview ends after the last question.",
+        "moneyOn": "On. After the last question Mike asks about salary. Target {target} {currency}.",
+        "moneyTurnOn": "Turn on",
+        "moneyTurnOff": "Turn off",
+        "moneyEdit": "Change",
+        "numbersMissing": "Add your numbers for this call.",
+        "needNumbers": "Add your numbers to start.",
+        "case": "Your case",
+        "caseSummary_one": "{n} result",
+        "caseSummary_other": "{n} results"
       },
       "tough": {
         "theme": "Which questions should I ask? Pick a theme, or Mix for one from each.",
@@ -736,6 +775,89 @@
         "firm": "Firm",
         "tight": "Tight budget",
         "surprise": "Surprise me"
+      },
+      "scenario": {
+        "ask": "What kind of salary talk is this?",
+        "noMatch": "I didn't catch that. Pick one:",
+        "screening": {
+          "name": "Screening call",
+          "blurb": "A recruiter asks for your salary expectations at the first screen. Do not anchor low."
+        },
+        "offer": {
+          "name": "Offer call",
+          "blurb": "You have an offer. Raise the base, then the package."
+        },
+        "internship": {
+          "name": "Internship to full-time",
+          "blurb": "Your internship is ending and they want to keep you. Ask for the right level and a fair base."
+        },
+        "counteroffer": {
+          "name": "Counteroffer",
+          "blurb": "You gave notice and your manager wants to keep you. Decide calmly: why you are leaving, what is on paper."
+        },
+        "raise": {
+          "name": "Raise with your lead",
+          "blurb": "Ask your lead for a raise: a number, your results, and a date if the answer is not now."
+        }
+      },
+      "leaveReason": {
+        "money": "More money",
+        "growth": "Growth",
+        "manager": "My manager",
+        "remote": "Remote work",
+        "other": "Something else"
+      },
+      "month": {
+        "1": "January",
+        "2": "February",
+        "3": "March",
+        "4": "April",
+        "5": "May",
+        "6": "June",
+        "7": "July",
+        "8": "August",
+        "9": "September",
+        "10": "October",
+        "11": "November",
+        "12": "December"
+      },
+      "prep": {
+        "ask": "Want to prepare first? About 3 minutes: how bargaining works, then your case.",
+        "yes": "Yes, let's prepare",
+        "no": "No, start now",
+        "useLast": "Use my case from last time",
+        "noMatch": "I didn't catch that. Pick one:",
+        "next": "Next",
+        "toCase": "Skip to my case",
+        "example": "Example",
+        "q1": "Two or three results with a number: what did you do, and what changed?",
+        "q1Raise": "Two or three results with a number since your last raise: what did you do, and what changed?",
+        "q2": "Why this number?",
+        "reason": {
+          "market": "Market range",
+          "scope": "Bigger scope",
+          "offer": "Another offer"
+        },
+        "q3": "If base is stuck, what else would work for you? Pick any, then Done.",
+        "lever": {
+          "step_up": "Step-up after probation",
+          "sign_on": "Sign-on bonus",
+          "review": "Earlier review",
+          "remote": "Remote days",
+          "title": "Title",
+          "part_now": "A part now",
+          "dated_raise": "Dated raise"
+        },
+        "done": "Done",
+        "skip": "Skip",
+        "summary": "Here's your case. Mike will use it in hints.",
+        "lastShown": "Here's your case from last time.",
+        "card": {
+          "title": "Your case",
+          "results": "Results",
+          "reason": "Why this number",
+          "fallbacks": "If base is stuck"
+        }
       }
     }
   },
@@ -867,7 +989,8 @@
       "muted": "Muted",
       "ended": "Ended",
       "between": "Round complete",
-      "paused": "Paused"
+      "paused": "Paused",
+      "checking": "Mike is checking…"
     },
     "heard": "What we heard. A wrong word? You can fix it in the debrief.",
     "firstTime": {
@@ -1133,6 +1256,25 @@
       },
       "shortcut": "Show or hide a hint (Tough questions and Negotiation)",
       "usedLine": "Hints you used: {list}."
+    },
+    "moneyPart": "Salary talk",
+    "steps": {
+      "label": "Steps of the talk",
+      "current": "Step {n} of 5: {name}",
+      "offer": {
+        "1": "Number",
+        "2": "Reason",
+        "3": "Objection",
+        "4": "Trade",
+        "5": "Writing"
+      },
+      "raise": {
+        "1": "Results",
+        "2": "Number",
+        "3": "Not now → date",
+        "4": "Trade",
+        "5": "Writing"
+      }
     }
   },
   "feedback": {
@@ -1656,7 +1798,8 @@
         "time": "You asked for time ({days} days)",
         "declined": "You declined",
         "limit": "Mike closed at the turn limit",
-        "ended": "You ended the practice"
+        "ended": "You ended the practice",
+        "noted": "Mike noted your number"
       },
       "moves": {
         "title": "What moved the offer",
@@ -1678,7 +1821,8 @@
         "offer": "Competing offer"
       },
       "better": {
-        "title": "Say it better"
+        "title": "Say it better",
+        "why": "Why: {why}"
       },
       "edge": {
         "noOfferTitle": "No offer yet",
@@ -1687,6 +1831,76 @@
         "noRoom": "Mike had no room to move on base this time.",
         "declined": "No deal: you declined.",
         "lastOffer": "Last offer {amount} {currency}"
+      },
+      "raise": {
+        "now": "Raise now: {from} → {to} {currency} (+{pct}%)",
+        "dated": "A raise at a date: {amount} {currency} after {months} months",
+        "nonMoney": "No raise in money, but Mike offered something else",
+        "none": "Your base did not move.",
+        "currentPay": "Your pay then",
+        "ask": "What you asked for",
+        "criteria": "Goals named for the date",
+        "levers": "Other things Mike offered",
+        "threat": "You hinted you would leave without a real offer",
+        "datedLine": "After {months} months: {amount} {currency}",
+        "inWriting": "In writing",
+        "room": "Room you had (your pay to your ask)"
+      },
+      "screening": {
+        "first": "Your first number",
+        "band": {
+          "below": "below the band Mike used",
+          "inside": "inside the band Mike used",
+          "above": "above the band Mike used"
+        },
+        "noNumber": "You did not name one",
+        "askedRange": "You asked for their range",
+        "gotRange": "They gave you a range",
+        "revealed": "You told them your current pay",
+        "scope": "You tied the number to the scope",
+        "package": "You stayed open on the package"
+      },
+      "facts": {
+        "title": "How you handled it",
+        "levelAsked": "You asked for a level",
+        "levelWon": "You got the level",
+        "stepUp": "Step-up Mike agreed to",
+        "results": "You named your results"
+      },
+      "counter": {
+        "title": "The two offers",
+        "now": "Your pay now",
+        "new": "New offer",
+        "mike": "Mike's counter",
+        "reason": "You named your reason",
+        "matched": "Mike's counter matched the new offer",
+        "writing": "You asked for the counter in writing",
+        "time": "You asked for time",
+        "promise": "You accepted a promise that was not on paper",
+        "deadline": "You accepted a rushed deadline"
+      },
+      "objections": {
+        "title": "Objections you faced",
+        "answered": "Answered",
+        "notAnswered": "Not answered",
+        "mayBeWrong": "May be wrong",
+        "mayBeWrongTip": "Vukoli checks this with simple rules. It can miss an answer that was fine.",
+        "summary": "{answered} of {total} answered",
+        "mike": "Mike",
+        "you": "You",
+        "silent": "No reply"
+      },
+      "check": {
+        "line": "Mike checked with the hiring manager at turn {n}.",
+        "base": "He came back with {from} → {to} {currency}.",
+        "lever": "He came back with something other than base pay.",
+        "none": "He came back with nothing new.",
+        "deadline": "Mike set a deadline at turn {n}."
+      },
+      "homework": {
+        "title": "Before the real talk",
+        "repeat": "You gave the same reason {n} times: “{quote}”",
+        "practiseWithPrep": "Practise again with prep"
       }
     },
     "tough": {
@@ -1728,6 +1942,10 @@
         "apology": "Apologised {n} times",
         "noExample": "No example"
       }
+    },
+    "moneyTalk": {
+      "title": "Salary talk",
+      "none": "The interview ended before the salary talk."
     }
   },
   "history": {
@@ -1798,7 +2016,15 @@
       "calm": "Calm in {n} of {total}",
       "moved": "+{amount} {currency} now · {pct}%",
       "stepUp": "{now} → {later} at {months} months",
-      "noOffer": "No offer yet"
+      "noOffer": "No offer yet",
+      "firstNumber": "First number {amount} {currency} · {band}",
+      "noNumber": "No number named",
+      "band": {
+        "below": "below the band",
+        "inside": "inside the band",
+        "above": "above the band"
+      },
+      "noChange": "No change agreed"
     },
     "list": "Saved sessions",
     "emptyState": {
@@ -2174,6 +2400,9 @@
   "tactic": {
     "hint": "Hint",
     "hideHint": "Hide the hint",
+    "anotherHint": "Another hint",
+    "hintStalled": "The hint did not arrive.",
+    "hintRetry": "Try again",
     "trySaying": "Try saying",
     "or": "Or",
     "try": "Try",
@@ -2200,7 +2429,13 @@
       "rangePair": "Add both ends of the range or leave both empty.",
       "rangeOrder": "The top of the range is below the bottom. Check the order.",
       "targetBelow": "Your target is below the range. Use at least {min}.",
-      "code": "Use a 3-letter code, like SEK."
+      "code": "Use a 3-letter code, like SEK.",
+      "currentPay": "Add your pay now.",
+      "ask": "Add what you will ask for.",
+      "askBelow": "Your ask is not above your pay now. Use more than {min}.",
+      "newOffer": "Add the new offer.",
+      "newOfferBelow": "The new offer is not above your pay now. Use more than {min}.",
+      "reason": "Pick why you are leaving."
     },
     "hint": {
       "above": "Above the posted range: Mike's budget will stop at the top of the range.",

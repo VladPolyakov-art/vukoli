@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { OverlayRoot } from "../../ds/OverlayRoot";
 import { fixtureProps } from "./fixtures";
 import { SessionView } from "./SessionView";
+import { talkStepsModel } from "./talkSteps";
 import type { SessionHint, SessionViewProps } from "./types";
 
 /* Screens/Session hint: the Tough talk Hint button in the island, the hint card under the transcript and the first-time
@@ -67,6 +68,9 @@ export const NegotiateHintShown = story("Negotiate · hint shown", (p) => negoti
 export const NegotiateHintButton = story("Negotiate · hint button", (p) => negotiate(p, closed, "mike-speaking"));
 /** While the user speaks the button is disabled; the tooltip says why. */
 export const NegotiateHintWaits = story("Negotiate · hint waits while you speak", (p) => negotiate(p, closed, "listening"));
+/** Negotiation v3 (P7): the steps strip above the island, when the course was taken. */
+export const NegotiateStepsObjection = story("Negotiate · steps strip, step 3 Objection", (p) => ({ ...negotiate(p, closed, "mike-speaking"), data: { ...negotiate(p, closed, "mike-speaking").data, talkSteps: talkStepsModel(3, "offer")! } }));
+export const NegotiateStepsRaise = story("Negotiate · steps strip, raise, step 1", (p) => ({ ...negotiate(p, closed, "your-turn"), data: { ...negotiate(p, closed, "your-turn").data, talkSteps: talkStepsModel(1, "raise")! } }));
 export const NegotiateFirstTime = story("Negotiate · first-time tips", (p) => ({ ...negotiate(p, closed, "mike-speaking"), firstTime: true }));
 
 /** Tough: the card shows the answer-shape line as its rule. */

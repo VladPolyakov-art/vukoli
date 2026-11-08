@@ -63,6 +63,10 @@
 }
 .secondary:not(:disabled):not([aria-disabled="true"]):hover { background: var(--color-surface-chip-hover); }
 .secondary:not(:disabled):not([aria-disabled="true"]):active { background: var(--color-surface-chip-hover); }
+/* Disabled secondary still reads as a button (owner 2026-11-08): no opacity (dark chip = plaque grey, it vanished);
+ * dim label + the control stroke as an edge. */
+.secondary:disabled,
+.secondary[aria-disabled="true"] { opacity: 1; color: var(--color-text-disabled); box-shadow: inset 0 0 0 var(--border-width) var(--color-border-control); }
 
 .ghost {
   background: transparent;

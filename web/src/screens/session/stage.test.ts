@@ -39,3 +39,12 @@ describe("Session → Presence state (D49)", () => {
     }
   });
 });
+
+describe("Session → checking with the hiring manager (Negotiation v2)", () => {
+  it("shows Mike as thinking, with the checking label, while the input stays yours", () => {
+    const st = stageFor({ ...base, phase: "your-turn", input: "text", data: { ...base.data, checking: true } });
+    expect(st.presence).toBe("thinking");
+    expect(st.label).toBe("Mike is checking…");
+  });
+});
+

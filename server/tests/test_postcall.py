@@ -307,3 +307,51 @@ def test_sessions_left_half_prepared_by_a_stopped_server_are_closed_on_start():
         pass
     saved = storage.read_record("sessions", record["id"])
     assert "post_call" not in saved and saved["debrief"] and saved["feedback"][1]["complete"] is True
+
+
+# ---------- D117: a separate debrief engine ----------
+
+async def test_a_separate_debrief_engine_takes_answers_in_parallel_and_ignores_a_live_call(fake_llm, monkeypatch):
+    llm = fake_llm(REPLIES)
+    running = {"now": 0, "max": 0}
+    real = llm.chat_stream
+
+    async def slow_stream(*a, **k):
+        running["now"] += 1
+        running["max"] = max(running["max"], running["now"])
+        try:
+            await asyncio.sleep(0.05)
+            async for piece in real(*a, **k):
+                yield piece
+        finally:
+            running["now"] -= 1
+    monkeypatch.setattr(llm, "chat_stream", slow_stream)
+    saves: list = []
+    ctx = make_context(llm, saves=saves)
+    ctx.own_engine = True
+    items = [(answer_record(n), None) for n in (1, 2, 3, 4)]
+    postcall.LIVE_SESSIONS["n"] = 1                     # a new call on Ollama does not hold up a Claude debrief
+    try:
+        assert await asyncio.wait_for(postcall.run_answers(items, ctx), 5) is True
+    finally:
+        postcall.LIVE_SESSIONS["n"] = 0
+    assert sorted(saves) == [1, 2, 3, 4] and all(r["complete"] for r, _ in items)
+    assert running["max"] > 1
+
+
+async def test_debrief_engine_setting_falls_back_to_the_live_engine(monkeypatch):
+    live = object()
+    assert await ws.debrief_llm({"debrief_engine": ""}, "ollama", live) == (live, "ollama")
+    assert await ws.debrief_llm({"debrief_engine": "ollama"}, "ollama", live) == (live, "ollama")
+
+    async def not_ready(settings, engine_id, voice=False):
+        return EngineStatus(code="unauthorized", ready=False)
+    monkeypatch.setattr(ws, "check_engine", not_ready)
+    assert await ws.debrief_llm({"debrief_engine": "claude_cli"}, "ollama", live) == (live, "ollama")
+
+    async def ready(settings, engine_id, voice=False):
+        return EngineStatus(code="ready", ready=True)
+    monkeypatch.setattr(ws, "check_engine", ready)
+    other = object()
+    monkeypatch.setattr(ws, "get_llm", lambda settings, engine_id, voice=False: other)
+    assert await ws.debrief_llm({"debrief_engine": "claude_cli"}, "ollama", live) == (other, "claude_cli")

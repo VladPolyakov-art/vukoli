@@ -11,7 +11,7 @@ import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from . import (__version__, config, content, debrief_view, engines, feedback, memory, negotiation, planner, postcall, storage,
+from . import (__version__, bargain, talkcase, config, content, debrief_view, engines, feedback, memory, negotiation, planner, postcall, storage,
                stt, talk, telemetry, tough, tts, usage)
 from .engines.base import BACKGROUND, EngineError, LLMEngine
 from .engines.gemini_live import GeminiLiveDriver, basic_status
@@ -69,7 +69,11 @@ def parse_negotiate(block) -> dict:
     role = block.get("role")
     if not isinstance(role, str) or not 1 <= len(role.strip()) <= talk.MAX_ROLE:
         raise ValueError("negotiate.role")
-    target = _number(block.get("target"), "negotiate.target")
+    scenario = block.get("scenario", "offer")
+    if scenario not in bargain.SCENARIOS:
+        raise ValueError("negotiate.scenario")
+    extra = _scenario_fields(block, scenario)
+    target = extra.pop("target", None) or _number(block.get("target"), "negotiate.target")
     low, high = block.get("job_low"), block.get("job_high")
     if (low is None) != (high is None):
         raise ValueError("negotiate.range")
@@ -86,8 +90,42 @@ def parse_negotiate(block) -> dict:
     real = block.get("has_real_offer", False)
     if not isinstance(real, bool):
         raise ValueError("negotiate.has_real_offer")
+    if scenario == "counteroffer":
+        real, low, high = True, None, None
+    elif scenario == "raise":
+        low, high = None, None
+    seed = block.get("seed")
+    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed <= 2147483647):
+        raise ValueError("negotiate.seed")
     return {"role": role.strip(), "job_low": low, "job_high": high, "target": target, "currency": currency,
-            "style": style, "has_real_offer": real}
+            "style": style, "has_real_offer": real, "scenario": scenario, "seed": seed,
+            "prep": talkcase.parse_prep(block.get("prep")), **extra}
+
+
+def _scenario_fields(block: dict, scenario: str) -> dict:
+    """The inputs only some scenarios have (counteroffer, raise); `target` comes back when the scenario defines it."""
+    out: dict = {}
+    if scenario in ("counteroffer", "raise") or (scenario == "internship" and block.get("current_pay") is not None):
+        out["current_pay"] = _number(block.get("current_pay"), "negotiate.current_pay")
+    if scenario == "counteroffer":
+        out["new_offer"] = _number(block.get("new_offer"), "negotiate.new_offer")
+        if out["new_offer"] <= out["current_pay"]:
+            raise ValueError("negotiate.new_offer")
+        reason = block.get("leave_reason")
+        if reason not in ("money", "growth", "manager", "remote", "other"):
+            raise ValueError("negotiate.leave_reason")
+        out["leave_reason"] = reason
+        out["target"] = out["new_offer"]
+    if scenario == "raise":
+        out["ask"] = _number(block.get("ask"), "negotiate.ask")
+        if out["ask"] <= out["current_pay"]:
+            raise ValueError("negotiate.ask")
+        month = block.get("review_month")
+        if month is not None and (isinstance(month, bool) or not isinstance(month, int) or not 1 <= month <= 12):
+            raise ValueError("negotiate.review_month")
+        out["review_month"] = month
+        out["target"] = out["ask"]
+    return out
 
 
 def parse_tough(block) -> dict:
@@ -130,6 +168,14 @@ def parse_start(data: dict, settings: dict) -> dict:
     resume_given = bool(data.get("resume_session_id"))
     negotiate_form = parse_negotiate(data.get("negotiate")) if mode == "negotiate" and not resume_given else None
     tough_form = parse_tough(data.get("tough")) if mode == "tough" and not resume_given else None
+    money = data.get("money_talk", False)
+    if not isinstance(money, bool):
+        raise ValueError("money_talk")
+    money_form = None
+    if money and mode == "interview" and not quick and not resume_given:
+        money_form = parse_negotiate({**(data.get("negotiate") if isinstance(data.get("negotiate"), dict) else {}),
+                                      "scenario": "screening", "style": "friendly", "has_real_offer": False})
+
     drill = data.get("drill") is True and mode == "interview"      # a weak-spot drill: its name, and its focus (C1b)
     focus = planner.parse_focus(data.get("focus")) if drill else []
     resume_id = str(data.get("resume_session_id") or "")
@@ -141,7 +187,8 @@ def parse_start(data: dict, settings: dict) -> dict:
             "drill": drill, "focus": focus, "level": config.normalize_level(data.get("level") or settings["level"]),
             "voice": voice, "speak": data.get("speak", True) is not False,
             "suggest": bool(data.get("suggest", False)) and mode not in talk.TALK_MODES, "resume": resume_id,
-            "quick": quick and not resume_id, "negotiate": negotiate_form, "tough": tough_form}
+            "quick": quick and not resume_id, "negotiate": negotiate_form, "tough": tough_form,
+            "money_form": money_form}
 
 
 # US-13 AC5: a session cut off by the connection can be picked up again from its saved record.
@@ -207,10 +254,26 @@ def talk_questions(driver) -> list[dict]:
 
 def talk_started(driver, opts: dict) -> dict:
     """Extra `session_started` fields for the Tough talk modes."""
+    plan = getattr(driver, "money_plan", None)
+    if opts["mode"] == "interview" and plan:
+        f = plan["form"]
+        return {"money_talk": {"enabled": True, "style": plan["style"], "role": f["role"], "currency": f["currency"],
+                               "target": f["target"], "job_low": f["job_low"], "job_high": f["job_high"]},
+                "hint_available": getattr(driver, "money", None) is not None}
     if opts["mode"] not in talk.TALK_MODES:
         return {}
     out = {"talk": True, "hint_available": True}
-    if opts["mode"] == "negotiate":
+    if opts["mode"] == "negotiate" and bargain.is_v2(driver.neg):
+        st = driver.neg
+        sc = bargain.scenario_info(st["scenario"])
+        out["negotiate"] = {"scenario": st["scenario"], "scenario_name": sc["name"], "role": st["role"], "currency": st["currency"],
+                            "period": st["period"], "style": "surprise" if st["surprise"] else st["style"],
+                            "has_real_offer": st["has_real_offer"], "job_low": st["job_low"] if st["scenario"] != "raise" else None,
+                            "job_high": st["job_high"] if st["scenario"] != "raise" else None, "target": st["target"],
+                            "current_pay": st.get("current_pay"), "new_offer": st.get("new_offer"),
+                            "leave_reason": st.get("leave_reason"), "ask": st.get("ask"), "review_month": st.get("review_month"),
+                            "user_opens": sc.get("opens") == "you"}
+    elif opts["mode"] == "negotiate":
         st = driver.neg
         out["negotiate"] = {"role": st["role"], "currency": st["currency"], "period": st["period"],
                             "style": "surprise" if st["surprise"] else st["style"], "has_real_offer": st["has_real_offer"],
@@ -301,7 +364,8 @@ async def session_socket(websocket: WebSocket) -> None:
 
     def turn_complete(speaker: str, text: str, meta: dict | None = None) -> None:
         meta = dict(meta or {})
-        payload = {k: meta.get(k) for k in ("kind", "question_id", "thread_id", "turn_id", "interrupted", "outcome", "index", "total")
+        payload = {k: meta.get(k) for k in ("kind", "question_id", "thread_id", "turn_id", "interrupted", "outcome", "index", "total",
+                                       "checking", "check_s", "came_back", "talk_step")
                    if meta.get(k) is not None}
         if speaker == "user" and payload.get("turn_id") is None and state["pending_voice"]:
             payload["turn_id"] = state["voice_turn"]
@@ -313,6 +377,9 @@ async def session_socket(websocket: WebSocket) -> None:
             return
         state["pending_voice"] = False
         if meta.get("kind") == "quick_choice":         # "interview or English?": not an answer, no feedback
+            release_audio(meta.get("transcript"))
+            return
+        if meta.get("answer_kind") == "money":          # the salary part of an interview: no feedback, the debrief has it
             release_audio(meta.get("transcript"))
             return
         if opts.get("mode") in talk.TALK_MODES:         # tough / negotiate: no feedback records, the debrief is made from state
@@ -378,6 +445,16 @@ async def session_socket(websocket: WebSocket) -> None:
             return await gate.background(job)
         finally:
             BACKGROUND.reset(mark)
+
+    async def send_hint_line(payload: dict) -> None:
+        """D117: the card went out with its fixed example; the model's line from the person's own words follows."""
+        try:
+            line = await driver.hint_example(payload)
+        except Exception as exc:                    # noqa: BLE001 - the fixed example stays
+            log.info("Hint line failed: %s", type(exc).__name__)
+            return
+        if line:
+            emit("hint_update", n=payload.get("n"), card_id=payload.get("card_id"), example=line)
 
     def public_record(record: dict) -> dict:
         return {k: v for k, v in record.items() if k != "history_index"}
@@ -571,11 +648,14 @@ async def session_socket(websocket: WebSocket) -> None:
                 if wanted == "voice" and isinstance(driver, TextDriver):
                     driver.enable_stt(stt.get_stt(settings))
             elif kind == "hint":
-                payload = driver.hint() if isinstance(driver, TextDriver) else None
+                payload = driver.hint(another=data.get("another") is True) if isinstance(driver, TextDriver) else None
                 if payload is None:
                     error("hint_unavailable", "Hints are only available in Tough talk practice.", retryable=False)
                 else:
                     emit("hint", **payload)
+                    refine = asyncio.ensure_future(send_hint_line(payload))
+                    side_tasks.add(refine)
+                    refine.add_done_callback(side_tasks.discard)
             elif kind == "silence":
                 if isinstance(driver, TextDriver):
                     await driver.say_silence()
@@ -657,6 +737,9 @@ async def session_socket(websocket: WebSocket) -> None:
                     error("resume_unavailable", "This session can't be continued.", retryable=False)
                     return
                 resume_info["negotiation" if opts["mode"] == "negotiate" else "tough"] = block
+            elif opts["mode"] == "interview" and resume_saved.get("money_plan"):
+                resume_info["money_plan"] = resume_saved["money_plan"]
+                resume_info["money_talk"] = resume_saved.get("money_talk")
         else:
             plan = planner.plan_questions(opts["round_type"], opts["questions"], extra=extra, focus=opts["focus"]) \
                 if opts["mode"] == "interview" else []      # quick: the interview plan is ready; English drops it
@@ -665,10 +748,14 @@ async def session_socket(websocket: WebSocket) -> None:
         if opts["mode"] == "negotiate" and not resume_saved:
             form = opts["negotiate"]
             surprise = form["style"] == "surprise"
-            neg_state = negotiation.new_state(form, random.choice(talk.STYLE_IDS) if surprise else form["style"], surprise)
+            style = random.choice(talk.STYLE_IDS) if surprise else form["style"]
+            neg_state = bargain.new_state(form, style, surprise)
         elif opts["mode"] == "tough" and not resume_saved:
             tough_state = tough.new_state(opts["tough"]["theme"], tough.pick_questions(opts["tough"]["theme"]))
         talk_mode = opts["mode"] in talk.TALK_MODES
+        money_plan = None
+        if opts.get("money_form") and not resume_saved and opts["mode"] == "interview":
+            money_plan = {"form": opts["money_form"], "style": bargain.data()["money_talk"]["style_by_strictness"][str(opts["strictness"])]}
         callbacks = dict(
             on_audio_chunk=audio,
             on_turn_start=lambda speaker: emit("turn_start", speaker=speaker),
@@ -703,7 +790,7 @@ async def session_socket(websocket: WebSocket) -> None:
                 llm, mode=opts["mode"], plan=plan, strictness=opts["strictness"], level=opts["level"],
                 voice=opts["voice"], speed=settings["kokoro_speed"], speak=opts["speak"], stt=recogniser,
                 settings=settings, topic=opts["topic"], focus_gaps=planner.focus_gaps(opts["focus"]),
-                quick=opts["quick"], on_mode=mode_selected, neg=neg_state, tough_state=tough_state,
+                quick=opts["quick"], on_mode=mode_selected, neg=neg_state, tough_state=tough_state, money_plan=money_plan,
                 on_notice=lambda code, text: emit("notice", code=code, message=text),
                 on_preview=lambda text: emit("speech_preview", turn_id=state["voice_turn"], text=text),
                 on_error=lambda code, message, hint, retryable: error(code, message, hint, retryable),
@@ -719,7 +806,8 @@ async def session_socket(websocket: WebSocket) -> None:
                    "title": storage.session_title(opts["mode"], vacancy_title, opts["drill"])}
         if talk_mode:
             session["feedback"] = []
-            session["title"] = (talk.start_title("negotiate", role=driver.neg["role"], style=driver.neg["style"])
+            session["title"] = (talk.start_title("negotiate", role=driver.neg["role"], style=driver.neg["style"],
+                                                 scenario=driver.neg.get("scenario", "") if bargain.is_v2(driver.neg) else "")
                                 if opts["mode"] == "negotiate" else talk.start_title("tough", theme=driver.tough["theme"]))
         if opts["focus"]:
             session["focus"] = opts["focus"]            # what this drill worked on (a resumed session keeps it)
@@ -777,9 +865,16 @@ async def session_socket(websocket: WebSocket) -> None:
         if session and talk_mode_of(driver):
             if driver.mode == "negotiate":
                 session["negotiation"] = driver.neg
-                session["title"] = talk.start_title("negotiate", role=driver.neg["role"], style=driver.neg["style"])
+                session["title"] = talk.start_title("negotiate", role=driver.neg["role"], style=driver.neg["style"],
+                                                    scenario=driver.neg.get("scenario", "") if bargain.is_v2(driver.neg) else "")
             else:
                 session["tough"] = driver.tough
+        elif session and getattr(driver, "money_plan", None):
+            session["money_plan"] = driver.money_plan
+            if driver.money is not None:
+                session["money_talk"] = driver.money
+                if driver.money.get("user_turns") and " \u00b7 salary talk" not in session.get("title", ""):
+                    session["title"] = session.get("title", "") + " \u00b7 salary talk"
 
         def release_session() -> None:
             saved_event.set()
@@ -791,12 +886,16 @@ async def session_socket(websocket: WebSocket) -> None:
         if session and any(t["role"] == "user" for t in history):
             # D96: the feedback is made now, after the call, by a job that does not belong to this socket: it keeps
             # going if the window closes, and this handler only forwards its events while the socket is open.
+            post_llm, post_id = await debrief_llm(settings, opts.get("engine", ""), llm)
+            if post_id != opts.get("engine", ""):
+                session["debrief_engine"] = post_id
             ctx = postcall.Context(
-                llm=llm, stt=getattr(driver, "stt", None), run=in_background, emit=emit, settings=settings,
-                mode=opts.get("mode", "interview"), level=opts.get("level", "B1"), engine=opts.get("engine", ""),
+                llm=post_llm, stt=getattr(driver, "stt", None),
+                run=in_background if post_llm is llm else run_now, own_engine=post_llm is not llm, emit=emit, settings=settings,
+                mode=opts.get("mode", "interview"), level=opts.get("level", "B1"), engine=post_id,
                 known_terms=opts.get("context_terms", []), ignored=ignored_terms, dropped=dropped,
                 owner_ok=lambda: OWNER.get(session["id"]) is state["owner"])
-            job = asyncio.create_task(save_and_debrief(session, history, records, backlog, llm, settings, emit, state,
+            job = asyncio.create_task(save_and_debrief(session, history, records, backlog, post_llm, settings, emit, state,
                                                        t_start, ctx, release_session))
             postcall.JOBS.add(job)
             job.add_done_callback(postcall.JOBS.discard)
@@ -829,6 +928,28 @@ async def wait_for_job(job: asyncio.Task) -> None:
         raise
     except Exception as exc:
         log.warning("After-call work failed: %s", type(exc).__name__)
+
+
+async def run_now(job):
+    """The after-call runner for a debrief engine that is not the live model: nothing to share, run at once."""
+    return await job()
+
+
+async def debrief_llm(settings: dict, live_id: str, live_llm: LLMEngine | None) -> tuple[LLMEngine | None, str]:
+    """D117: the engine that writes the feedback and debrief. The setting `debrief_engine` ("" = the live one); falls
+    back to the live engine when the chosen one is not ready, so a debrief is never lost to a setting."""
+    want = settings.get("debrief_engine") or ""
+    if not want or want == live_id or want not in config.DEBRIEF_ENGINES:
+        return live_llm, live_id
+    try:
+        status = await asyncio.wait_for(check_engine(settings, want, False), 20)
+    except Exception as exc:                       # noqa: BLE001 - any failure means "use the live engine"
+        log.info("Debrief engine %s not checked: %s", want, type(exc).__name__)
+        return live_llm, live_id
+    if not status.ready:
+        log.info("Debrief engine %s not ready (%s): using %s", want, status.code, live_id)
+        return live_llm, live_id
+    return get_llm(settings, want, False), want
 
 
 def codex_binary(llm: LLMEngine | None) -> str | None:
@@ -932,6 +1053,7 @@ async def _save_and_debrief(session, history, records, backlog, llm, settings, e
             result = await asyncio.wait_for(feedback.debrief(
                 llm if session["mode"] == "interview" else None, session["feedback"],
                 layer_order=settings["layer_order"], past=past), timeout=150)
+            talk.attach_money(session, result)
     except Exception as exc:
         log.warning("Debrief failed: %s", type(exc).__name__)
         result = ({"kind": session["mode"], "verdict": "The debrief could not be prepared.", "source": "code",

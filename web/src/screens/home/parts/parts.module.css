@@ -55,6 +55,15 @@
 .headerSkip { margin-inline-start: auto; }
 .text strong { font-weight: var(--weight-semibold); }
 .aside { color: var(--color-text-tertiary); font-size: var(--text-sm); }
+/* The scenario question lists each call with its one-line description under Mike's text. */
+.termList { margin: var(--space-3) 0 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.termItem { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.termName { font-weight: var(--weight-semibold); font-size: var(--text-sm); }
+.termText { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+/* "Your case": the summary card at the end of the prep questions (reuses the term list above). */
+.caseCard { display: flex; flex-direction: column; gap: var(--space-2); }
+.caseTitle { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.caseBullets { margin: 0; padding-inline-start: var(--space-4); color: var(--color-text-primary); }
 .repliesIn > * { animation: global(fade-in) var(--duration-base) var(--ease-enter) backwards; animation-delay: calc(var(--i, 0) * var(--duration-stagger) / 2 + var(--duration-slow)); }
 .repliesOut { animation: global(soft-out) var(--duration-exit) var(--ease-exit) forwards; pointer-events: none; }
 .pasted { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
@@ -93,6 +102,7 @@
 .valueSub { color: var(--color-text-secondary); }
 .valueRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .rowAction { flex: none; margin-inline-start: auto; }
+.rowActions { display: inline-flex; gap: var(--space-3); flex: none; margin-inline-start: auto; }
 .planLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); font-size: var(--text-sm); }
 .planLine > svg { flex: none; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-2); }

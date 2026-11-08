@@ -3,7 +3,7 @@
  * read this one table, so a state is reachable by props and still playable (frames.tsx keeps it live). */
 import type { RecentState, ShellEngine } from "../../components/AppShell";
 import {
-  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NEGOTIATE, CTX_NEGOTIATE_AGAIN, CTX_NO_CV, CTX_OVERFLOW, CTX_RETURNING, CTX_TOUGH,
+  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NEGOTIATE, CTX_NEGOTIATE_AGAIN, CTX_NEGOTIATE_LAST, CTX_NO_CV, CTX_OVERFLOW, CTX_RETURNING, CTX_TOUGH,
   CV_FILE, JOB_FILE, JOB_LINK, KESTREL_LONG, KESTREL_PASTED, LONG_NAME, PASTED_LONG, PASTED_TEXT,
 } from "./fixtures";
 import type { NumbersValues } from "./numbers";
@@ -26,6 +26,8 @@ export type SceneInput =
   | { do: "resolveRange"; result: RangeResult }
   /** Tough talk: the numbers card is sent (the open card's values, with these typed over them). */
   | { do: "numbers"; values?: Partial<NumbersValues> }
+  /** Interview plan: the numbers of the salary part, as typed in the dialog. */
+  | { do: "moneyNumbers"; values: Partial<NumbersValues> }
   | { do: "tactics"; hidden: boolean };
 
 export interface HomeScene {
@@ -104,10 +106,20 @@ const NOTE_LONG = "I freeze when they ask about salary, and I tend to ramble whe
 
 /* Tough talk paths. The post's range is the one Kestrel Pay lists. */
 const RANGE: RangeResult = { ok: true, low: 85000, high: 98000, currency: "EUR" };
-const NEG_START: SceneInput[] = [{ do: "begin", input: { kind: "suggestion", id: "negotiate" } }];
+const NEG_SCENARIO: SceneInput[] = [{ do: "begin", input: { kind: "suggestion", id: "negotiate" } }];
+const NEG_START: SceneInput[] = [{ do: "begin", input: { kind: "suggestion", id: "negotiate", scenario: "offer" } }];
+const scenarioStart = (scenario: "screening" | "internship" | "counteroffer" | "raise"): SceneInput[] => [{ do: "begin", input: { kind: "suggestion", id: "negotiate", scenario } }, { do: "pick", reply: "role:type" }, { do: "say", text: "Product Designer" }];
+const RAISE_NUMBERS: SceneInput[] = [...scenarioStart("raise"), { do: "numbers", values: { currentPay: "60,000", ask: "72,000", month: "none" } }];
+const COUNTER_NUMBERS: SceneInput[] = [...scenarioStart("counteroffer"), { do: "numbers", values: { currentPay: "60,000", newOffer: "70,000", reason: "growth" } }];
 const NEG_NUMBERS: SceneInput[] = [...NEG_START, { do: "pick", reply: "job:v1" }, { do: "resolveRange", result: RANGE }];
 const NEG_STYLE: SceneInput[] = [...NEG_NUMBERS, { do: "numbers", values: { target: "96,000" } }];
 const NEG_PLAN: SceneInput[] = [...NEG_STYLE, { do: "pick", reply: "style:firm" }];
+/* Negotiation v3 (D118): prepare first, the mini-course, "your case". */
+const NEG_PREP: SceneInput[] = NEG_PLAN;
+const NEG_COURSE: SceneInput[] = [...NEG_PREP, { do: "pick", reply: "prep:yes" }];
+const NEG_CASE1: SceneInput[] = [...NEG_COURSE, { do: "pick", reply: "course:skip" }];
+const NEG_CASE3: SceneInput[] = [...NEG_CASE1, { do: "say", text: "Cut onboarding drop-off by a third.\nLed the checkout redesign for 40k merchants." }, { do: "pick", reply: "case2:market" }];
+const NEG_CASE_PLAN: SceneInput[] = [...NEG_CASE3, { do: "pick", reply: "case3:step_up" }, { do: "pick", reply: "case3:sign_on" }, { do: "pick", reply: "case3:done" }];
 const TOUGH_PLAN: SceneInput[] = [{ do: "begin", input: { kind: "suggestion", id: "tough" } }, { do: "pick", reply: "theme:money" }];
 
 export const SCENES = {
@@ -170,6 +182,8 @@ export const SCENES = {
   plan: { ...ret, label: "Plan", inputs: PLAN },
   planPreparing: { ...ret, label: "Plan, questions preparing", inputs: PASTED_PLAN },
   planPrepError: { ...ret, label: "Plan, questions failed", inputs: [...PASTED_PLAN, { do: "update", job: { ...KESTREL_PASTED, state: "error" } }] },
+  planMoneyOff: { ...ret, label: "Interview plan, salary talk offered", note: "A row \"End with a salary talk\", off by default.", inputs: PLAN },
+  planMoneyOn: { ...ret, label: "Interview plan, ends with a salary talk", inputs: [...PLAN, { do: "moneyNumbers", values: { role: "Senior Product Designer", target: "96,000", currency: "EUR" } }] },
   planNoCv: { ...ret, ctx: CTX_NO_CV, label: "Plan without a CV", inputs: PLAN },
   planEngineDown: { ...ret, label: "Plan, engine not running", inputs: PLAN, props: { name: "Alex", ...engineDown }, engine: ENGINE_DOWN },
   planTextMode: { ...ret, label: "Plan, answering by typing", inputs: PLAN, props: { name: "Alex", textMode: true, browserBanner: true } },
@@ -209,6 +223,15 @@ export const SCENES = {
   },
 
   /* ---------- tough talk (tough-talk.md §2) ---------- */
+  negScenario: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: which kind of call", note: "Five scenarios with a one-line blurb each; the first question of the setup.", inputs: NEG_SCENARIO },
+  negScenarioMobile: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: which kind of call, 375", inputs: NEG_SCENARIO },
+  negRaiseForm: { ...ret, ctx: CTX_NEGOTIATE, label: "Raise: numbers form", note: "Current pay, the raise you ask for, an optional review month.", inputs: scenarioStart("raise") },
+  negRaiseError: { ...ret, ctx: CTX_NEGOTIATE, label: "Raise: errors", note: "The ask is not above the current pay.", inputs: scenarioStart("raise"), numbersView: { values: { currentPay: "72,000", ask: "60,000" }, showErrors: true } },
+  negCounterForm: { ...ret, ctx: CTX_NEGOTIATE, label: "Counteroffer: numbers form", inputs: scenarioStart("counteroffer") },
+  negScreeningForm: { ...ret, ctx: CTX_NEGOTIATE, label: "Screening: numbers form", inputs: scenarioStart("screening") },
+  negInternForm: { ...ret, ctx: CTX_NEGOTIATE, label: "Internship: numbers form", inputs: scenarioStart("internship") },
+  negRaisePlan: { ...ret, ctx: CTX_NEGOTIATE, label: "Raise: plan with tactics", inputs: [...RAISE_NUMBERS, { do: "pick", reply: "style:firm" }] },
+  negCounterPlan: { ...ret, ctx: CTX_NEGOTIATE, label: "Counteroffer: plan with tactics", inputs: [...COUNTER_NUMBERS, { do: "pick", reply: "style:firm" }] },
   negRole: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-1: which role", inputs: NEG_START },
   negRoleTyping: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-1: type the role", inputs: [...NEG_START, { do: "pick", reply: "role:type" }] },
   negRangeReading: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: reading the post for a range", inputs: [...NEG_START, { do: "pick", reply: "job:v1" }], hold: true },
@@ -232,6 +255,14 @@ export const SCENES = {
   negPlanOffer: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan, real offer (N7 joins)", inputs: [...NEG_PLAN, { do: "change", row: "offer", value: "on" }] },
   negPlanNumbersOpen: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan: Change your numbers", inputs: NEG_PLAN, props: { name: "Alex", initialOverlay: "change-numbers" } },
   negPlanStyleOpen: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan: Change Mike", inputs: NEG_PLAN, props: { name: "Alex", initialOverlay: "change-style" } },
+  negPrepAsk: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: prepare first?", inputs: NEG_PREP },
+  negPrepAskLast: { ...ret, ctx: CTX_NEGOTIATE_LAST, label: "Negotiate: prepare first? (a case from last time)", inputs: NEG_PREP },
+  negCourseStep: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: mini-course, step 1", inputs: NEG_COURSE },
+  negCourseStepMobile: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: mini-course, step 1, 375", inputs: NEG_COURSE },
+  negCaseResults: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: your case, results", inputs: NEG_CASE1 },
+  negCaseFallbacks: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: your case, what else would work", inputs: [...NEG_CASE3, { do: "pick", reply: "case3:step_up" }] },
+  negCasePlan: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: Your case card and the plan row", inputs: NEG_CASE_PLAN },
+  negCasePlanMobile: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: Your case card and the plan row, 375", inputs: NEG_CASE_PLAN },
   negPlanHidden: { ...ret, ctx: { ...CTX_NEGOTIATE, talk: TALK_HIDDEN }, label: "Negotiate plan, tactics hidden", inputs: NEG_PLAN },
   negPlanEngineDown: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan, engine not running", inputs: NEG_PLAN, props: { name: "Alex", ...engineDown }, engine: ENGINE_DOWN },
   negSkipped: { ...ret, ctx: CTX_NEGOTIATE_AGAIN, label: "Negotiate: Skip with remembered numbers", inputs: [...NEG_START, { do: "pick", reply: "job:v1" }, { do: "resolveRange", result: RANGE }, { do: "skip" }] },

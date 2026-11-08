@@ -1,10 +1,27 @@
 /* Fixture for the tough-talk setup: what `GET /api/tough-talk/content` returns (card texts copied from
  * app/server/content/tough_talk.json, theme counts from the question bank), plus remembered values. Stories, review
  * states and tests only. */
-import type { ToughTalkContent } from "../../lib/types";
+import type { CourseStep, NegotiatePrep, ToughTalkContent } from "../../lib/types";
 import type { NumbersMemory, TalkContext } from "./types";
 
+/** Negotiation v3: the mini-course as the server sends it (`course` of `GET /api/tough-talk/content`, prd-v3-prep §4). */
+export const COURSE_OFFER: CourseStep[] = [
+  { title: "Know your number and why.", rule: "Pick a number a little above your target, and one reason for it: results, scope or market.", example: "Based on the scope and two launches I led, I'm looking at 62,000." },
+  { title: "Say it first, with the reason.", rule: "The first number anchors the talk.", example: "For this role I'm looking at 62,000, because I'd own onboarding end to end." },
+  { title: "Answer the objection with a new fact.", rule: "Answer that exact concern; bring a fact you have not said yet. Repeating the same reason sounds stuck.", example: "Fair point. Last year I cut onboarding drop-off by a third, so 60,000 still feels right." },
+  { title: "If base is stuck, trade.", rule: "Ask for a step-up after probation, a sign-on bonus or an earlier review.", example: "If 55,500 is the limit today, could we agree on 60,000 after the three-month probation?" },
+  { title: "Close it in writing.", rule: "Amount, date, goals, in the offer letter.", example: "Great. Could you put the 60,000 at three months and the goals in the offer?" },
+];
+export const COURSE_RAISE: CourseStep[] = [
+  { title: "Collect results since your last raise.", rule: "Two or three things you did, each with a number.", example: "Since my last raise I cut support tickets by a quarter and led the checkout redesign." },
+  { title: "Open with the number and two results.", rule: "Say the number first, then the results that back it.", example: "I'd like to move to 72,000: I led the checkout redesign and cut tickets by a quarter." },
+  { title: "Turn “not now” into a date and criteria.", rule: "Ask when you can talk again and what would need to be true.", example: "If not now, can we agree on a date in three months and what I need to show by then?" },
+  { title: "Trade: a part now, title, or a dated raise.", rule: "If the full ask is stuck, ask for something that moves.", example: "Could we do a part now and the rest at the review in six months?" },
+  { title: "Get it in writing.", rule: "Amount, date and criteria, by email.", example: "Could you confirm the new amount and the date in an email?" },
+];
+
 export const TALK_CONTENT: ToughTalkContent = {
+  course: { offer: COURSE_OFFER, raise: COURSE_RAISE },
   cards: [
     {
         "id": "N1",
@@ -126,8 +143,15 @@ export const TALK_CONTENT: ToughTalkContent = {
         "modes": [
             "tough"
         ]
-    }
-],
+    },
+    {"id": "S1", "title": "Ask for the range first", "rule": "At a first screen, it is fair to ask what range they planned for the role before you name a number.", "evidence": "Common advice; knowing the range lowers the risk of anchoring too low.", "example": "Before I give a number, what range did you plan for this role?", "modes": ["negotiate"]},
+    {"id": "S2", "title": "Put your number at the bottom of the band", "rule": "If you name a number, make it the lowest you would accept, not the middle of your hope.", "evidence": "Anchoring research: the first number frames the talk, and a low first number is hard to move up.", "example": "Based on the scope, I'm looking at 95,000 to 105,000.", "modes": ["negotiate"]},
+    {"id": "I1", "title": "Ask for the level, not just the pay", "rule": "As an intern, ask for the title and level you have already worked at, and tie it to results you shipped.", "evidence": "Level sets the pay band for years; it is easier to fix at conversion than later.", "example": "I've owned the onboarding project end to end, so I'd like to be hired at mid level.", "modes": ["negotiate"]},
+    {"id": "C1", "title": "Name the reason before the number", "rule": "When you got an outside offer, say the real reason you are leaving. If it is not only money, a match on money will not solve it.", "evidence": "Counteroffers often fail when the reason for leaving is not pay.", "example": "It's partly money, but mostly the growth path I don't see here.", "modes": ["negotiate"]},
+    {"id": "C2", "title": "Get the counter in writing", "rule": "If the counter is fine, ask for it in writing with the date before you decide. A verbal promise is hard to hold.", "evidence": "Written terms are the only terms you can check later.", "example": "Could you send that in writing, with the date the promotion starts?", "modes": ["negotiate"]},
+    {"id": "R1", "title": "Bring results and a number", "rule": "Open a raise talk with two or three results since your last raise and the number you ask for.", "evidence": "Raises are easier to approve when the manager can repeat your case to their own boss.", "example": "Since March I led the migration and cut support tickets by a third. I'm asking for 72,000.", "modes": ["negotiate"]},
+    {"id": "R2", "title": "If it is not now, ask for a date and the goals", "rule": "When the answer is not now, ask for a specific date and the goals that unlock the raise, and ask for them in writing.", "evidence": "A dated, written commitment turns 'later' into a plan.", "example": "What would I need to show by the June review for a raise to 72,000? Could you confirm it by email?", "modes": ["negotiate"]}
+  ],
   themes: [
     { id: "money", name: "Money", count: 5, personal: false },
     { id: "leaving", name: "Leaving and gaps", count: 4, personal: false },
@@ -159,4 +183,13 @@ export const TALK_RETURNING: TalkContext = {
   numbers: { last: KESTREL_NUMBERS, byJob: { v1: KESTREL_NUMBERS } },
   tacticsHidden: { tough: false, negotiate: false },
 };
+/** A case saved with an earlier Offer call (`GET /api/talk/last-case`). */
+export const LAST_CASE: NegotiatePrep = {
+  course: true,
+  results: ["Cut onboarding drop-off by a third", "Led the checkout redesign for 40k merchants"],
+  reason: "Market range",
+  fallbacks: ["step_up", "sign_on"],
+};
+/** Returning, with a saved case for the Offer scenario: "Use my case from last time" is offered. */
+export const TALK_WITH_LAST_CASE: TalkContext = { ...TALK_RETURNING, lastCases: { offer: LAST_CASE } };
 export const TALK_HIDDEN: TalkContext = { ...TALK_RETURNING, tacticsHidden: { tough: true, negotiate: true } };

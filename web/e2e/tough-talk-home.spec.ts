@@ -2,7 +2,7 @@
  * each mode, the numbers form (validation, prefill from a saved job) and Start into the session. The session and the
  * debrief are covered by the B specs. Data is fictional (Kestrel Pay). */
 import { expect, test, type Page } from "@playwright/test";
-import { resetApp, skipSetup } from "./helpers";
+import { JOB_TEXT, resetApp, skipSetup } from "./helpers";
 
 test.beforeEach(async ({ page, request }) => {
   await resetApp(request);
@@ -24,6 +24,8 @@ async function seedJob(page: Page, text: string): Promise<string> {
 async function openNegotiate(page: Page) {
   await page.goto("/");
   await page.getByRole("group", { name: "Other practice" }).getByRole("button", { name: "Negotiate salary" }).click();
+  await expect(page.getByText("What kind of salary talk is this?")).toBeVisible();
+  await quick(page).getByRole("button", { name: /^Offer call/ }).click();
 }
 
 test.describe("Tough talk on Home: chips", () => {
@@ -42,6 +44,8 @@ test.describe("Tough talk on Home: chips", () => {
     await page.goto("/?track=tough");
     await expect(page.getByText("Which questions should I ask?")).toBeVisible();
     await page.goto("/?track=negotiate");
+    await expect(page.getByText("What kind of salary talk is this?")).toBeVisible();
+    await page.goto("/?track=negotiate&scenario=offer");
     await expect(page.getByText(/Which role are we negotiating for\?/)).toBeVisible();
   });
 });
@@ -66,7 +70,7 @@ test.describe("Tough talk on Home: Tough questions", () => {
     const plan = page.getByRole("region", { name: "Here's the plan" });
     await plan.getByRole("button", { name: "Hide tactics" }).click();
     await expect(plan.getByRole("button", { name: "Show them" })).toBeVisible();
-    await page.goto("/?track=negotiate");
+    await page.goto("/?track=negotiate&scenario=offer");
     await page.getByRole("button", { name: "No job, I'll type it" }).click();
     await expect(page.getByRole("button", { name: "Show them" })).toHaveCount(0);
   });
@@ -85,6 +89,7 @@ test.describe("Tough talk on Home: Negotiate salary", () => {
     await page.getByRole("button", { name: "Use these numbers" }).click();
 
     await quick(page).getByRole("button", { name: /^Firm/ }).click();
+    await quick(page).getByRole("button", { name: "No, start now" }).click();
     const plan = page.getByRole("region", { name: "Here's the plan" });
     await expect(plan).toContainText("Product Designer");
     await expect(plan).toContainText("85,000");
@@ -142,3 +147,92 @@ test.describe("Tough talk on Home: Negotiate salary", () => {
     await expect(page.getByLabel("My target")).toHaveValue("");
   });
 });
+
+test.describe("Negotiation v2 on Home: scenarios", () => {
+  test("the scenario step lists the five calls, each with a one-line blurb", async ({ page }) => {
+    await openNegotiateScenarios(page);
+    for (const name of ["Screening call", "Offer call", "Internship to full-time", "Counteroffer", "Raise with your lead"]) {
+      await expect(quick(page).getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
+    }
+    await expect(page.getByText("Ask your lead for a raise", { exact: false }).first()).toBeVisible();
+  });
+
+  test("a link with a scenario skips the question", async ({ page }) => {
+    await page.goto("/?track=negotiate&scenario=raise");
+    await expect(page.getByText("What kind of salary talk is this?")).toHaveCount(0);
+    await page.getByRole("button", { name: "No job, I'll type it" }).click();
+    await page.getByPlaceholder(/Type the role/).fill("Product Designer");
+    await page.keyboard.press("Enter");
+    await expect(page.getByLabel("Your pay now, per year")).toBeVisible();
+    await expect(page.getByLabel("What you will ask for, per year")).toBeVisible();
+  });
+
+  test("raise: the plan names the scenario and starts a session", async ({ page }) => {
+    await page.goto("/?track=negotiate&scenario=raise");
+    await page.getByRole("button", { name: "No job, I'll type it" }).click();
+    await page.getByPlaceholder(/Type the role/).fill("Product Designer");
+    await page.keyboard.press("Enter");
+    await page.getByLabel("Your pay now, per year").fill("60000");
+    await page.getByLabel("What you will ask for, per year").fill("72000");
+    await page.getByRole("button", { name: "Use these numbers" }).click();
+    await quick(page).getByRole("button", { name: /^Firm/ }).click();
+    await quick(page).getByRole("button", { name: "No, start now" }).click();
+    const plan = page.getByRole("region", { name: "Here's the plan" });
+    await expect(plan).toContainText("Raise with your lead");
+    await plan.getByRole("button", { name: "Start negotiation" }).click();
+    await expect(page).toHaveURL(/\/session$/);
+  });
+
+  test("negative: a raise below the current pay is not accepted", async ({ page }) => {
+    await page.goto("/?track=negotiate&scenario=raise");
+    await page.getByRole("button", { name: "No job, I'll type it" }).click();
+    await page.getByPlaceholder(/Type the role/).fill("Product Designer");
+    await page.keyboard.press("Enter");
+    await page.getByLabel("Your pay now, per year").fill("72000");
+    await page.getByLabel("What you will ask for, per year").fill("60000");
+    await page.getByLabel("What you will ask for, per year").blur();
+    await expect(page.getByRole("alert").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Use these numbers" })).toBeDisabled();
+    await expect(quick(page).getByRole("button", { name: /^Firm/ })).toHaveCount(0);
+  });
+
+  test("counteroffer asks why you are leaving", async ({ page }) => {
+    await page.goto("/?track=negotiate&scenario=counteroffer");
+    await page.getByRole("button", { name: "No job, I'll type it" }).click();
+    await page.getByPlaceholder(/Type the role/).fill("Product Designer");
+    await page.keyboard.press("Enter");
+    await expect(page.getByLabel("New offer, per year")).toBeVisible();
+    await expect(page.getByLabel("Why you are leaving")).toBeVisible();
+  });
+});
+
+test.describe("Negotiation v2 on Home: interview salary talk", () => {
+  async function interviewPlan(page: Page) {
+    await page.goto("/");
+    await page.getByRole("textbox", { name: "Message Mike" }).fill(JOB_TEXT);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await page.getByRole("button", { name: "Behavioural", exact: true }).click();
+    await page.getByRole("button", { name: "Nothing else" }).click();
+    const plan = page.getByRole("region", { name: "Here's the plan" });
+    await expect(plan).toBeVisible();
+    return plan;
+  }
+
+  test("the interview plan offers a salary talk, off by default; turning it on asks for the numbers", async ({ page }) => {
+    const plan = await interviewPlan(page);
+    await expect(plan).toContainText("Salary talk");
+    await expect(plan).toContainText("Off. The interview ends after the last question.");
+    await plan.getByRole("button", { name: "Turn on" }).click();
+    const dialog = page.getByRole("dialog", { name: "Salary talk numbers" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel("My target").fill("95000");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(plan).toContainText("On. After the last question Mike asks about salary.");
+    await expect(plan.getByRole("button", { name: "Turn off" })).toBeVisible();
+  });
+});
+
+async function openNegotiateScenarios(page: Page) {
+  await page.goto("/");
+  await page.getByRole("group", { name: "Other practice" }).getByRole("button", { name: "Negotiate salary" }).click();
+}

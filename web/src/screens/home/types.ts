@@ -4,7 +4,7 @@
  * runs the script (`script.ts`). Nothing here knows about the network. */
 import type { ReactNode } from "react";
 import type { IconName, WeakSpotLayer } from "../../ds";
-import type { FocusSpot, Level, NegotiateStart, NegotiateStyle, TacticCardData, ToughTalkContent, ToughTheme } from "../../lib/types";
+import type { FocusSpot, Level, NegotiatePrep, NegotiateScenario, MoneyTalkStart, NegotiateStart, NegotiateStyle, TacticCardData, ToughTalkContent, ToughTheme } from "../../lib/types";
 import type { NumbersValues } from "./numbers";
 
 export type Track = "interview" | "english" | "tough" | "negotiate";
@@ -62,7 +62,13 @@ export type SuggestionId =
 /** `practice`: the second chip row (Practise English · Tough questions · Negotiate salary, tough-talk.md §2.1). */
 export interface Suggestion { id: SuggestionId; icon: IconName; label: string; group?: "practice" }
 
-export interface SetupReply { id: string; label: string; icon?: IconName }
+export interface SetupReply {
+  id: string;
+  label: string;
+  icon?: IconName;
+  /** A multi-select reply (negotiate prep, "what else would work"): shown pressed; the question stays open. */
+  selected?: boolean;
+}
 
 /** What the user's message carries: a pasted job (3 lines + "Show all"), a link or a file. */
 export interface SetupAttachment {
@@ -97,6 +103,10 @@ export interface SetupTurn {
   plan?: boolean;
   /** Negotiate N-2: the numbers card sits inside this message (until it is submitted). */
   numbers?: NumbersTurn;
+  /** A short term / description list under the message (the scenario question). */
+  list?: Array<{ term: string; text: string }>;
+  /** Negotiate v3: the "Your case" summary card under this message (lever names, not ids). */
+  caseCard?: { results: string[]; reason: string; fallbacks: string[] };
 }
 
 /** The numbers card inside Mike's message (tough-talk.md §2.4). */
@@ -107,6 +117,8 @@ export interface NumbersTurn {
   /** The role field is shown only when N-1 did not give the role. */
   roleField: boolean;
   currencies: string[];
+  /** Negotiation v2: which fields the card shows (absent: the offer call). */
+  scenario?: NegotiateScenario;
   /** Review states: the card opens with its errors shown (as after a press on "Use these numbers"). */
   showErrors?: boolean;
 }
@@ -122,9 +134,11 @@ export interface TalkContext {
   numbers: { last: NumbersMemory | null; byJob: Record<string, NumbersMemory> };
   /** "Hide tactics" per mode (Settings → Practice turns them back on). */
   tacticsHidden: { tough: boolean; negotiate: boolean };
+  /** Negotiate v3: `GET /api/talk/last-case` per scenario (null = none saved; absent = not asked yet). */
+  lastCases?: Partial<Record<NegotiateScenario, NegotiatePrep | null>>;
 }
 
-export type PlanRow = "job" | "round" | "strictness" | "level" | "topic" | "focus" | "role" | "style" | "offer" | "theme";
+export type PlanRow = "job" | "round" | "strictness" | "level" | "topic" | "focus" | "role" | "style" | "offer" | "theme" | "scenario" | "money" | "case";
 
 export interface PlanModel {
   kind: "interview" | "drill" | "english" | "tough" | "negotiate";
@@ -148,6 +162,12 @@ export interface PlanModel {
   focusOptions?: { id: "all" | WeakSpotLayer; label: string }[];
   /** Negotiate salary (kind `negotiate`): the numbers card's values, as the `start.negotiate` block wants them. */
   negotiate?: NegotiateStart & { company?: string };
+  /** Negotiate: the scenario of the call (the plan's Scenario row). */
+  scenario?: NegotiateScenario;
+  /** Negotiate v3: the person's case (the plan's "Your case" row); absent = no prep or nothing answered. Levers by name. */
+  case?: { results: string[]; reason: string; fallbacks: string[] };
+  /** Interview: "End with a salary talk". `values` are the screening fields; `ready` = they are valid (else turning it on asks for them). */
+  money?: { on: boolean; ready: boolean; values: NumbersValues; roleEditable: boolean; currencies: string[]; start?: MoneyTalkStart };
   /** Tough questions (kind `tough`): the chosen theme and its display name ("Money"). */
   tough?: { theme: ToughTheme; themeName: string };
   /** Tough talk: the tactic strip above Start (cards from `GET /api/tough-talk/content`, in the order of the call);
@@ -163,6 +183,9 @@ export interface PlanModel {
     fromPost: boolean;
     /** The role is typed, not taken from a saved job: the dialog shows the Role field. */
     roleEditable: boolean;
+    scenarios: { id: NegotiateScenario; name: string; blurb: string }[];
+    /** The numbers as typed so far (the dialog starts from them when the scenario changed and they no longer fit). */
+    numbers?: NumbersValues;
   };
   /** English. */
   level?: Level;

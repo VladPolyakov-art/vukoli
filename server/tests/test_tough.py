@@ -94,9 +94,51 @@ def test_hint_picker():
     st = tough.new_state("personal", ["I1", "I2", "I4", "I7", "M4"])
     assert tough.pick_hint(st)["card_id"] == "T1"
     st = tough.new_state("fit", tough.pick_questions("fit", random.Random(1)))
-    assert tough.pick_hint(st)["card_id"] == talk.question(st["ids"][0])["card"]
+    assert tough.pick_hint(st)["card_id"] == tough.SHAPE_CARD          # the question's own "how to build this answer"
     st["stage"] = "pressed"
     assert tough.pick_hint(st)["card_id"] == "T2"
+
+
+def _press(st, another):
+    h = tough.pick_hint(st, another)
+    st["hints_used"].append({"card_id": h["card_id"], "question_id": h["question_id"], "turn": h["turn"]})
+    return h
+
+
+def test_every_press_moves_to_a_new_card_for_the_question():
+    """Owner 08.11: Tough hints kept showing the same card (T2, T2, pause, T2, T2) on 'Another hint' and on H."""
+    st = tough.new_state("weakness", ["W2", "W1", "W3", "W4", "F2"])
+    st["stage"] = "pressed"
+    got = [_press(st, another=i % 2 == 0)["card_id"] for i in range(4)]
+    assert got == ["T2", tough.SHAPE_CARD, tough.CHECK_CARD, "N4"]
+    assert _press(st, True)["card_id"] == "T2"                         # then it cycles
+
+
+def test_question_cards_carry_the_question_and_a_fill_in_example():
+    st = tough.new_state("weakness", ["W2", "W1", "W3", "W4", "F2"])
+    h = tough.pick_hint(st)
+    p = tough.hint_payload(st, h, 1)
+    q = talk.question("W2")
+    assert p["title"] == "How to build this answer" and p["shape"] == q["shape"] and "[" in p["example"]
+    h["card_id"] = tough.CHECK_CARD
+    p = tough.hint_payload(st, h, 2)
+    assert q["checking"] in p["text"] and "Avoid:" in p["text"] and p["example"] == ""
+    assert all(qq.get("hint_example") for qq in talk.questions())
+
+
+def test_no_pause_card_after_the_user_paused():
+    st = tough.new_state("weakness", ["W2", "W1", "W3", "W4", "F2"])
+    st["log"][0]["answers"] = [{"role": "answer", "text": "Good question, let me think."}]
+    assert "N4" not in tough.hint_ranking(st)[0]
+
+
+def test_debrief_titles_for_question_cards_and_no_virtual_ids_in_cards():
+    st = tough.new_state("weakness", ["W2", "W1", "W3", "W4", "F2"])
+    st["log"][0]["answers"] = [{"role": "answer", "text": "I said the release was ready and it was not. That was mine."}]
+    _press(st, False)
+    d = tough.debrief(st)
+    assert d["hints_used"][0]["title"] == "How to build this answer"
+    assert tough.SHAPE_CARD not in d["cards"] and tough.CHECK_CARD not in d["cards"]
 
 
 # ---------- after-call merge: a flag survives only with a verbatim quote ----------
@@ -154,3 +196,33 @@ def test_blaming_outranks_personal_info_for_hurt_most():
     st["checks"]["L2"] = tough.merge_check(a2, {**off, "blames_others": {"value": True, "evidence_quote": "My manager was terrible"}, "calmer_answer": ""})
     hm = tough.debrief(st)["summary"]["hurt_most"]
     assert hm["signal"] == "blames_others" and hm["question_no"] == 2
+
+
+def test_another_hint_is_a_different_card_and_cycles():
+    st = tough.new_state("fit", tough.pick_questions("fit", random.Random(1)))
+    first = tough.pick_hint(st)
+    second = tough.pick_hint(st | {"hints_used": [{"card_id": first["card_id"], "question_id": first["question_id"], "turn": first["turn"]}]}, another=True)
+    assert second["card_id"] != first["card_id"] and second["shape"] == first["shape"]
+    shown = [{"card_id": c, "question_id": first["question_id"], "turn": first["turn"]} for c in tough.hint_ranking(st)[0]]
+    again = tough.pick_hint(st | {"hints_used": shown}, another=True)
+    assert again["card_id"] == first["card_id"]                       # every card shown at this turn: start over
+    assert tough.pick_hint(st | {"hints_used": shown})["card_id"] == first["card_id"]      # a plain press ignores the history
+
+
+def test_session_hint_falls_back_when_the_picker_breaks(monkeypatch):
+    from server import session as sess
+    obj = object.__new__(sess.TextDriver)
+    obj.mode = "tough"
+    monkeypatch.setattr(sess.TextDriver, "_hint", lambda self, another: (_ for _ in ()).throw(RuntimeError("boom")))
+    out = obj.hint(another=True)
+    assert out["mode"] == "tough" and out["title"] and out["text"] and out["example"]
+    obj.mode = "interview"
+    assert obj.hint() is None
+
+
+def test_after_a_follow_up_the_first_hint_is_one_not_seen_on_this_question():
+    st = tough.new_state("money", ["M3", "M1", "M2", "M4", "M8"])
+    assert _press(st, False)["card_id"] == tough.SHAPE_CARD
+    st["log"][0]["answers"].append({"role": "answer", "text": "Yes, still interested. What does the package include?"})
+    st["stage"] = "followed"
+    assert _press(st, False)["card_id"] == tough.CHECK_CARD
