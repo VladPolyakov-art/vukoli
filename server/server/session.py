@@ -17,12 +17,14 @@ question in a follow-up turn), the code switches to the next question in the sam
 from __future__ import annotations
 
 import asyncio
+import copy
+import json
 import logging
 import re
 import time
 from typing import AsyncGenerator, AsyncIterator, Callable, Optional
 
-from . import content, tts
+from . import content, negotiation, talk, tough, tts
 from .content import Question
 from .engines.base import EngineError, LLMEngine
 from .engines.gemini_live import drop_last_answer
@@ -89,7 +91,8 @@ class TextDriver:
                  on_voice_dropped: Optional[Callable] = None, on_voice_noise: Optional[Callable] = None,
                  gate: ModelGate | None = None, resume: dict | None = None,
                  focus_gaps: list[str] | None = None, quick: bool = False,
-                 on_mode: Optional[Callable] = None, **_ignored) -> None:
+                 on_mode: Optional[Callable] = None, neg: dict | None = None,
+                 tough_state: dict | None = None, **_ignored) -> None:
         self.llm = llm
         self.mode = mode
         self.plan = list(plan or [])
@@ -136,6 +139,18 @@ class TextDriver:
             self.q_index = min(int(resume.get("q_index", 0)), max(len(self.plan) - 1, 0))
             self.follow_ups = list(resume.get("follow_ups", []))
             self.finished = bool(resume.get("finished"))
+        # Tough talk modes: the negotiation / tough-question state lives here (code owns it; the model only phrases lines).
+        self.neg = (resume or {}).get("negotiation") or neg
+        self.tough = (resume or {}).get("tough") or tough_state
+        if mode == "negotiate" and not self.neg:
+            raise ValueError("a negotiation needs its state")
+        if mode == "tough" and not self.tough:
+            raise ValueError("tough questions need their state")
+        if resume and mode == "tough" and self.tough:
+            self.finished = bool(self.tough.get("closed"))
+        if resume and mode == "negotiate" and self.neg:
+            self.finished = self.neg.get("phase") == "closed"
+        self._talk_snaps: list[tuple] = []
         self._repeat_offered = False            # the last line was "Would you like me to repeat the question?"
         self._snapshots: list[tuple[int, list[str], bool]] = []
         self._running = False
@@ -177,7 +192,7 @@ class TextDriver:
 
     async def run(self, audio_input_stream: AsyncGenerator[bytes, None]) -> None:
         self._running = True
-        warm = [self.llm.warm_up(self._warm_messages())]
+        warm = [self.llm.warm_up(self._warm_messages())] if self.mode != "tough" else []
         if self.stt is not None and self.stt.available:
             warm.append(asyncio.to_thread(self.stt.warm_up))
         self._warm_task = asyncio.ensure_future(asyncio.gather(*warm, return_exceptions=True))
@@ -210,17 +225,20 @@ class TextDriver:
             self._reply_task = self._spawn(self._quick_respond(clean))
             return
         self._snapshots.append((self.q_index, list(self.follow_ups), self.finished))
+        self._talk_snaps.append((copy.deepcopy(self.neg), copy.deepcopy(self.tough)))
         question = self.current_question()
         last_model = next((t for t in reversed(self.transcript_history) if t["role"] == "model"), None)
         if self.mode == "interview" and question:                  # not "Take your time..." or "Sure. <question>"
             asked = self.follow_ups[-1] if self.follow_ups else question.text
+        elif self.mode == "tough" and tough.current(self.tough):
+            asked = tough.current(self.tough)["text"]
         else:
             asked = last_model["text"] if last_model else ""
         meta = {"turn_id": turn_id, "source": "voice" if transcript is not None else "text",
                 "question": asked,
                 "question_id": question.id if question else "",
                 "competency": question.competency if question else "",
-                "answer_kind": ("follow_up" if self.follow_ups else "main") if self.mode == "interview" else "turn",
+                "answer_kind": self._answer_kind(),
                 "transcript": transcript}
         self.transcript_history.append({"role": "user", "text": clean, "question_id": meta["question_id"],
                                         "kind": meta["answer_kind"]})
@@ -228,6 +246,13 @@ class TextDriver:
             self.on_turn_complete("user", clean, meta)
         self._metrics = {"turn_id": turn_id, "t0": time.perf_counter(), "stt_ms": stt_ms}
         self._reply_task = self._spawn(self._respond(clean, transcript))
+
+    def _answer_kind(self) -> str:
+        if self.mode == "interview":
+            return "follow_up" if self.follow_ups else "main"
+        if self.mode == "tough":
+            return "question"
+        return "turn"                  # english and negotiate: free turns
 
     def enable_stt(self, recogniser: STT) -> None:
         """The user switched a text session to voice: attach the recogniser and warm it up in the background."""
@@ -317,6 +342,8 @@ class TextDriver:
         await self._cancel_reply(interrupted=False)
         if self._snapshots:
             self.q_index, self.follow_ups, self.finished = self._snapshots.pop()
+        if self._talk_snaps:
+            self.neg, self.tough = self._talk_snaps.pop()
         self._repeat_offered = False
         question = drop_last_answer(self.transcript_history)
         if question:
@@ -346,12 +373,19 @@ class TextDriver:
     def _warm_messages(self) -> list[dict]:
         if self.mode == "interview":
             return [{"role": "system", "content": self._p1_system()}, {"role": "user", "content": "warm-up"}]
+        if self.mode == "negotiate":
+            return [{"role": "system", "content": self._p7_system()}, {"role": "user", "content": "warm-up"}]
+        if self.mode == "tough":
+            return []
         return [{"role": "system", "content": self._tutor_system()}, {"role": "user", "content": "warm-up"}]
 
     def _p1_system(self) -> str:
         # Static for the whole session so the engine can reuse its cache of the system prompt (latency).
         return content.system("p1_interviewer", max_follow_ups=self.max_follow_ups, strictness=self.strictness) \
             + content.name_line(self.settings.get("name", ""))
+
+    def _p7_system(self) -> str:
+        return content.system("p7_recruiter") + content.name_line(self.settings.get("name", ""))
 
     def _tutor_system(self) -> str:
         preset = content.level_presets().get(self.level, content.level_presets().get("B1", ""))
@@ -363,6 +397,16 @@ class TextDriver:
             self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
             await self._deliver(self._from_list(_sentences(content.copy("quick_opening", name=self.settings.get("name", "")))),
                                 lambda: {"kind": "turn"}, record=False)
+            return
+        if self.mode == "negotiate":
+            self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
+            line = negotiation.opening_line(self.neg, self.settings.get("name", ""))
+            await self._deliver(self._from_list(_sentences(line)), lambda: self._neg_meta("turn"))
+            return
+        if self.mode == "tough":
+            self._metrics = {"turn_id": None, "t0": time.perf_counter(), "stt_ms": None, "opening": True}
+            line = tough.opening_line(self.tough, self.settings.get("name", ""))
+            await self._deliver(self._from_list(_sentences(line)), lambda: self._tough_meta("question"))
             return
         if self.mode == "interview":
             first = self.plan[0]
@@ -410,6 +454,22 @@ class TextDriver:
             self._hold()
             await self._respond(last["text"], None)
             return
+        if self.mode == "negotiate":
+            if self.neg["phase"] == "closed":
+                await self._deliver(self._from_list(_sentences(talk.data()["recruiter_lines"]["closed_again"]["*"])),
+                                    lambda: self._neg_meta("closing"), record=False)
+            else:
+                await self._deliver(self._from_list(_sentences(negotiation.restate_line(self.neg))),
+                                    lambda: self._neg_meta("turn"))
+            return
+        if self.mode == "tough":
+            if self.tough["closed"]:
+                await self._deliver(self._from_list(_sentences(talk.data()["tough_lines"]["closing"])),
+                                    lambda: self._tough_meta("closing"), record=False)
+            else:
+                line = talk.data()["tough_lines"]["repeat"].format(question=tough.current(self.tough)["text"])
+                await self._deliver(self._from_list(_sentences(line)), lambda: self._tough_meta("repeat"))
+            return
         if self.finished:
             await self._deliver(self._from_list([content.copy("interview_closing")]), lambda: {"kind": "closing"})
             return
@@ -428,10 +488,112 @@ class TextDriver:
         try:
             if self.mode == "interview":
                 await self._interview_reply(answer, transcript)
+            elif self.mode == "negotiate":
+                await self._negotiate_reply(answer)
+            elif self.mode == "tough":
+                await self._tough_reply(answer)
             else:
                 await self._tutor_reply()
         finally:
             self._release(token)
+
+    # ---------- tough talk modes ----------
+
+    def _neg_meta(self, kind: str, reply=None) -> dict:
+        st = self.neg
+        out = {"kind": kind, "outcome": st["outcome"], "index": st["user_turns"]}
+        return out
+
+    def _tough_meta(self, kind: str) -> dict:
+        st = self.tough
+        q = tough.current(st)
+        out = {"kind": kind, "index": min(st["index"] + 1, tough.TOTAL), "total": tough.TOTAL}
+        if q:
+            out["question_id"] = q["id"]
+        return out
+
+    async def _negotiate_reply(self, answer: str) -> None:
+        """Code moves first (negotiation.step on a copy), then the model phrases the line; the copy becomes the
+        state only when the line has been delivered, so a cut-off turn can be resumed or redone from the old state."""
+        work = copy.deepcopy(self.neg)
+        reply = negotiation.step(work, answer)
+        name = self.settings.get("name", "")
+        base = negotiation.scripted_line(work, reply, name, base_only=True)
+        line = base
+        closing = reply.closing or reply.move in ("restate_offer",)
+        self._metrics["path"] = "fixed"
+        if not closing and reply.move not in ("closed_again", "wait_ack", *negotiation.SCRIPTED_MOVES):
+            said = await self._recruiter_model_line(work, reply, answer)
+            if said:
+                line, self._metrics["path"] = said, "model"
+            elif said is not None:
+                work["guard_replacements"] += 1
+        text = " ".join([line, *negotiation.tail(reply)])
+        kind = "closing" if reply.closing else "turn"
+
+        def meta() -> dict:
+            self.neg = work
+            self.finished = work["phase"] == "closed"
+            return self._neg_meta(kind)
+        await self._deliver(self._from_list(_sentences(text)), meta)
+
+    async def _recruiter_model_line(self, st: dict, reply, answer: str) -> str | None:
+        """The model's phrasing of one move. "" = the line failed the number guard (caller counts it);
+        None = no model line (error or empty), the scripted line is used without counting."""
+        user = content.user("p7_recruiter", **{k: ("" if v is None else v) for k, v in
+                                                negotiation.model_input(st, reply, answer).items()})
+        messages = [{"role": "system", "content": self._p7_system()}, {"role": "user", "content": user}]
+        raw = ""
+        agen = self.llm.chat_stream(messages, temperature=0.4, max_tokens=140, json_schema=content.schema("p7_recruiter"))
+        try:
+            async for delta in agen:
+                raw += delta
+        except EngineError as exc:
+            log.warning("Recruiter line failed: %s", exc.code)
+            return None
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.warning("Recruiter line failed: %s", type(exc).__name__)
+            return None
+        finally:
+            await agen.aclose()
+        try:
+            line = norm(str(json.loads(raw).get("recruiter_line", "")))
+        except (ValueError, AttributeError):
+            m = re.search(r'"recruiter_line"\s*:\s*"((?:[^"\\]|\\.)*)', raw)
+            line = norm(m.group(1)) if m else ""
+        if not line:
+            return None
+        if not negotiation.guard_ok(line, negotiation.numbers_allowed(reply, st)):
+            log.info("Recruiter line replaced by the scripted line (number guard)")
+            return ""
+        return trim_words(line, 70)
+
+    async def _tough_reply(self, answer: str) -> None:
+        work = copy.deepcopy(self.tough)
+        res = tough.step(work, answer)
+        self._metrics["path"] = "fixed"
+
+        def meta() -> dict:
+            self.tough = work
+            self.finished = work["closed"]
+            return self._tough_meta(res["kind"] if res["kind"] in ("question", "follow_up", "pressure", "move_on", "closing",
+                                                                   "repeat") else "question")
+        await self._deliver(self._from_list(_sentences(res["line"])), meta)
+
+    def hint(self) -> dict | None:
+        """An in-call tactic card chosen by code (no model). Recorded in the state for the debrief."""
+        if self.mode == "negotiate":
+            spoken = [t for t in self.transcript_history if t["role"] == "user"]
+            cid = negotiation.pick_hint(self.neg, spoken)
+            self.neg["hints_used"].append({"card_id": cid, "turn": self.neg["user_turns"]})
+            return talk.hint_payload(cid, "negotiate", len(self.neg["hints_used"]), example=negotiation.card_example(cid, self.neg))
+        if self.mode == "tough":
+            h = tough.pick_hint(self.tough)
+            self.tough["hints_used"].append({"card_id": h["card_id"], "question_id": h["question_id"]})
+            return talk.hint_payload(h["card_id"], "tough", len(self.tough["hints_used"]), h["shape"])
+        return None
 
     async def _interview_reply(self, answer: str, transcript: Transcript | None) -> None:
         question = self.plan[self.q_index]

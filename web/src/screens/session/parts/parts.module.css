@@ -39,6 +39,11 @@
 .suggestAnswer { margin: 0; line-height: var(--leading-relaxed); }
 .suggestList { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }
 
+/* ---------- hint card (tough talk) ---------- */
+/* Same place and width as the suggester; the card's own radius (--radius-md) comes from TacticCard. */
+.hintCard { width: 100%; max-width: var(--layout-narrow); scroll-margin-bottom: calc(var(--island-h) + var(--island-offset) + var(--space-6)); }
+.hintCard > * { border-radius: var(--radius-md); }
+
 /* ---------- banners ---------- */
 /* D61: the notices sit in the dock, right above the state text and the island (the dock is measured, so the
  * transcript keeps its room above them; nothing covers the glow). */

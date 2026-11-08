@@ -13,15 +13,17 @@ import { Button, Presence, scrollBehavior, StatusPill, useScrollFocusable } from
 import { t } from "../../i18n";
 import { Banners } from "./parts/Banners";
 import { FirstTime } from "./parts/FirstTime";
+import { HintCard } from "./parts/HintCard";
 import { Interrupted } from "./parts/Interrupted";
 import { islandModel, SessionIsland } from "./parts/Island";
 import { MicHelpDialog } from "./parts/MicHelpDialog";
 import { ShortcutsDialog } from "./parts/ShortcutsDialog";
 import { Suggester } from "./parts/Suggester";
 import { Transcript } from "./parts/Transcript";
+import { hintGate } from "./hint";
 import { HINT_MS, stageFor } from "./stage";
 import { follow, FOLLOW_START, isAtBottom, showJump, type FollowEvent, type FollowState } from "./transcriptScroll";
-import type { SessionViewProps } from "./types";
+import { countsTurns, type SessionViewProps } from "./types";
 import { useIslandOverflow, useSessionLayout } from "./useSessionLayout";
 import s from "./SessionView.module.css";
 
@@ -51,11 +53,11 @@ const SENT_GUARD_MS = 2000;
 
 /** C2 (text mode): is this key press, with the focus outside any text field, the user typing an answer? Inside a dialog
  * or a menu the keys keep their own meaning. */
-function typesIntoAnswer(e: KeyboardEvent | ReactKeyboardEvent, target: HTMLElement | null, strayAt: { current: number }, sentAt: { current: number }): boolean {
+function typesIntoAnswer(e: KeyboardEvent | ReactKeyboardEvent, target: HTMLElement | null, strayAt: { current: number }, sentAt: { current: number }, hintKey = false): boolean {
   if (e.key.length !== 1 || e.key === " ") return false;          // Enter, Tab, arrows, Esc and Space keep their jobs
   if (target?.closest('dialog, [role="dialog"], [role="menu"], [role="listbox"]')) return false;
   if (e.key !== e.key.toLowerCase() && e.key !== "?") return true;     // a capital: a sentence being started
-  if (!TEXT_SHORTCUTS.has(e.key)) return true;
+  if (!TEXT_SHORTCUTS.has(e.key) && !(hintKey && e.key === "h")) return true;
   const now = performance.now();
   return now - strayAt.current < TYPING_GAP_MS || now - sentAt.current < SENT_GUARD_MS;   // a shortcut letter in the middle of typing, or right after Send
 }
@@ -103,7 +105,7 @@ export function SessionView(props: SessionViewProps) {
   };
   const sendRef = useRef(send);
   useLayoutEffect(() => { sendRef.current = send; });
-  const contentKey = `${data.transcript.length}:${lastTurn ? textLength(lastTurn.text) + (lastTurn.interim?.length ?? 0) : 0}:${thinking ? 1 : 0}:${interrupted ? 1 : 0}`;
+  const contentKey = `${data.transcript.length}:${lastTurn ? textLength(lastTurn.text) + (lastTurn.interim?.length ?? 0) : 0}:${thinking ? 1 : 0}:${interrupted ? 1 : 0}:${data.hint?.open ? 1 : 0}`;
   const [islandH, setIslandH] = useState<number | null>(null);
   useLayoutEffect(() => {
     const instant = firstScroll.current || phase === "listening";
@@ -130,6 +132,8 @@ export function SessionView(props: SessionViewProps) {
 
   /* ---------- island model (also drives the keyboard) ---------- */
   const model = islandModel({ variant, input, phase, muted, interrupted, data, handlers });
+  /* Tough talk: the Hint button and the H key share one gate (tough-talk.md §4.1). */
+  const gate = hintGate({ phase, interrupted, data });
 
   /* ---------- island overlays ---------- */
   const [shortcuts, setShortcuts] = useState(props.initialOverlay === "shortcuts");
@@ -189,7 +193,7 @@ export function SessionView(props: SessionViewProps) {
     /* C2: in text mode keys that land outside the answer box are the user's typing (after Send with the mouse, the focus is
      * on a button or on the page), not shortcuts: the box takes the focus and the character.
      * Only a lone, lowercase press of a shortcut letter still acts as one. The cost of a stray R was the user's answer. */
-    if (!voice && typesIntoAnswer(e, target, strayAt, sentAt)) {
+    if (!voice && typesIntoAnswer(e, target, strayAt, sentAt, Boolean(data.hint))) {
       const box = rootRef.current?.querySelector<HTMLTextAreaElement>("[data-session-composer]");
       if (box) {
         strayAt.current = performance.now();
@@ -203,6 +207,7 @@ export function SessionView(props: SessionViewProps) {
     const live = !interrupted && phase !== "connecting" && phase !== "saving";
     const run = (fn?: () => void) => { if (fn) { e.preventDefault(); fn(); } };
     if (key === "?") run(() => setShortcuts(true));
+    else if (key === "h" && data.hint && handlers?.onToggleHint) { if (gate.enabled) run(handlers.onToggleHint); }
     else if (key === "n" && model.main?.kind === "button" && (model.main.id === "next" || model.main.id === "debrief") && !model.main.disabled) run(model.main.onClick);
     else if (!live || !voice) {
       if (key === "r" && model.canRedo) run(handlers?.onRedo);
@@ -265,8 +270,9 @@ export function SessionView(props: SessionViewProps) {
                 />
               ) : null}
               {interrupted ? <Interrupted kind={overlay === "interrupted-voice" ? "voice" : "engine"} handlers={handlers} info={data.interrupted} /> : null}
-              {showTips ? <FirstTime input={input} pauseSec={data.pauseSec} english={variant === "english"} /> : null}
+              {showTips ? <FirstTime input={input} pauseSec={data.pauseSec} english={countsTurns(variant)} variant={variant} /> : null}
               {showSuggester && suggestOn && !interrupted ? <Suggester suggestion={data.suggestion} /> : null}
+              {data.hint && !interrupted ? <HintCard hint={data.hint} onHide={handlers?.onHideHint} /> : null}
             </div>
           </div>
           {showJump(followState) ? (
@@ -299,6 +305,7 @@ export function SessionView(props: SessionViewProps) {
                     compact={props.island ? props.island === "stacked" : compactIsland}
                                     moreOpen={props.initialOverlay === "more"}
                     showSuggester={showSuggester}
+                    hintGate={data.hint ? gate : undefined}
                     suggestOn={suggestOn}
                     onSuggest={(on) => { setSuggestOn(on); handlers?.onSetSuggest?.(on); }}
                     tools={props.tools ?? "open"}

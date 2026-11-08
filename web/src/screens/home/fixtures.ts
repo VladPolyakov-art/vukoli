@@ -1,6 +1,7 @@
 /* Home fixture: docs/ia.md §6 (Alex Morgan, Product Designer; Kestrel Pay / Lumen Health / Fieldnote). All fictional.
  * The stress fixture (+30% text) lives apart, as the shared rules ask (ds/screens/_index.md §2). */
 import type { ScriptContext } from "./script";
+import { TALK_FIRST, TALK_RETURNING } from "./talkFixtures";
 import type { JobItem, Phrase, WeakItem } from "./types";
 
 export const KESTREL: JobItem = {
@@ -76,6 +77,7 @@ export const CTX_RETURNING: ScriptContext = {
   weakSessions: 2,
   level: "B2",
   phrases: PHRASES,
+  talk: TALK_FIRST,
 };
 export const CTX_FIRST: ScriptContext = {
   track: "interview",
@@ -88,11 +90,17 @@ export const CTX_FIRST: ScriptContext = {
   weakSessions: 0,
   level: null,
   phrases: [],
+  talk: TALK_FIRST,
 };
 export const CTX_NO_WEAK: ScriptContext = { ...CTX_RETURNING, weak: [], weakSessions: 0 };
 export const CTX_NO_CV: ScriptContext = { ...CTX_RETURNING, hasCv: false };
 export const CTX_ENGLISH: ScriptContext = { ...CTX_RETURNING, track: "english" };
 export const CTX_ENGLISH_FIRST: ScriptContext = { ...CTX_FIRST, track: "english" };
+/** Tough talk (tough-talk.md §2): a first try, and a return with Firm and Kestrel Pay's numbers remembered. */
+export const CTX_TOUGH: ScriptContext = { ...CTX_RETURNING, track: "tough" };
+export const CTX_NEGOTIATE: ScriptContext = { ...CTX_RETURNING, track: "negotiate" };
+export const CTX_NEGOTIATE_AGAIN: ScriptContext = { ...CTX_RETURNING, track: "negotiate", talk: TALK_RETURNING };
+export const CTX_NEGOTIATE_FIRST: ScriptContext = { ...CTX_FIRST, track: "negotiate" };
 
 /** A pasted job the server read (company and role from its first line). */
 export const KESTREL_PASTED: JobItem = { ...KESTREL, id: "v9", added: "Oct 20", questions: 0, state: "preparing" };

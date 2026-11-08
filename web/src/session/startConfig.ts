@@ -1,12 +1,12 @@
 /* Builds the `start` message (PROTOCOL.md) from the Home choices and per-browser preferences. */
 import { browserSttSupported } from "../audio/browserStt";
 import { prefs } from "../lib/prefs";
-import type { FocusSpot, Level, Settings, StartMessage, SttInfo } from "../lib/types";
+import type { FocusSpot, Level, NegotiateStart, Settings, StartMessage, SttInfo, ToughTheme } from "../lib/types";
 import type { SessionConfig } from "./useSession";
 
 export interface StartChoices {
   /** `quick` (D111): the call opens with Mike's "interview or English?"; the plan and the job are the server's. */
-  mode: "interview" | "english" | "quick";
+  mode: "interview" | "english" | "quick" | "tough" | "negotiate";
   answer: "voice" | "text";
   roundType?: "hr" | "behavioural" | "mix";
   strictness?: number;
@@ -17,6 +17,10 @@ export interface StartChoices {
   drill?: boolean;
   /** The weak spots a drill works on (the plan's focus, after Change focus). */
   focus?: FocusSpot[];
+  /** `negotiate`: the numbers card (the server checks `role`, `target`, the range and the currency). */
+  negotiate?: NegotiateStart;
+  /** `tough`: the theme (default `mix`). `strictness` as in an interview (3 adds "That sounds rehearsed"). */
+  toughTheme?: ToughTheme;
 }
 
 /** The server reads at most this many focus spots. */
@@ -51,6 +55,13 @@ export function buildSessionConfig(choices: StartChoices, settings: Settings | n
       start.drill = true;
       if (choices.focus?.length) start.focus = choices.focus.slice(0, MAX_FOCUS);
     }
+  } else if (choices.mode === "negotiate") {
+    // Tough talk (protocol.md §1): no round, questions, level or topic; the numbers travel in `negotiate`.
+    if (choices.negotiate) start.negotiate = choices.negotiate;
+    if (choices.vacancyId) start.vacancy_id = choices.vacancyId;
+  } else if (choices.mode === "tough") {
+    start.tough = { theme: choices.toughTheme ?? "mix" };
+    start.strictness = choices.strictness ?? settings?.strictness ?? 2;
   } else {
     start.level = choices.level ?? settings?.level ?? "B1";
     if (choices.topic) start.topic = choices.topic;

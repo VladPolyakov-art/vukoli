@@ -10,7 +10,7 @@ import { captureErrorCode, VoiceCapture, type CaptureError } from "../audio/capt
 import { micLevel } from "../audio/level";
 import { Playback } from "../audio/playback";
 import { prefs } from "../lib/prefs";
-import type { ClientMessage, InputMode, ServerMessage, StartMessage } from "../lib/types";
+import type { ClientMessage, InputMode, PracticeMode, ServerMessage, StartMessage } from "../lib/types";
 import { t } from "../i18n";
 import { initialState, sessionReducer } from "./reducer";
 import type { RecheckEdit } from "./recheck";
@@ -28,8 +28,13 @@ export function socketUrl(): string {
   return `${proto}//${window.location.host}/ws/session`;
 }
 
+/** The mode a session shows before `session_started` says it (a quick start is an interview until the user chooses). */
+export function initialMode(mode: SessionConfig["start"]["mode"]): PracticeMode {
+  return mode === "english" || mode === "tough" || mode === "negotiate" ? mode : "interview";
+}
+
 export function useSession(config: SessionConfig) {
-  const [state, dispatch] = useReducer(sessionReducer, undefined, () => initialState(config.start.input, config.start.mode === "english" ? "english" : "interview"));
+  const [state, dispatch] = useReducer(sessionReducer, undefined, () => initialState(config.start.input, initialMode(config.start.mode)));
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [micError, setMicError] = useState<CaptureError | "stt_unsupported" | "stt_denied" | null>(null);
@@ -323,6 +328,14 @@ export function useSession(config: SessionConfig) {
     },
     dismissRecheckError() {
       dispatch({ type: "local/dismiss_recheck_error" });
+    },
+    /** Tough talk: H / the Hint button. An open card is hidden; otherwise the server is asked for the card of this moment. */
+    toggleHint() {
+      if (stateRef.current.hint) { dispatch({ type: "local/hint_hide" }); return; }
+      send({ type: "hint" });
+    },
+    hideHint() {
+      dispatch({ type: "local/hint_hide" });
     },
     setSuggest(on: boolean) {
       dispatch({ type: "local/suggest", on });

@@ -217,7 +217,8 @@ def search_sessions(query: str, limit: int = DEFAULT_LIMIT) -> list[dict]:
     scored = []
     for doc in _docs():
         jobs = [j for j in dict.fromkeys([doc.vacancy_title, vacancies.get(doc.vacancy_id, "")]) if j]
-        mode_words = {"english": "english", "interview": "interview"}.get(doc.mode, "")
+        mode_words = {"english": "english", "interview": "interview", "tough": "tough questions",
+                      "negotiate": "negotiation salary"}.get(doc.mode, "")
         head_title = _fold(f"{doc.title} {mode_words}")
         head_jobs = [(j, _fold(j)) for j in jobs]
         head_all = head_title + " " + " ".join(low for _, low in head_jobs)

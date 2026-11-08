@@ -117,6 +117,10 @@ def kind_of(schema: dict | None) -> str:
         return "suggester"
     if "situation" in props:
         return "p2a"
+    if "recruiter_line" in props:
+        return "p7"
+    if "shares_personal_info" in props:
+        return "p8"
     return "unknown"
 
 
@@ -197,6 +201,26 @@ def debrief(text: str) -> dict:
                                                           if spots else "Nothing repeated stood out.")),
             "weak_spots": spots, "strength": "You kept each answer on the question.",
             "next_step": "Practise one answer again, out loud, with a result at the end."}
+
+
+def recruiter(text: str) -> dict:
+    """Tough talk (p7): a plain line that says only the amount it was given (the number guard accepts it)."""
+    amount = _line(text, "AMOUNT_TO_SAY")
+    lever = _line(text, "LEVER_TO_SAY")
+    move = _line(text, "MOVE")
+    parts = ["Thanks, I hear you."]
+    if amount and amount != "None":
+        parts.append(f"Where we stand is {amount} a year.")
+    if lever and lever != "None":
+        parts.append(f"I can add {lever}.")
+    return {"recruiter_line": " ".join(parts) if move else "Understood."}
+
+
+def tough_check(text: str) -> dict:
+    """Tough talk (p8): nothing flagged. Real flags need a real model; the tests set their own replies."""
+    flag = {"value": False, "evidence_quote": ""}
+    return {k: dict(flag) for k in ("shares_personal_info", "blames_others", "argues_instead", "redirects_to_work",
+                                    "rambling", "no_example")} | {"calmer_answer": ""}
 
 
 def stronger(text: str) -> dict:
@@ -290,7 +314,7 @@ def reply_for(messages: list[Msg], schema: dict | None) -> str:
         return plain_reply(messages)
     builders = {"p1": interviewer, "p2a": content_layer, "p2b": lambda t: {"items": language_items(t)},
                 "p5b": english_corrections, "p3": debrief, "p2c": stronger, "p0": questions,
-                "suggester": suggestion}
+                "suggester": suggestion, "p7": recruiter, "p8": tough_check}
     data = builders[kind](text) if kind in builders else from_schema(schema or {})
     return json.dumps(data, ensure_ascii=False)
 

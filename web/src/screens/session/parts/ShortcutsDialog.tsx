@@ -2,7 +2,7 @@
  * A plain Dialog with a <dl> of Kbd → action. Esc closes it (never the session). */
 import { Button, Dialog, Kbd } from "../../../ds";
 import { t } from "../../../i18n";
-import type { SessionInput, SessionVariant } from "../types";
+import { countsTurns, type SessionInput, type SessionVariant } from "../types";
 import s from "./parts.module.css";
 
 export function ShortcutsDialog({ open, onClose, input, variant, onMicHelp }: {
@@ -19,7 +19,8 @@ export function ShortcutsDialog({ open, onClose, input, variant, onMicHelp }: {
     ] as [string, string][]) : []),
     ["R", t("session.shortcuts.r")],
     ...(voice ? ([["T", t("session.shortcuts.t")]] as [string, string][]) : []),
-    ...(variant === "english" ? [] : ([["N", t("session.shortcuts.n")]] as [string, string][])),
+    ...(countsTurns(variant) ? [] : ([["N", t("session.shortcuts.n")]] as [string, string][])),
+    ...(variant === "tough" || variant === "negotiate" ? ([["H", t("session.hint.shortcut")]] as [string, string][]) : []),
     ["Esc", t("session.shortcuts.esc")],
     ["?", t("session.shortcuts.q")],
   ];

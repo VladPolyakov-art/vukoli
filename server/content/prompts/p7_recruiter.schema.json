@@ -1,0 +1,1 @@
+{"type":"object","required":["recruiter_line"],"properties":{"recruiter_line":{"type":"string"}}}

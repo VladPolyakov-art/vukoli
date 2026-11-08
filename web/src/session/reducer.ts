@@ -1,7 +1,8 @@
 /* Pure session state: every server message (PROTOCOL.md) and local action goes through `sessionReducer`.
  * No I/O here, so it is unit-tested in reducer.test.ts. useSession.ts wires it to the socket and audio. */
 import type {
-  Debrief, FeedbackRecord, InputMode, LanguageItem, LowConfWord, Question, ServerError, ServerMessage, SttInfo, TurnKind,
+  AnyDebrief, FeedbackRecord, HintCard, InputMode, LanguageItem, LowConfWord, NegotiateOutcome, PracticeMode, Question,
+  ServerError, ServerMessage, SttInfo, TurnKind,
 } from "../lib/types";
 
 /** Start-time engine codes and end-of-session codes: the session cannot continue. */
@@ -71,7 +72,7 @@ export interface SessionState {
   phase: Phase;
   input: InputMode;
   sessionId: string;
-  mode: "interview" | "english";
+  mode: PracticeMode;
   /** Quick start: the session's name once the user has chosen (the server's; empty before and in other sessions). */
   title: string;
   engine: string;
@@ -116,11 +117,19 @@ export interface SessionState {
   /** The last check-again that failed; the editor shows it. */
   recheckError: { feedbackId: string; code: string; message: string } | null;
   suggestion: SuggestionState | null;
+  /** Tough talk: the tactic card the Hint button asked for (null: none shown). Cleared by Hide and by Mike's next line. */
+  hint: HintCard | null;
+  /** Tough talk: hints asked so far in this session (the server's `n`). */
+  hintsUsed: number;
+  /** Tough talk, `negotiate`: how Mike closed the call (US-66 AC6); null until then. */
+  outcome: NegotiateOutcome | null;
+  /** Tough talk: Hint is ready (the server said so at the start). */
+  hintAvailable: boolean;
   notice: { code: string; message: string } | null;
   error: ServerError | null;
   fatal: ServerError | null;
   savedSessionId: string;
-  debrief: Debrief | null;
+  debrief: AnyDebrief | null;
   saveError: string;
   endedReason: string;
   lastTurnMs: number | null;
@@ -133,13 +142,13 @@ function settle(open: number[], turn: number | undefined): number[] {
   return turn === undefined ? [] : open.filter((id) => id !== turn);
 }
 
-export function initialState(input: InputMode, mode: "interview" | "english" = "interview"): SessionState {
+export function initialState(input: InputMode, mode: PracticeMode = "interview"): SessionState {
   return {
     phase: "connecting", input, sessionId: "", mode, title: "", engine: "", model: "", speaks: false, questions: [], stt: null,
     suggesterAvailable: false, suggestOn: false, warnings: [], ready: false, mikeTurnOpen: false, awaitingReply: false,
     recording: false, recordingTurnId: null, openVoiceTurns: [], awaitingBeforeVoice: false, preview: "", transcript: [], threadOrder: [], currentThreadId: "",
     followUps: [], currentQuestionText: "", closing: false, threadOfTurn: {}, feedback: {}, feedbackOrder: [],
-    feedbackProgress: null, unavailable: {}, stronger: {}, rechecking: {}, recheckError: null, suggestion: null, notice: null, error: null, fatal: null,
+    feedbackProgress: null, unavailable: {}, stronger: {}, rechecking: {}, recheckError: null, suggestion: null, hint: null, hintsUsed: 0, outcome: null, hintAvailable: false, notice: null, error: null, fatal: null,
     savedSessionId: "", debrief: null, saveError: "", endedReason: "", lastTurnMs: null, interrupted: null,
   };
 }
@@ -153,6 +162,8 @@ export type LocalAction =
   | { type: "local/recheck_requested"; feedbackIds: string[] }
   | { type: "local/dismiss_recheck_error" }
   | { type: "local/suggest"; on: boolean }
+  /** Tough talk: Hide the hint (button, H, or Mike's next line). */
+  | { type: "local/hint_hide" }
   | { type: "local/end_requested" }
   | { type: "local/input_changed"; input: InputMode }
   | { type: "local/socket_closed" }
@@ -243,6 +254,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
         phase: "live", sessionId: action.session_id, mode: action.mode, engine: action.engine,
         model: action.model, speaks: action.speaks, questions: action.questions, stt: action.stt,
         suggesterAvailable: action.suggester_available, suggestOn: action.suggest, warnings: action.warnings ?? [],
+        hintAvailable: action.hint_available === true,
       };
     case "ready":
       return { ...state, ready: true };
@@ -252,7 +264,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     /* ---------- Mike's turns ---------- */
     case "turn_start":
       return {
-        ...state, mikeTurnOpen: true, awaitingReply: false, notice: null, error: null,
+        ...state, mikeTurnOpen: true, awaitingReply: false, notice: null, error: null, hint: null,
         transcript: [...state.transcript, { key: nextKey("m"), speaker: "model", text: "", live: true }],
       };
     case "transcript_delta": {
@@ -308,7 +320,8 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
           ...next,
           threadOrder: isNew ? [...state.threadOrder, threadId] : state.threadOrder,
           currentThreadId: threadId,
-          currentQuestionText: q?.text ?? action.full_text,
+          // Tough talk sends ids only (the question text is empty): Mike's own line is the question.
+          currentQuestionText: q?.text || action.full_text,
           followUps: isNew ? [] : state.followUps,
           suggestion: isNew ? null : state.suggestion,
         };
@@ -319,7 +332,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
         // English mode: each coach line is its own "question".
         next = { ...next, currentQuestionText: action.full_text };
       } else if (kind === "closing") {
-        next = { ...next, closing: true };
+        next = { ...next, closing: true, outcome: action.outcome ?? next.outcome };
       }
       return next;
     }
@@ -479,6 +492,15 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
       };
     case "suggestion_unavailable":
       return { ...state, suggestion: { status: "unavailable", question: action.question, message: action.message } };
+
+    /* ---------- hint (tough talk) ---------- */
+    case "hint": {
+      const { type: _type, ...card } = action;
+      void _type;
+      return { ...state, hint: card, hintsUsed: Math.max(state.hintsUsed, action.n) };
+    }
+    case "local/hint_hide":
+      return state.hint ? { ...state, hint: null } : state;
 
     /* ---------- end ---------- */
     case "local/end_requested":

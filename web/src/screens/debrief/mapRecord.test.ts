@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FeedbackRecord, LanguageItem, SessionRecord } from "../../lib/types";
+import type { Debrief, FeedbackRecord, LanguageItem, SessionRecord } from "../../lib/types";
 import { answerSegments, feedbackOfFlag, mapRecord, questionRefs, rewriteSegments, threadsFromRecord, usageText } from "./mapRecord";
 
 const item = (over: Partial<LanguageItem> = {}): LanguageItem => ({
@@ -176,7 +176,7 @@ describe("usageText (D88)", () => {
 });
 
 describe("D98: scorecard, how it lands, plan", () => {
-  const d98 = (over: Partial<NonNullable<SessionRecord["debrief"]>> = {}): SessionRecord["debrief"] => ({
+  const d98 = (over: Partial<Debrief> = {}): Debrief => ({
     verdict: "Clear stories.",
     weak_spots: [
       { layer: "content", tag: "no_result", text: "End every story with a number.", evidence: ["q1", "q2"], said: "I rebuilt the onboarding.", said_kind: "quote", lands_as: "The story ends without a point." },

@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NO_CV, CTX_RETURNING, CV_FILE, JOB_FILE, KESTREL_PASTED, PASTED_TEXT } from "./fixtures";
+import {
+  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NEGOTIATE, CTX_NEGOTIATE_AGAIN, CTX_NO_CV, CTX_RETURNING, CTX_TOUGH, CV_FILE, JOB_FILE,
+  KESTREL_PASTED, PASTED_TEXT,
+} from "./fixtures";
+import { EMPTY_NUMBERS } from "./numbers";
 import { weakFromSession } from "./sessionFocus";
-import { attach, begin, change, pick, planFor, resolveCv, resolveJob, say, setupModel, skip, suggestionsFor } from "./script";
+import {
+  attach, begin, change, pick, planFor, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip, submitNumbers,
+  suggestionsFor, tacticOrder, type SetupState,
+} from "./script";
 
 const last = <T,>(xs: T[]) => xs[xs.length - 1]!;
 
 describe("home setup script", () => {
   it("suggests Again / Drill / English to a returning user, General / Example / English on a first visit", () => {
-    expect(suggestionsFor(CTX_RETURNING).map((s) => s.label)).toEqual(["Kestrel Pay again", "Drill my weak spots", "Practise English"]);
-    expect(suggestionsFor(CTX_FIRST).map((s) => s.label)).toEqual(["General questions", "Show me an example", "Practise English"]);
+    expect(suggestionsFor(CTX_RETURNING).map((s) => s.label)).toEqual(["Kestrel Pay again", "Drill my weak spots", "Practise English", "Tough questions", "Negotiate salary"]);
+    expect(suggestionsFor(CTX_FIRST).map((s) => s.label)).toEqual(["General questions", "Show me an example", "Practise English", "Tough questions", "Negotiate salary"]);
     expect(suggestionsFor(CTX_ENGLISH).map((s) => s.label)).toEqual(["Talk about your work", "Small talk", "Practise my 2 phrases"]);
   });
 
@@ -223,5 +230,244 @@ describe("home setup script", () => {
     s = attach(CTX_RETURNING, s, JOB_FILE);
     expect(s.pending).toMatchObject({ kind: "file", file: JOB_FILE.name });
     expect(s.turns.find((x) => x.replies?.length)?.answered).toBe(true);
+  });
+});
+
+/** What the user types into the card on a first try: the target (the rest comes from the post). */
+const filled = (s: SetupState) => ({ ...last(s.turns).numbers!.values, target: last(s.turns).numbers!.values.target || "96,000" });
+const withRange = { ok: true, low: 85000, high: 98000, currency: "EUR" } as const;
+
+/** The negotiate chat up to the numbers card with Kestrel Pay (range read from the post). */
+function toNumbers(ctx = CTX_NEGOTIATE): SetupState {
+  let s = begin(ctx, { kind: "suggestion", id: "negotiate" });
+  s = pick(ctx, s, last(s.turns).id, "job:v1");
+  expect(s.pending?.kind).toBe("range");
+  return resolveRange(ctx, s, withRange);
+}
+
+describe("tough talk: chips", () => {
+  it("puts the practice modes in their own row, always the same three in the same order", () => {
+    for (const ctx of [CTX_RETURNING, CTX_FIRST]) {
+      const row = suggestionsFor(ctx).filter((x) => x.group === "practice");
+      expect(row.map((x) => [x.id, x.icon])).toEqual([["english", "chat"], ["tough", "hand"], ["negotiate", "target"]]);
+      expect(suggestionsFor(ctx).filter((x) => x.group !== "practice")).toHaveLength(2);
+    }
+  });
+  it("leaves the English track alone and offers no chips inside a tough-talk chat", () => {
+    expect(suggestionsFor(CTX_ENGLISH).some((x) => x.id === "tough" || x.id === "negotiate")).toBe(false);
+    expect(suggestionsFor(CTX_TOUGH)).toEqual([]);
+    expect(suggestionsFor(CTX_NEGOTIATE)).toEqual([]);
+  });
+});
+
+describe("tough talk: negotiate script", () => {
+  it("asks for the role with the three newest jobs and a way to type it", () => {
+    const s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    expect(s.track).toBe("negotiate");
+    expect(s.turns[0]).toMatchObject({ speaker: "user", text: "Negotiate salary" });
+    expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Kestrel Pay", "Lumen Health", "Fieldnote", "No job, I'll type it"]);
+    expect(setupModel(CTX_NEGOTIATE, s)).toMatchObject({ stage: "reply", step: { n: 1, of: 3 }, canSkip: true });
+  });
+
+  it("reads the post for the range after a job is picked, then shows the numbers card prefilled", () => {
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "job:v1");
+    expect(s.stage).toBe("pending");
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 1, of: 3 });
+    s = resolveRange(CTX_NEGOTIATE, s, withRange);
+    expect(s.turns.some((x) => x.text === "Kestrel Pay, Senior Product Designer. The post says 85,000–98,000 EUR.")).toBe(true);
+    const card = last(s.turns).numbers!;
+    expect(card).toMatchObject({ fromPost: true, roleField: false });
+    expect(card.values).toMatchObject({ low: "85,000", high: "98,000", currency: "EUR", role: "Senior Product Designer" });
+    expect(s.stage).toBe("numbers");
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 2, of: 3 });
+  });
+
+  it("says so when the post lists no range, and asks for the numbers without a prefill", () => {
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "job:v2");
+    s = resolveRange(CTX_NEGOTIATE, s, { ok: true, low: null, high: null, currency: null });
+    expect(s.turns.some((x) => x.text === "Lumen Health, Product Designer, Design Systems. The post doesn't list a range, so add your numbers.")).toBe(true);
+    expect(last(s.turns).numbers).toMatchObject({ fromPost: false });
+    expect(last(s.turns).numbers?.values).toMatchObject({ low: "", high: "" });
+    // a failed read is the same as no range
+    let f = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    f = resolveRange(CTX_NEGOTIATE, pick(CTX_NEGOTIATE, f, last(f.turns).id, "job:v2"), { ok: false });
+    expect(last(f.turns).numbers).toBeDefined();
+  });
+
+  it("takes a typed role (at most 80 characters) and shows the Role field in the numbers card", () => {
+    let s = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "role:type");
+    expect(last(s.turns).text).toBe("Type the role, e.g. Product Designer");
+    expect(setupModel(CTX_NEGOTIATE, s).placeholder).toBe("Type the role, e.g. Product Designer");
+    s = say(CTX_NEGOTIATE, s, "x".repeat(120));
+    expect(s.draft.role).toHaveLength(80);
+    // N-1 gave the role, so the card does not ask for it again
+    expect(last(s.turns).numbers).toMatchObject({ roleField: false, fromPost: false });
+    expect(last(s.turns).numbers?.values.role).toHaveLength(80);
+  });
+
+  it("collapses the sent card into a bubble and asks the style (first try: Friendly is the suggestion)", () => {
+    let s = toNumbers();
+    const turn = last(s.turns);
+    s = submitNumbers(CTX_NEGOTIATE, s, turn.id, { ...turn.numbers!.values, target: "96,000" });
+    expect(s.turns.find((x) => x.id === turn.id)?.numbers).toBeUndefined();
+    expect(s.turns.some((x) => x.speaker === "user" && x.text === "85,000–98,000 EUR · target 96,000 · no competing offer")).toBe(true);
+    expect(last(s.turns).text).toBe("How tough should I be? For a first try, Friendly is a good start.");
+    expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Friendly · easy", "Firm · medium", "Tight budget · hard", "Surprise me"]);
+    expect(setupModel(CTX_NEGOTIATE, s).step).toEqual({ n: 3, of: 3 });
+  });
+
+  it("does not send an invalid card", () => {
+    const s = toNumbers();
+    const turn = last(s.turns);
+    expect(submitNumbers(CTX_NEGOTIATE, s, turn.id, { ...turn.numbers!.values, target: "" })).toBe(s);
+    expect(submitNumbers(CTX_NEGOTIATE, s, turn.id, { ...turn.numbers!.values, target: "80000" })).toBe(s);
+  });
+
+  it("remembers: a returning user is asked 'Same as last time, Firm?' with easier / harder / surprise", () => {
+    let s = toNumbers(CTX_NEGOTIATE_AGAIN);
+    // this job's numbers come back prefilled
+    expect(last(s.turns).numbers?.values).toMatchObject({ target: "96,000", currency: "EUR" });
+    s = submitNumbers(CTX_NEGOTIATE_AGAIN, s, last(s.turns).id, filled(s));
+    expect(last(s.turns).text).toBe("Same as last time, Firm?");
+    expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Yes, Firm", "Easier: Friendly", "Harder: Tight budget", "Surprise me"]);
+  });
+
+  it("matches style words typed in the chat, and asks again when none fits", () => {
+    let s = toNumbers();
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, filled(s));
+    const bad = say(CTX_NEGOTIATE, { ...s }, "no idea");
+    expect(last(bad.turns).text).toBe("I didn't catch the style. Pick one:");
+    s = say(CTX_NEGOTIATE, s, "go firm please");
+    expect(s.stage).toBe("plan");
+    expect(planFor(CTX_NEGOTIATE, s).negotiate?.style).toBe("firm");
+  });
+
+  it("builds the plan: start block, Length, tactics in the order of the call", () => {
+    let s = toNumbers();
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, filled(s));
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:tight");
+    const plan = planFor(CTX_NEGOTIATE, s);
+    expect(plan.kind).toBe("negotiate");
+    expect(plan.negotiate).toEqual({ role: "Senior Product Designer", job_low: 85000, job_high: 98000, target: 96000, currency: "EUR", style: "tight", has_real_offer: false, company: "Kestrel Pay" });
+    expect(plan.minutes).toBe(10);
+    expect(plan.tactics?.map((c) => c.id)).toEqual(["N2", "N1", "N3", "N4", "N5", "N6", "N9", "N10", "N8"]);
+    expect(setupModel(CTX_NEGOTIATE, s).stage).toBe("plan");
+  });
+
+  it("adds N7 only when the competing-offer box is on, and Change toggles it", () => {
+    let s = toNumbers();
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, filled(s));
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:firm");
+    s = change(CTX_NEGOTIATE, s, "offer", "on");
+    expect(planFor(CTX_NEGOTIATE, s).negotiate?.has_real_offer).toBe(true);
+    expect(planFor(CTX_NEGOTIATE, s).tactics?.map((c) => c.id)).toContain("N7");
+    expect(tacticOrder("negotiate", { hasOffer: false })).not.toContain("N7");
+  });
+
+  it("changes the style and the numbers from the plan card", () => {
+    let s = toNumbers();
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, filled(s));
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:firm");
+    s = change(CTX_NEGOTIATE, s, "style", "friendly");
+    s = submitNumbers(CTX_NEGOTIATE, s, null, { ...planValues(s), target: "97k" });
+    const plan = planFor(CTX_NEGOTIATE, s);
+    expect(plan.negotiate).toMatchObject({ style: "friendly", target: 97000 });
+  });
+
+  it("sends text typed beside the form, and at the plan, to the note", () => {
+    let s = toNumbers();
+    s = say(CTX_NEGOTIATE, s, "I freeze when they ask about salary.");
+    expect(last(s.turns).text).toBe("Noted. Fill in the numbers above when you're ready.");
+    expect(s.stage).toBe("numbers");
+    expect(s.draft.note).toBe("I freeze when they ask about salary.");
+  });
+
+  it("skip: remembered numbers and style fill the plan; without them the numbers card is asked", () => {
+    let s = begin(CTX_NEGOTIATE_AGAIN, { kind: "suggestion", id: "negotiate" });
+    s = pick(CTX_NEGOTIATE_AGAIN, s, last(s.turns).id, "job:v1");
+    s = resolveRange(CTX_NEGOTIATE_AGAIN, s, withRange);
+    s = skip(CTX_NEGOTIATE_AGAIN, s);
+    expect(s.stage).toBe("plan");
+    expect(planFor(CTX_NEGOTIATE_AGAIN, s).negotiate).toMatchObject({ style: "firm", target: 96000 });
+
+    let f = begin(CTX_NEGOTIATE, { kind: "suggestion", id: "negotiate" });
+    f = skip(CTX_NEGOTIATE, f);
+    expect(f.stage).toBe("numbers");
+    expect(last(f.turns).numbers?.roleField).toBe(true);
+    expect(setupModel(CTX_NEGOTIATE, f).canSkip).toBe(true);
+    expect(skip(CTX_NEGOTIATE, f)).toBe(f);
+  });
+
+  it("hides and shows the tactics for this chat, starting from the stored preference", () => {
+    let s = toNumbers();
+    s = submitNumbers(CTX_NEGOTIATE, s, last(s.turns).id, filled(s));
+    s = pick(CTX_NEGOTIATE, s, last(s.turns).id, "style:firm");
+    expect(planFor(CTX_NEGOTIATE, s).tacticsHidden).toBe(false);
+    s = setTacticsHidden(s, true);
+    expect(planFor(CTX_NEGOTIATE, s).tacticsHidden).toBe(true);
+    const stored = { ...CTX_NEGOTIATE, talk: { ...CTX_NEGOTIATE.talk!, tacticsHidden: { tough: false, negotiate: true } } };
+    expect(planFor(stored, s.draft.tacticsHidden === undefined ? s : { ...s, draft: { ...s.draft, tacticsHidden: undefined } }).tacticsHidden).toBe(true);
+  });
+});
+
+function planValues(s: SetupState) {
+  const p = planFor(CTX_NEGOTIATE, s).negotiate!;
+  return { ...EMPTY_NUMBERS, role: p.role, low: "85,000", high: "98,000", target: "96,000", currency: p.currency };
+}
+
+describe("tough talk: tough questions script", () => {
+  it("asks the theme with seven replies (Personal is its own theme) and shows the plan", () => {
+    let s = begin(CTX_TOUGH, { kind: "suggestion", id: "tough" });
+    expect(s.track).toBe("tough");
+    expect(last(s.turns).text).toBe("Which questions should I ask? Pick a theme, or Mix for one from each.");
+    expect(last(s.turns).replies?.map((r) => r.label)).toEqual(["Money", "Leaving and gaps", "Weak spots", "Fit", "English at work", "Personal questions", "Mix"]);
+    expect(setupModel(CTX_TOUGH, s).step).toEqual({ n: 1, of: 1 });
+    s = pick(CTX_TOUGH, s, last(s.turns).id, "theme:money");
+    const m = setupModel(CTX_TOUGH, s);
+    expect(m.stage).toBe("plan");
+    expect(m.plan).toMatchObject({ kind: "tough", questions: 5, minutes: 15, tough: { theme: "money", themeName: "Money" } });
+    expect(m.plan?.tactics?.map((c) => c.id)).toEqual(["N3", "T1", "T2"]);
+  });
+
+  it("puts N3 first for Money and Mix, last otherwise", () => {
+    expect(tacticOrder("tough", { theme: "mix" })).toEqual(["N3", "T1", "T2"]);
+    expect(tacticOrder("tough", { theme: "fit" })).toEqual(["T1", "T2", "N3"]);
+  });
+
+  it("explains the Personal theme and keeps it out of Mix", () => {
+    let s = begin(CTX_TOUGH, { kind: "suggestion", id: "tough" });
+    s = pick(CTX_TOUGH, s, last(s.turns).id, "theme:personal");
+    expect(s.turns.some((x) => x.text?.startsWith("In many places an interviewer may not be allowed to ask these."))).toBe(true);
+    expect(planFor(CTX_TOUGH, s).tough?.theme).toBe("personal");
+    expect(planFor(CTX_TOUGH, s).questions).toBe(4);
+    expect(planFor(CTX_TOUGH, change(CTX_TOUGH, s, "theme", "mix")).tough?.theme).toBe("mix");
+  });
+
+  it("matches theme words, asks again when none fits, and skip chooses Mix", () => {
+    let s = begin(CTX_TOUGH, { kind: "suggestion", id: "tough" });
+    const bad = say(CTX_TOUGH, s, "hmm");
+    expect(last(bad.turns).text).toBe("I didn't catch the theme. Pick one:");
+    expect(last(bad.turns).replies).toHaveLength(7);
+    const kept = skip(CTX_TOUGH, s);
+    expect(planFor(CTX_TOUGH, kept).tough?.theme).toBe("mix");
+    s = say(CTX_TOUGH, s, "ask me about leaving my last job");
+    expect(planFor(CTX_TOUGH, s).tough?.theme).toBe("leaving");
+  });
+
+  it("sends text at the plan to the note", () => {
+    let s = begin(CTX_TOUGH, { kind: "suggestion", id: "tough" });
+    s = pick(CTX_TOUGH, s, last(s.turns).id, "theme:fit");
+    s = say(CTX_TOUGH, s, "keep it short");
+    expect(planFor(CTX_TOUGH, s).note).toBe("keep it short");
+  });
+
+  it("works without the server content: the chat runs, the plan has no strip", () => {
+    const ctx = { ...CTX_TOUGH, talk: undefined };
+    let s = begin(ctx, { kind: "suggestion", id: "tough" });
+    s = pick(ctx, s, last(s.turns).id, "theme:money");
+    expect(planFor(ctx, s)).toMatchObject({ questions: 5, tactics: [] });
   });
 });

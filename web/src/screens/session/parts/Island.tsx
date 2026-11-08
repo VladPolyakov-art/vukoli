@@ -13,7 +13,8 @@ import { useRef, useState } from "react";
 import { Badge, Button, Composer, Dots, Island, IconButton, Menu, MicButton, Tooltip, type IconName, type IslandGroup, type MenuEntry } from "../../../ds";
 import { t } from "../../../i18n";
 import { clock } from "../clock";
-import type { SessionData, SessionHandlers, SessionInput, SessionPhase, SessionVariant } from "../types";
+import type { HintGate } from "../hint";
+import { countsTurns, type SessionData, type SessionHandlers, type SessionInput, type SessionPhase, type SessionVariant } from "../types";
 import s from "./Island.module.css";
 
 /** The main action slot of the Voice group (V2.2). */
@@ -36,10 +37,11 @@ export function islandModel(p: {
   handlers?: SessionHandlers;
 }): IslandModel {
   const { variant, input, phase, muted, interrupted, data, handlers: h } = p;
-  const english = variant === "english";
+  const turns = countsTurns(variant);
   const voice = input === "voice";
   // English has no Next question: after the feedback the conversation goes on (it is the user's turn again).
-  const yourTurn = phase === "your-turn" || (english && AFTER.has(phase));
+  // Negotiate is the same, until Mike closes the call: then "See your debrief" (tough-talk.md §4.3).
+  const yourTurn = phase === "your-turn" || (turns && AFTER.has(phase) && !(variant === "negotiate" && data.closing));
 
   let main: Main = null;
   if (interrupted || phase === "saving" || phase === "connecting") main = null;
@@ -88,6 +90,8 @@ export interface SessionIslandProps {
   /** More menu */
   moreOpen?: boolean;
   showSuggester: boolean;
+  /** Tough talk: the Hint button takes the suggester's slot (tough-talk.md §4.1). */
+  hintGate?: HintGate;
   suggestOn: boolean;
   onSuggest: (on: boolean) => void;
   /** D62: "open" = no More menu on wide; "menu" = shortcuts, mic help and context stay in More. */
@@ -107,7 +111,7 @@ function Status({ data, variant, entering, context, full }: Pick<SessionIslandPr
   const total = Math.max(0, Math.floor(data.elapsed));
   const aria = t("session.elapsedAria", { m: Math.floor(total / 60), s: total % 60 });
   // D62: "2 of 5" alone didn't read as the question number: wide says "Question 2 of 5", phones "Q2 of 5".
-  const short = variant === "english" || !data.step || full ? data.progress : t("session.island.step", { n: data.step.n, of: data.step.of });
+  const short = countsTurns(variant) || !data.step || full ? data.progress : t("session.island.step", { n: data.step.n, of: data.step.of });
   const status = (
     <span className={`${s.status} ${entering ? "motion-meta" : ""}`}>
       {short ? <span className={s.progress} aria-label={data.progress}>{short}</span> : null}
@@ -123,8 +127,8 @@ function Status({ data, variant, entering, context, full }: Pick<SessionIslandPr
 /** The slot keeps the width of its longest label (V2.1: the island never changes width). Ghost copies of every label
  * this variant can show sit in the same grid cell, invisible and inert; the visible button stretches to it (D61). */
 function MainSlot({ main, variant, stacked, sized = true }: { main: Main; variant: SessionVariant; stacked: boolean; sized?: boolean }) {
-  const labels = variant === "english"
-    ? [t("session.controls.interrupt"), t("session.controls.sendNow"), t("session.controls.talk"), t("session.controls.sent")]
+  const labels = countsTurns(variant)
+    ? [t("session.controls.interrupt"), t("session.controls.sendNow"), t("session.controls.talk"), t("session.controls.sent"), ...(variant === "negotiate" ? [t("session.panel.seeDebrief")] : [])]
     : [t("session.controls.interrupt"), t("session.controls.sendNow"), t("session.controls.talk"), t("session.controls.sent"), t("session.panel.nextQuestion"), t("session.panel.seeDebrief")];
   const size = stacked ? "lg" : "md";
   return (
@@ -206,8 +210,7 @@ export function SessionIsland(p: SessionIslandProps) {
   const { variant, input, phase, data, handlers: h, model, layout, interrupted } = p;
   const voice = input === "voice";
   const stacked = layout === "stacked";
-  const english = variant === "english";
-  const endLabel = english ? t("session.endPractice") : t("session.end");
+  const endLabel = countsTurns(variant) ? t("session.endPractice") : t("session.end");
   const onEnd = interrupted ? h?.onEndAndDebrief ?? h?.onEnd : h?.onEnd;
 
   const end = (
@@ -290,6 +293,16 @@ export function SessionIsland(p: SessionIslandProps) {
       label={p.suggestOn ? t("session.island.suggestHide") : t("session.island.suggestShow")}
       pressed={p.suggestOn}
       onClick={() => p.onSuggest(!p.suggestOn)}
+    />
+  ) : p.hintGate && data.hint ? (
+    <IconButton
+      icon="bulb"
+      data-track="hint-toggle"
+      label={data.hint.open ? t("session.hint.hide") : t("session.hint.show")}
+      title={p.hintGate.enabled ? undefined : p.hintGate.reason}
+      pressed={data.hint.open}
+      disabled={!p.hintGate.enabled}
+      onClick={h?.onToggleHint}
     />
   ) : null;
   const help = (

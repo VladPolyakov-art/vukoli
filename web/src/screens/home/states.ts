@@ -3,10 +3,12 @@
  * read this one table, so a state is reachable by props and still playable (frames.tsx keeps it live). */
 import type { RecentState, ShellEngine } from "../../components/AppShell";
 import {
-  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NO_CV, CTX_OVERFLOW, CTX_RETURNING, CV_FILE, JOB_FILE, JOB_LINK, KESTREL_LONG,
-  KESTREL_PASTED, LONG_NAME, PASTED_LONG, PASTED_TEXT,
+  CTX_ENGLISH, CTX_ENGLISH_FIRST, CTX_FIRST, CTX_NEGOTIATE, CTX_NEGOTIATE_AGAIN, CTX_NO_CV, CTX_OVERFLOW, CTX_RETURNING, CTX_TOUGH,
+  CV_FILE, JOB_FILE, JOB_LINK, KESTREL_LONG, KESTREL_PASTED, LONG_NAME, PASTED_LONG, PASTED_TEXT,
 } from "./fixtures";
-import { suggestionsFor, type CvResult, type JobResult, type ScriptContext, type StartInput } from "./script";
+import type { NumbersValues } from "./numbers";
+import { suggestionsFor, type CvResult, type JobResult, type RangeResult, type ScriptContext, type StartInput } from "./script";
+import { TALK_HIDDEN } from "./talkFixtures";
 import type { HomeViewProps, JobItem, PlanRow } from "./types";
 
 /** One step replayed through the script. `pick` answers the last open question with that reply id. */
@@ -19,7 +21,12 @@ export type SceneInput =
   | { do: "skip" }
   | { do: "change"; row: PlanRow; value: string }
   | { do: "attach"; file: { name: string; size: string } }
-  | { do: "resolveCv"; result: CvResult };
+  | { do: "resolveCv"; result: CvResult }
+  /** Tough talk: the post's salary range arrived. */
+  | { do: "resolveRange"; result: RangeResult }
+  /** Tough talk: the numbers card is sent (the open card's values, with these typed over them). */
+  | { do: "numbers"; values?: Partial<NumbersValues> }
+  | { do: "tactics"; hidden: boolean };
 
 export interface HomeScene {
   label: string;
@@ -37,6 +44,10 @@ export interface HomeScene {
   hold?: boolean;
   /** How a pending read resolves when played live. */
   resolveWith?: JobResult;
+  /** How the post's range resolves when played live (default: 85,000–98,000 EUR). */
+  rangeWith?: RangeResult;
+  /** Review: the open numbers card shows these values / its errors (as typed, then Use these numbers pressed). */
+  numbersView?: { values?: Partial<NumbersValues>; showErrors?: boolean };
   /** How a CV sent in the chat resolves when played live (D89). */
   cvWith?: CvResult;
   /** D90: the mic in the chat starts listening / with this error under the composer; played live it writes DICTATED. */
@@ -90,6 +101,14 @@ const PASTED: SceneInput[] = [
 const PASTED_PLAN: SceneInput[] = [...PASTED, { do: "pick", reply: "round:behavioural" }, { do: "pick", reply: "anything:none" }];
 const NOTE = "I freeze when they ask about salary.";
 const NOTE_LONG = "I freeze when they ask about salary, and I tend to ramble when they ask why I want to leave my current team. Please ask me both, and stop me if an answer runs past two minutes. Also ask one question about working with engineers who disagree with a design decision.";
+
+/* Tough talk paths. The post's range is the one Kestrel Pay lists. */
+const RANGE: RangeResult = { ok: true, low: 85000, high: 98000, currency: "EUR" };
+const NEG_START: SceneInput[] = [{ do: "begin", input: { kind: "suggestion", id: "negotiate" } }];
+const NEG_NUMBERS: SceneInput[] = [...NEG_START, { do: "pick", reply: "job:v1" }, { do: "resolveRange", result: RANGE }];
+const NEG_STYLE: SceneInput[] = [...NEG_NUMBERS, { do: "numbers", values: { target: "96,000" } }];
+const NEG_PLAN: SceneInput[] = [...NEG_STYLE, { do: "pick", reply: "style:firm" }];
+const TOUGH_PLAN: SceneInput[] = [{ do: "begin", input: { kind: "suggestion", id: "tough" } }, { do: "pick", reply: "theme:money" }];
 
 export const SCENES = {
   /* ---------- start screen ---------- */
@@ -188,6 +207,42 @@ export const SCENES = {
       { do: "say", text: NOTE_LONG },
     ],
   },
+
+  /* ---------- tough talk (tough-talk.md §2) ---------- */
+  negRole: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-1: which role", inputs: NEG_START },
+  negRoleTyping: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-1: type the role", inputs: [...NEG_START, { do: "pick", reply: "role:type" }] },
+  negRangeReading: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate: reading the post for a range", inputs: [...NEG_START, { do: "pick", reply: "job:v1" }], hold: true },
+  negNumbersEmpty: {
+    ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-2: numbers, nothing known",
+    note: "No job, role typed: no range, no remembered numbers.",
+    inputs: [...NEG_START, { do: "pick", reply: "role:type" }, { do: "say", text: "Product Designer" }],
+  },
+  negNumbersPrefilled: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-2: numbers, range from the post", inputs: NEG_NUMBERS },
+  negNumbersError: {
+    ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-2: numbers, errors",
+    note: "Top below bottom, no target: errors appear on submit, in the field, with the icon.",
+    inputs: NEG_NUMBERS,
+    numbersView: { values: { low: "98,000", high: "85,000", target: "" }, showErrors: true },
+  },
+  negNumbersMobile: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-2: numbers, 375", inputs: NEG_NUMBERS },
+  negStyleFirst: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate N-3: style, first try", inputs: NEG_STYLE },
+  negStyleAgain: { ...ret, ctx: CTX_NEGOTIATE_AGAIN, label: "Negotiate N-3: style, returning", inputs: NEG_STYLE },
+  negPlan: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan with tactics", inputs: NEG_PLAN },
+  negPlanMobile: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan, 375", inputs: NEG_PLAN },
+  negPlanOffer: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan, real offer (N7 joins)", inputs: [...NEG_PLAN, { do: "change", row: "offer", value: "on" }] },
+  negPlanNumbersOpen: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan: Change your numbers", inputs: NEG_PLAN, props: { name: "Alex", initialOverlay: "change-numbers" } },
+  negPlanStyleOpen: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan: Change Mike", inputs: NEG_PLAN, props: { name: "Alex", initialOverlay: "change-style" } },
+  negPlanHidden: { ...ret, ctx: { ...CTX_NEGOTIATE, talk: TALK_HIDDEN }, label: "Negotiate plan, tactics hidden", inputs: NEG_PLAN },
+  negPlanEngineDown: { ...ret, ctx: CTX_NEGOTIATE, label: "Negotiate plan, engine not running", inputs: NEG_PLAN, props: { name: "Alex", ...engineDown }, engine: ENGINE_DOWN },
+  negSkipped: { ...ret, ctx: CTX_NEGOTIATE_AGAIN, label: "Negotiate: Skip with remembered numbers", inputs: [...NEG_START, { do: "pick", reply: "job:v1" }, { do: "resolveRange", result: RANGE }, { do: "skip" }] },
+  toughTheme: { ...ret, ctx: CTX_TOUGH, label: "Tough T-1: which theme", inputs: [{ do: "begin", input: { kind: "suggestion", id: "tough" } }] },
+  toughThemeMobile: { ...ret, ctx: CTX_TOUGH, label: "Tough T-1: which theme, 375", inputs: [{ do: "begin", input: { kind: "suggestion", id: "tough" } }] },
+  toughPlan: { ...ret, ctx: CTX_TOUGH, label: "Tough plan with tactics", inputs: TOUGH_PLAN },
+  toughPlanMobile: { ...ret, ctx: CTX_TOUGH, label: "Tough plan, 375", inputs: TOUGH_PLAN },
+  toughPersonal: { ...ret, ctx: CTX_TOUGH, label: "Tough: Personal questions", inputs: [{ do: "begin", input: { kind: "suggestion", id: "tough" } }, { do: "pick", reply: "theme:personal" }] },
+  toughPlanThemeOpen: { ...ret, ctx: CTX_TOUGH, label: "Tough plan: Change theme", inputs: TOUGH_PLAN, props: { name: "Alex", initialOverlay: "change-theme" } },
+  toughPlanHidden: { ...ret, ctx: { ...CTX_TOUGH, talk: TALK_HIDDEN }, label: "Tough plan, tactics hidden", inputs: TOUGH_PLAN },
+  toughPlanEngineDown: { ...ret, ctx: CTX_TOUGH, label: "Tough plan, engine not running", inputs: TOUGH_PLAN, props: { name: "Alex", ...engineDown }, engine: ENGINE_DOWN },
 } satisfies Record<string, HomeScene>;
 
 export type HomeSceneId = keyof typeof SCENES;

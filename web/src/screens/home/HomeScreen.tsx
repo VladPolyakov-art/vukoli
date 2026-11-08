@@ -27,11 +27,13 @@ import { homePrefs, shortDate } from "./homePrefs";
 import { quickStartFor } from "./quickStart";
 import { HomeView } from "./HomeView";
 import {
-  attach, begin, change, pick, planFor, removeNote, resolveCv, resolveJob, say, setupModel, skip, suggestionsFor, updateJob,
+  attach, begin, change, pick, planFor, removeNote, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip,
+  submitNumbers, suggestionsFor, updateJob,
   type ScriptContext, type SetupState,
 } from "./script";
+import { talkPrefs } from "./talkPrefs";
 import { lowerFirstWord, weakFromSession } from "./sessionFocus";
-import type { EnglishTopic, JobItem, PlanModel, Track, WeakItem } from "./types";
+import { trackFromParam, type EnglishTopic, type JobItem, type PlanModel, type Track, type WeakItem } from "./types";
 
 let browserBannerDismissed = false;
 const TOPICS: EnglishTopic[] = ["free", "work", "small"];
@@ -59,7 +61,7 @@ export function HomeScreen() {
   const [params] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const track: Track = params.get("track") === "english" ? "english" : "interview";
+  const track: Track = trackFromParam(params.get("track"));
   const { settings, selectedEngine, refreshEngines, updateSettings } = useApp();
   const engineReady = Boolean(selectedEngine?.status.ready);
   const vacancies = useLoad(() => api.vacancies());
@@ -67,6 +69,10 @@ export function HomeScreen() {
   const sessions = useLoad(() => api.sessions());
   const memory = useLoad(() => api.memory());
   const stt = useLoad(() => api.stt());
+  /* Tough talk: the tactic cards and the themes. If the server does not answer the chats still run, without the strip. */
+  const talkContent = useLoad(() => api.toughTalkContent());
+  /** Bumped when a stored preference changes (hide tactics), so the context reads it again. */
+  const [prefsTick, setPrefsTick] = useState(0);
   /* "Drill these weak spots" in a debrief names its session (C1): the drill works on that debrief's weak spots. */
   const drillSession = params.get("drill") === "1" ? params.get("session") : null;
   const drillRecord = useLoad(() => (drillSession ? api.session(drillSession) : Promise.resolve(null)), [drillSession]);
@@ -93,7 +99,8 @@ export function HomeScreen() {
   const installOffer = useInstallOffer();
 
   // "Start over" (home.md §4.1): the Practice nav row (a new location on "/") returns to the start screen.
-  useEffect(() => { setSetup(null); }, [location.key]);
+  const talkAsked = useRef(false);
+  useEffect(() => { setSetup(null); talkAsked.current = false; }, [location.key]);
   // Engine check every 5 seconds while it is not ready.
   useInterval(() => { void refreshEngines(); }, 5000, Boolean(selectedEngine) && !engineReady);
 
@@ -107,7 +114,8 @@ export function HomeScreen() {
 
   const ctx = useMemo<ScriptContext>(() => {
     const jobs = list.map((v) => toJob(v, prep[v.id] ?? "ready"));
-    const interviews = (sessionList ?? []).filter((x) => x.mode !== "english");
+    // Interviews only: English, Tough questions and Negotiation sessions are not "the last interview".
+    const interviews = (sessionList ?? []).filter((x) => x.mode === "interview" || x.mode === "");
     const lastInterview = interviews[0];
     const remembered = prefs.vacancy();
     const weak: WeakItem[] = (memoryData?.weak_spots ?? []).slice(0, 6).map((w) => {
@@ -135,8 +143,16 @@ export function HomeScreen() {
       weakSessions: memoryData?.sessions_considered ?? 0,
       level: (sessionList ?? []).some((x) => x.mode === "english") ? settings?.level ?? null : null,
       phrases: [],
+      talk: {
+        content: talkContent.data ?? null,
+        lastStyle: talkPrefs.lastStyle(),
+        numbers: talkPrefs.numbers(),
+        tacticsHidden: { tough: prefs.tacticsHidden("tough"), negotiate: prefs.tacticsHidden("negotiate") },
+      },
     };
-  }, [list, prep, sessionList, memoryData, hasCv, settings, track]);
+    // prefsTick: the stored "hide tactics" choice changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list, prep, sessionList, memoryData, hasCv, settings, track, talkContent.data, prefsTick]);
 
   /* "Drill these weak spots" in a debrief arrives as /?drill=1&session=<id>&job=<id>: open the drill plan with that
      debrief's own weak spots (C1), once, after the data has loaded. Without a session (or when it cannot be read, or has
@@ -149,6 +165,15 @@ export function HomeScreen() {
     drillAsked.current = true;
     setSetup(begin(ctx, { kind: "drill", jobId: params.get("job") || (drillSession ? null : undefined), weak: weakFromSession(drillRecord.data) }));
   }, [params, drillSession, dataReady, ctx, drillRecord.data]);
+
+  /* `?track=tough|negotiate` ("Practise again" from a debrief or History): the matching setup chat opens by itself, once,
+     when the saved jobs and the tactic cards have loaded. */
+  const talkReady = !vacancies.loading && !talkContent.loading;
+  useEffect(() => {
+    if (talkAsked.current || (track !== "tough" && track !== "negotiate") || !talkReady) return;
+    talkAsked.current = true;
+    setSetup(begin(ctx, { kind: "suggestion", id: track }));
+  }, [track, talkReady, ctx, location.key]);
 
   /* Questions from a job: the plan's Job row shows "Preparing questions…" and Start waits until the call returns
    * (QA-02: a session started meanwhile would ask a general question). A failure or the timeout says that general
@@ -181,6 +206,12 @@ export function HomeScreen() {
     const p = setup?.pending;
     if (!p) return;
     let cancelled = false;
+    if (p.kind === "range") {
+      api.salaryRange(p.jobId ?? "")
+        .then((r) => { if (!cancelled) setSetup((st) => (st ? resolveRange(ctx, st, { ok: true, low: r.low, high: r.high, currency: r.currency }) : st)); })
+        .catch(() => { if (!cancelled) setSetup((st) => (st ? resolveRange(ctx, st, { ok: false }) : st)); });
+      return () => { cancelled = true; };
+    }
     if (p.kind === "cv") {
       const file = sentFile.current;
       (file ? api.uploadProfile(file) : Promise.reject(new Error("no file")))
@@ -246,6 +277,21 @@ export function HomeScreen() {
   };
 
   const start = (plan: PlanModel, answer: "voice" | "text") => {
+    if (plan.kind === "negotiate" && plan.negotiate) {
+      const n = plan.negotiate;
+      // US-63 AC6 / US-64 AC2: the next visit starts from these numbers and this style.
+      talkPrefs.remember(n.style, plan.job?.id ?? null, { role: n.role, low: n.job_low, high: n.job_high, target: n.target, currency: n.currency, hasOffer: n.has_real_offer });
+      const config = buildSessionConfig({ mode: "negotiate", answer, negotiate: plan.negotiate, vacancyId: plan.job?.id }, settings, stt.data);
+      const title = t("session.negotiate.title", { role: plan.negotiate.role });
+      leave(() => navigate("/session", { state: { config, title } }));
+      return;
+    }
+    if (plan.kind === "tough" && plan.tough) {
+      const config = buildSessionConfig({ mode: "tough", answer, toughTheme: plan.tough.theme, strictness: plan.strictness }, settings, stt.data);
+      const title = t("session.tough.title", { theme: plan.tough.themeName });
+      leave(() => navigate("/session", { state: { config, title } }));
+      return;
+    }
     if (plan.kind === "english") {
       const level = plan.level ?? settings?.level ?? "B1";
       if (settings && settings.level !== level) void updateSettings({ level });
@@ -346,6 +392,13 @@ export function HomeScreen() {
         }}
         onSkip={() => run((st) => skip(ctx, st))}
         onChange={(row, value) => run((st) => change(ctx, st, row, value))}
+        onNumbers={(turnId, values) => run((st) => submitNumbers(ctx, st, turnId, values))}
+        onTactics={(hidden) => {
+          const mode = setup?.track === "tough" ? "tough" : "negotiate";
+          prefs.setTacticsHidden(mode, hidden);
+          setPrefsTick((n) => n + 1);
+          run((st) => setTacticsHidden(st, hidden));
+        }}
         onRemoveNote={() => run(removeNote)}
         onRetryPrep={() => {
           const job = shown?.plan?.job ? (setup?.jobs ?? []).concat(ctx.jobs).find((j) => j.id === shown.plan!.job!.id) : undefined;

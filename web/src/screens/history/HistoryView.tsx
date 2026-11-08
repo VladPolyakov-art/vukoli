@@ -1,11 +1,11 @@
 /* Archive list (D80; was History, ds/screens/debrief.md §4; US-21, US-23). Pure: every state comes from props. The live
- * container is `screens/History.tsx`. Filter chips (All / Interview / English), week groups, G16 list rows with rename,
+ * container is `screens/History.tsx`. Filter chips (All / Interview / English / Tough questions / Negotiation), week groups, G16 list rows with rename,
  * "Move back to Recents" and Delete (asks first, then to Trash). A removed row slides out, focus has already moved on; the toast with Undo belongs to the caller. */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Badge, Button, Callout, Chip, ChipGroup, Dialog, durationMs, EmptyState, Icon, IconButton, ListRow, ListRows, Menu, Skeleton, Swap, Toast,
-  type MenuEntry,
+  type IconName, type MenuEntry,
 } from "../../ds";
 import { RouterLink } from "../../components/AppShell";
 import { Page } from "../../components/Page";
@@ -31,7 +31,9 @@ function focusAfter(li: HTMLElement | null) {
   target.focus();
 }
 
-const icon = (track: Track) => (track === "english" ? "chat" : "briefcase");
+const TRACK_ICON: Record<Track, IconName> = { interview: "briefcase", english: "chat", tough: "hand", negotiate: "target" };
+const TRACK_START: Record<Track, string> = { interview: "/", english: "/?track=english", tough: "/?track=tough", negotiate: "/?track=negotiate" };
+const icon = (track: Track): IconName => TRACK_ICON[track];
 
 function Meta({ row }: { row: HistoryRowModel }) {
   const length = formatDuration(row.durationS);
@@ -83,6 +85,8 @@ export function HistoryView(props: HistoryViewProps) {
     all: rows.length,
     interview: rows.filter((r) => r.track === "interview").length,
     english: rows.filter((r) => r.track === "english").length,
+    tough: rows.filter((r) => r.track === "tough").length,
+    negotiate: rows.filter((r) => r.track === "negotiate").length,
   }), [rows]);
 
   const visible = useMemo(
@@ -131,13 +135,16 @@ export function HistoryView(props: HistoryViewProps) {
 
   const chips = (disabled?: boolean) => (
     <ChipGroup label={t("history.filter.label")} role="radio" className={s.filter}>
-      {(["all", "interview", "english"] as const).map((k) => (
+      {(["all", "interview", "english", "tough", "negotiate"] as const).map((k) => (
         <Chip key={k} role="radio" data-track={`archive-filter-${k}`} selected={track === k} count={state === "ready" ? counts[k] : undefined} disabled={disabled} onClick={() => setTrack(k)}>
           {t(`history.filter.${k}`)}
         </Chip>
       ))}
     </ChipGroup>
   );
+
+  /** The filtered-empty state of the chosen practice ("All" never shows one: it has the page's own empty state). */
+  const emptyTrack: Track = track === "all" ? "interview" : track;
 
   const section = (label: string, id: string) => `${id}-${label}`;
 
@@ -278,15 +285,15 @@ export function HistoryView(props: HistoryViewProps) {
             <div className={s.filteredEmpty} data-review-id="History/FilteredEmpty" data-review-section="History · Filtered empty" data-comment-target="">
               <EmptyState
                 compact
-                icon={track === "english" ? "chat" : "briefcase"}
-                title={t(`history.none.${track === "english" ? "english" : "interview"}.title`)}
+                icon={icon(emptyTrack)}
+                title={t(`history.none.${emptyTrack}.title`)}
                 actions={(
-                  <Button variant="secondary" data-track="archive-filtered-start" onClick={() => navigate(track === "english" ? "/?track=english" : "/")}>
-                    {t(`history.none.${track === "english" ? "english" : "interview"}.start`)}
+                  <Button variant="secondary" data-track="archive-filtered-start" onClick={() => navigate(TRACK_START[emptyTrack])}>
+                    {t(`history.none.${emptyTrack}.start`)}
                   </Button>
                 )}
               >
-                {t(`history.none.${track === "english" ? "english" : "interview"}.body`)}
+                {t(`history.none.${emptyTrack}.body`)}
               </EmptyState>
             </div>
           )}

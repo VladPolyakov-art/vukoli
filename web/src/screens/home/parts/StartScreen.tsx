@@ -8,7 +8,7 @@ import type { KeyboardEvent, Ref } from "react";
 import type { ComposerSend } from "../../../ds";
 import { Button, Chip, ChipGroup, Composer, ComposerAttachment, Icon, IconButton, Skeleton } from "../../../ds";
 import { t } from "../../../i18n";
-import type { HomeViewProps, Track } from "../types";
+import type { HomeViewProps, Suggestion, Track } from "../types";
 import s from "./parts.module.css";
 
 export function Footer({ track }: { track: Track }) {
@@ -19,6 +19,20 @@ export function Footer({ track }: { track: Track }) {
 
 /** Longer chip labels ("Kestrel Payments Internati… again") are clamped by CSS; the full text goes to `title`. */
 const CHIP_CLAMP = 28;
+
+/** One row of chips (tough-talk.md §2.1: the personal chips, then the three practice modes). */
+function Chips({ label, items, loading, onSuggestion }: { label: string; items: Suggestion[] } & Pick<HomeViewProps, "loading" | "onSuggestion">) {
+  if (!items.length) return null;
+  return (
+    <ChipGroup label={label} hideLabel align="center">
+      {items.map((x) => (
+        <Chip key={x.id} icon={x.icon} data-track={`suggestion-${x.id}`} title={x.label.length > CHIP_CLAMP ? x.label : undefined} disabled={loading} onClick={() => onSuggestion?.(x.id)}>
+          <span className={s.chipLabel}>{x.label}</span>
+        </Chip>
+      ))}
+    </ChipGroup>
+  );
+}
 
 export interface StartScreenProps extends HomeViewProps {
   narrow: boolean;
@@ -96,13 +110,10 @@ export function StartScreen(props: StartScreenProps) {
         {props.loading && !suggestions.length ? (
           <Skeleton variant="lines" lines={1} className={s.suggestionsSkeleton} />
         ) : suggestions.length ? (
-          <ChipGroup label={t("chat.start.suggestions")} hideLabel align="center">
-            {suggestions.map((x) => (
-              <Chip key={x.id} icon={x.icon} data-track={`suggestion-${x.id}`} title={x.label.length > CHIP_CLAMP ? x.label : undefined} disabled={props.loading} onClick={() => props.onSuggestion?.(x.id)}>
-                <span className={s.chipLabel}>{x.label}</span>
-              </Chip>
-            ))}
-          </ChipGroup>
+          <>
+            <Chips label={t("chat.start.suggestions")} items={suggestions.filter((x) => x.group !== "practice")} loading={props.loading} onSuggestion={props.onSuggestion} />
+            <Chips label={t("home.talk.groupOther")} items={suggestions.filter((x) => x.group === "practice")} loading={props.loading} onSuggestion={props.onSuggestion} />
+          </>
         ) : null}
       </div>
     </div>

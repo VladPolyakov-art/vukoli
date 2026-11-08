@@ -103,6 +103,7 @@ export function HomeView(props: HomeViewProps) {
   const placeholder = dictation?.state === "listening" ? t("chat.dictate.listening")
     : dictation?.state === "transcribing" ? t("chat.dictate.working")
       : setup?.stage === "plan" ? t("chat.setup.placeholderPlan")
+        : setup?.placeholder ? setup.placeholder
         : setup?.stage === "job" ? t("chat.setup.placeholderJob") : t("chat.setup.placeholderReply");
   const hasInput = Boolean(composer.text.trim() || composer.file);
   /* The end button: Send with text or a file, otherwise the mic (stop while it listens), as on the start screen. */
@@ -116,7 +117,8 @@ export function HomeView(props: HomeViewProps) {
       track: hearing ? "composer-dictate-stop" : "composer-dictate",
       onSend: props.onDictate,
     };
-  const english = track === "english";
+  // English and the tough-talk modes take no job or CV file in the chat.
+  const english = track === "english" || setup?.track === "tough" || setup?.track === "negotiate";
   const addFile = english ? null : (
     <IconButton icon="plus" size="sm" outlined label={t(setup?.stage === "job" ? "chat.setup.addJobFile" : "chat.setup.addCv")} data-track="composer-add-file" onClick={props.onAddFile} />
   );

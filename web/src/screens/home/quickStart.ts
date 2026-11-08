@@ -22,7 +22,7 @@ export interface QuickStartPlan {
 }
 
 export function quickStartFor(ctx: ScriptContext, textMode: boolean): QuickStartPlan | null {
-  if (ctx.track === "english") return null;
+  if (ctx.track !== "interview") return null;
   const last = ctx.firstVisit ? undefined : ctx.last;
   const job = last?.jobId ? ctx.jobs.find((j) => j.id === last.jobId) ?? null : null;
   const round: RoundType = last?.round ?? "mix";

@@ -1,0 +1,33 @@
+/* TacticCard: tokens only. Tile = plaque (note fill) in a strip; hint = Card in the Suggester slot. */
+.tile {
+  margin: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--note-fill, var(--color-subtle));
+  box-shadow: var(--note-shadow, none);
+  color: var(--color-text-primary);
+  list-style: none;
+}
+.hint { display: flex; flex-direction: column; gap: var(--space-2); }
+.head { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); }
+.headLabel { flex: 1; font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.hide { flex: none; }
+.title { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: var(--leading-normal); }
+.hint .title { font-size: var(--text-md); }
+.rule { margin: 0; font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-text-secondary); }
+.example { margin: 0; font-size: var(--text-md); line-height: var(--leading-normal); color: var(--color-text-primary); overflow-wrap: anywhere; }
+.evidence { margin: 0; font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-text-tertiary); }
+.try { display: flex; flex-direction: column; gap: var(--space-1); }
+.label { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text-secondary); }
+.alt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+.altTitle { margin: 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.body { display: flex; flex-direction: column; gap: var(--space-2); padding-block: var(--space-2); }

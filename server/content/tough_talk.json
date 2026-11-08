@@ -1,0 +1,822 @@
+{
+ "version": 1,
+ "notes": {
+  "no_data": "Use a number you researched yourself. Vukoli has no salary data. Mike's budget is built from these numbers.",
+  "practice": "Practice settings, not real recruiter data.",
+  "tough_practice": "Practice only. Not a prediction of a hiring decision.",
+  "personal": "In many places this may not be a lawful question. Rules differ by country, so check the rules where the job is."
+ },
+ "currencies": [
+  "USD",
+  "EUR",
+  "GBP",
+  "CAD",
+  "AUD",
+  "CHF",
+  "PLN"
+ ],
+ "styles": [
+  {
+   "id": "friendly",
+   "name": "Friendly",
+   "difficulty": "Easy",
+   "blurb": "Warm and open to a fair ask. Moves when you give a reason."
+  },
+  {
+   "id": "firm",
+   "name": "Firm",
+   "difficulty": "Medium",
+   "blurb": "Polite but steady. Needs a reason, and stops moving if you repeat yourself."
+  },
+  {
+   "id": "tight",
+   "name": "Tight budget",
+   "difficulty": "Hard",
+   "blurb": "Starts low, moves little, and pushes for a quick yes."
+  },
+  {
+   "id": "surprise",
+   "name": "Surprise me",
+   "difficulty": "?",
+   "blurb": "Mike picks a style at random. You see which in the debrief."
+  }
+ ],
+ "style_numbers": {
+  "friendly": {
+   "opening_frac": 0.55,
+   "round_cap": 4,
+   "concession": 0.4,
+   "unjustified_mult": 0.25
+  },
+  "firm": {
+   "opening_frac": 0.35,
+   "round_cap": 3,
+   "concession": 0.3,
+   "unjustified_mult": 0.0
+  },
+  "tight": {
+   "opening_frac": 0.1,
+   "round_cap": 2,
+   "concession": 0.25,
+   "unjustified_mult": 0.0
+  }
+ },
+ "turn_cap": 12,
+ "cards": [
+  {
+   "id": "N1",
+   "title": "Know your number, then pick who goes first",
+   "rule": "If you know your number, say it first, a little above your target and precise (97,250, not 100,000). If you do not, ask for their range.",
+   "evidence": "Lab studies on anchors and precise numbers. Who should go first is debated for job offers.",
+   "example": "Based on the scope, I'm looking at 96,500.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N2",
+   "title": "Ask for their range",
+   "rule": "Asking first is a fair move, not a dodge.",
+   "evidence": "Common advice",
+   "example": "Before I give a number, what range did you plan for this role?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N3",
+   "title": "Keep your current pay private",
+   "rule": "Talk about what the role is worth. In some places employers may not be allowed to ask.",
+   "evidence": "Law in some places, plus common advice",
+   "example": "I'd rather focus on what this role is worth. What range did you plan for it?",
+   "modes": [
+    "negotiate",
+    "tough"
+   ]
+  },
+  {
+   "id": "N4",
+   "title": "Pause before you answer",
+   "rule": "Two or three seconds help you think. It is not a pressure trick.",
+   "evidence": "One field study",
+   "example": "Thank you. Let me think about that for a second.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N5",
+   "title": "Give a reason with every number",
+   "rule": "Tie the ask to results or scope, not to your costs. Keep it warm.",
+   "evidence": "Common advice",
+   "example": "I've led two launches like this one, so I'm asking for 98,000.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N6",
+   "title": "If base is stuck, ask about the package",
+   "rule": "Sign-on, an earlier review, days off, remote days, title.",
+   "evidence": "Studies on multi-issue offers, plus common advice",
+   "example": "If base is fixed, could we add a sign-on bonus or a review at six months?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N7",
+   "title": "Only mention offers you really have",
+   "rule": "Name the timing, not the amount. Bluffs get checked.",
+   "evidence": "Studies on alternatives, plus common advice",
+   "example": "I have another offer and need to answer by Friday.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N8",
+   "title": "Ask for time and the terms in writing",
+   "rule": "A few days is a normal request.",
+   "evidence": "Common advice, one study on short deadlines",
+   "example": "Could you send the full terms? I'll reply by Thursday.",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N9",
+   "title": "Bridge the gap with a step-up",
+   "rule": "If they cannot reach your number now, agree on it later: the offer now, your number after the probation or in six months.",
+   "evidence": "Common advice",
+   "example": "If 90,000 is the limit today, could we agree on 98,000 after the three-month probation?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "N10",
+   "title": "Make the step-up real",
+   "rule": "Amount, date, what you need to show, and in the offer letter. A promise said aloud is not a deal.",
+   "evidence": "Common advice",
+   "example": "Great. Can we write the 98,000 at three months and the goals into the offer?",
+   "modes": [
+    "negotiate"
+   ]
+  },
+  {
+   "id": "T1",
+   "title": "Personal question: acknowledge, fact, redirect",
+   "rule": "Stay calm and short, then go back to the job.",
+   "evidence": "Common advice",
+   "example": "My plans won't affect my work. Can I tell you about my availability?",
+   "modes": [
+    "tough"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "Pushed back: say \"fair point\", then go shorter",
+   "rule": "Restate the core of your answer with one result.",
+   "evidence": "Common advice",
+   "example": "Fair point. In short: I cut release time by a third.",
+   "modes": [
+    "tough"
+   ]
+  }
+ ],
+ "themes": [
+  {
+   "id": "money",
+   "name": "Money"
+  },
+  {
+   "id": "leaving",
+   "name": "Leaving and gaps"
+  },
+  {
+   "id": "weakness",
+   "name": "Weak spots"
+  },
+  {
+   "id": "fit",
+   "name": "Fit"
+  },
+  {
+   "id": "english",
+   "name": "Speaking English at work"
+  },
+  {
+   "id": "personal",
+   "name": "Personal questions"
+  },
+  {
+   "id": "mix",
+   "name": "Mix"
+  }
+ ],
+ "questions": [
+  {
+   "id": "M1",
+   "theme": "money",
+   "text": "What kind of salary do you have in mind?",
+   "follow_up": "I need an actual figure, not a range.",
+   "checking": "Whether your number fits their budget, and how you value yourself.",
+   "trap": "Naming a low number, or refusing flatly.",
+   "shape": "Give the context, ask for their range, and if pressed give a number tied to the role. Say you are flexible on the whole package.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "M2",
+   "theme": "money",
+   "text": "And what do they pay you right now?",
+   "follow_up": "It's a simple question. Why not tell me?",
+   "checking": "The anchor for their offer.",
+   "trap": "Telling them, or making a number up.",
+   "shape": "Decline kindly, move to what this role is worth, and ask for their range.",
+   "card": "N3",
+   "personal": false
+  },
+  {
+   "id": "M3",
+   "theme": "money",
+   "text": "Our budget is lower than you'd hoped. Still interested?",
+   "follow_up": "So what would make it work for you?",
+   "checking": "How you react to a number.",
+   "trap": "An instant yes, or visible disappointment.",
+   "shape": "Pause, thank them, ask what the package includes, and say what would make it work.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "M4",
+   "theme": "money",
+   "text": "If I made you an offer right now, would you say yes today?",
+   "follow_up": "Most people just say yes. Why wait?",
+   "checking": "Whether you can be pushed to close.",
+   "trap": "Saying yes only to show enthusiasm.",
+   "shape": "Show interest, then ask for the offer in writing and a little time.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "M8",
+   "theme": "money",
+   "text": "We can't match what you earn now. Is that a deal-breaker?",
+   "follow_up": "Be honest, how big a step down can you take?",
+   "checking": "Your flexibility and honesty.",
+   "trap": "A bitter or apologetic reply.",
+   "shape": "Acknowledge it, talk about the value of the whole role, and offer to look for a package that works.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "L1",
+   "theme": "leaving",
+   "text": "Why do you want to leave your current job?",
+   "follow_up": "That sounds like you don't get along with them.",
+   "checking": "Your attitude and how stable you are.",
+   "trap": "Criticising your employer.",
+   "shape": "One neutral reason, the pull toward this role, and one line about what you learned.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "L2",
+   "theme": "leaving",
+   "text": "Were you laid off?",
+   "follow_up": "Why you and not someone else?",
+   "checking": "Whether you are honest about it.",
+   "trap": "A defensive or very long story.",
+   "shape": "State the fact plainly, say how big the event was (team or company), and say what you did next.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "L3",
+   "theme": "leaving",
+   "text": "There's half a year missing on your CV. What happened?",
+   "follow_up": "So you weren't working at all?",
+   "checking": "Your explanation and whether you are ready now.",
+   "trap": "Over-apologising or staying vague.",
+   "shape": "A short reason, what you did in that time (learning, projects), and why you are ready now.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "L6",
+   "theme": "leaving",
+   "text": "Who else are you interviewing with?",
+   "follow_up": "Any offers on the table yet?",
+   "checking": "How much competition there is, and how urgent it is.",
+   "trap": "Bluffing about offers.",
+   "shape": "Answer truthfully and in general terms. Say your interest in this role is high.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "W1",
+   "theme": "weakness",
+   "text": "What's your biggest weakness?",
+   "follow_up": "Everyone says that one. Give me a real one.",
+   "checking": "Your self-awareness.",
+   "trap": "A fake weakness such as working too hard.",
+   "shape": "A real weakness that is not core to the job, one thing you do about it, and a sign of progress.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "W3",
+   "theme": "weakness",
+   "text": "What would your manager say you need to fix?",
+   "follow_up": "When did they last tell you that?",
+   "checking": "Whether you take feedback in.",
+   "trap": "Vague praise.",
+   "shape": "One specific point from real feedback, and what you did about it.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "W4",
+   "theme": "weakness",
+   "text": "Tell me about a project that failed.",
+   "follow_up": "Whose fault was it?",
+   "checking": "Whether you own your part.",
+   "trap": "Blaming the team.",
+   "shape": "The context, your decision, the impact, the lesson, and how it changed your later work.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "W2",
+   "theme": "weakness",
+   "text": "When were you wrong in front of your team?",
+   "follow_up": "What did you change afterwards?",
+   "checking": "Humility.",
+   "trap": "Blaming the circumstances.",
+   "shape": "The fact, your share of it, and what you changed.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "F1",
+   "theme": "fit",
+   "text": "Honestly, you look overqualified for this.",
+   "follow_up": "Won't you be bored in six months?",
+   "checking": "Whether you will stay and be happy.",
+   "trap": "A defensive tone.",
+   "shape": "Say what you want from this role, how it fits your plan, and how you will use the extra experience.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "F2",
+   "theme": "fit",
+   "text": "You don't have the experience we listed.",
+   "follow_up": "Why should we take that risk?",
+   "checking": "Honesty and how fast you learn.",
+   "trap": "Bluffing or panicking.",
+   "shape": "Admit the gap, give the nearest evidence, and offer a concrete 30-day plan.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "F4",
+   "theme": "fit",
+   "text": "Why us and not one of our competitors?",
+   "follow_up": "That's on our website. What else?",
+   "checking": "Whether your interest is real.",
+   "trap": "General praise only.",
+   "shape": "Two specifics about their product or team, and one honest difference.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "F5",
+   "theme": "fit",
+   "text": "Why switch careers now?",
+   "follow_up": "Isn't this just running away from the old job?",
+   "checking": "Your reason and the risk you carry.",
+   "trap": "Escaping the old field.",
+   "shape": "The pull toward the new field, what you already bring, and proof that you committed (a project, a course).",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "F6",
+   "theme": "fit",
+   "text": "Why you over someone with more years?",
+   "follow_up": "That doesn't convince me yet.",
+   "checking": "What sets you apart.",
+   "trap": "Putting other people down.",
+   "shape": "Two strengths tied to this role, evidence for each, and how fast you learn.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "E1",
+   "theme": "english",
+   "text": "Is your English strong enough for this team?",
+   "follow_up": "What happens when you don't understand someone in a meeting?",
+   "checking": "What communication this role needs.",
+   "trap": "Apologising too much, or denying any difficulty.",
+   "shape": "A calm fact, evidence that you work in English, and how you handle an unclear moment.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "E2",
+   "theme": "english",
+   "text": "Will you need a visa from us?",
+   "follow_up": "How long would that take?",
+   "checking": "Cost and legal effort.",
+   "trap": "Hiding it.",
+   "shape": "A direct answer, your current status, and a rough timeline.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "E3",
+   "theme": "english",
+   "text": "Can you say that again in simpler words?",
+   "follow_up": null,
+   "checking": "How you adapt.",
+   "trap": "Freezing.",
+   "shape": "Say it again in two short sentences.",
+   "card": "T2",
+   "personal": false
+  },
+  {
+   "id": "I1",
+   "theme": "personal",
+   "text": "How old are you, if you don't mind?",
+   "follow_up": null,
+   "checking": "Energy, cost and risk, often through bias.",
+   "trap": "Answering, or showing offence.",
+   "shape": "Acknowledge, stay calm, and go back to your experience and what you would bring.",
+   "card": "T1",
+   "personal": true
+  },
+  {
+   "id": "I2",
+   "theme": "personal",
+   "text": "Are you planning to have kids soon?",
+   "follow_up": null,
+   "checking": "Availability.",
+   "trap": "Telling them, or answering with hostility.",
+   "shape": "Say your plans will not affect your commitment, then offer facts about your availability.",
+   "card": "T1",
+   "personal": true
+  },
+  {
+   "id": "I4",
+   "theme": "personal",
+   "text": "Any health issues we should know about?",
+   "follow_up": null,
+   "checking": "Risk of absence.",
+   "trap": "Sharing too much.",
+   "shape": "Say you can do the essential duties and ask if something specific about the role worries them.",
+   "card": "T1",
+   "personal": true
+  },
+  {
+   "id": "I7",
+   "theme": "personal",
+   "text": "Are you allowed to work here without sponsorship?",
+   "follow_up": null,
+   "checking": "Your right to work. This form of the question is usually lawful.",
+   "trap": "Mixing it up with the unlawful questions.",
+   "shape": "Answer directly: you are authorised to work here, or you will need sponsorship.",
+   "card": "T1",
+   "personal": true
+  }
+ ],
+ "tough_lines": {
+  "opening": "{hi} I'm Mike. This is a round of tough questions, {count} of them. Some are uncomfortable on purpose. Take your time. {question}",
+  "closing": "Okay. That was my last question. Thank you. You can end the session now to see your debrief.",
+  "move_on": "Okay, thank you. Let's move on.",
+  "next": "Okay.",
+  "repeat": "Sure. {question}",
+  "pressure": {
+   "long": "Okay, stop. Give me the short version.",
+   "no_result": "And what actually came of it?",
+   "apology": "You don't need to apologise. Just answer.",
+   "short": "Is that all?",
+   "rehearsed": "That sounds rehearsed. Try once more."
+  }
+ },
+ "tough_signals": {
+  "labels": {
+   "shares_personal_info": "Shared personal information",
+   "blames_others": "Blamed others",
+   "argues_instead": "Argued instead of answering",
+   "redirects_to_work": "Steered back to the job",
+   "rambling": "Rambled",
+   "over_apology": "Apologised too much",
+   "no_example": "No example or result"
+  },
+  "bad_priority": [
+   "blames_others",
+   "argues_instead",
+   "shares_personal_info",
+   "rambling",
+   "over_apology",
+   "no_example"
+  ],
+  "result_words": [
+   "result",
+   "resulted",
+   "increased",
+   "decreased",
+   "reduced",
+   "saved",
+   "grew",
+   "improved",
+   "launched",
+   "shipped",
+   "delivered",
+   "won",
+   "learned",
+   "outcome",
+   "led to",
+   "ended up",
+   "cut",
+   "raised",
+   "doubled",
+   "finished"
+  ],
+  "apology": [
+   "sorry",
+   "apologi[sz]e",
+   "apologies",
+   "excuse me",
+   "forgive me",
+   "my bad",
+   "i know it'?s not"
+  ]
+ },
+ "recruiter_lines": {
+  "opening": {
+   "friendly": "{hi} I'm Mike, from the recruiting team. We'd love to move forward on the {role} role. Before I share details, what are you expecting for the salary?",
+   "firm": "{hi} I'm Mike, from recruiting. We're ready to talk about the {role} role. What salary are you expecting?",
+   "tight": "{hi} I'm Mike, from recruiting. I have a short window today for the {role} role. What salary are you looking for?"
+  },
+  "press_number": {
+   "friendly": "I'd like a number to work with. What are you looking for?",
+   "firm": "I need a number to move on. What are you looking for?",
+   "tight": "I need a number to move on. What are you looking for?"
+  },
+  "ask_figure": {
+   "*": "Sorry, I didn't catch a figure. What number would work for you?"
+  },
+  "state_offer": {
+   "friendly": "Thanks for sharing. Here is where we are: we can offer {amount} base per year. How does that sound?",
+   "firm": "Here is what I can offer: {amount} base per year. What do you think?",
+   "tight": "Our offer is {amount} base per year. That's standard for the role. What do you think?"
+  },
+  "confirm_number": {
+   "*": "That fits what we planned. We can offer {amount} base per year. Shall we go ahead?"
+  },
+  "concede": {
+   "friendly": "That's a fair point. I can move to {amount} base per year.",
+   "firm": "Okay, I can stretch to {amount} base per year.",
+   "tight": "I can move a little, to {amount} base per year."
+  },
+  "concede_final": {
+   "friendly": "That's a fair point. I can move to {amount} base per year, and that's the best I can do on base.",
+   "firm": "I can stretch to {amount} base per year. That is as far as base goes.",
+   "tight": "I can move to {amount} base per year. That is final on base."
+  },
+  "over_budget": {
+   "friendly": "I hear you, but that's above what we can do on base. I can offer {amount} base per year.",
+   "firm": "That's above what we can do on base. My offer is {amount} base per year.",
+   "tight": "That's above what we can do on base. The offer stays at {amount} base per year."
+  },
+  "hold_confirm": {
+   "*": "Happy to confirm {amount} base per year. Shall we go ahead?"
+  },
+  "hold_final": {
+   "friendly": "I understand. {amount} base per year is where base stays.",
+   "firm": "{amount} base per year is final on base.",
+   "tight": "{amount} base per year is final. Base won't move."
+  },
+  "hold_same": {
+   "friendly": "I hear you. Can you tell me more about what's behind that number? Right now I can offer {amount} base per year.",
+   "firm": "I need something new to move on that. The offer is {amount} base per year.",
+   "tight": "Without something new I can't move. The offer is {amount} base per year."
+  },
+  "give_lever": {
+   "friendly": "I can add {lever}. Would that help?",
+   "firm": "I can offer {lever}.",
+   "tight": "One thing I can do is {lever}."
+  },
+  "lever_unavailable": {
+   "*": "I'm not able to change that right now."
+  },
+  "lever_repeat": {
+   "*": "We've already covered that one."
+  },
+  "equity": {
+   "*": "Equity is set by level and isn't part of this conversation."
+  },
+  "grant_time": {
+   "*": "Of course. Take {time}, and I'll send the terms in writing. The offer on the table is {amount} base per year."
+  },
+  "grant_time_noamount": {
+   "*": "Of course. Take {time}, and I'll send the terms in writing."
+  },
+  "decline_first": {
+   "*": "Is there anything that would make this work for you?"
+  },
+  "close_declined": {
+   "*": "Understood. Thank you for your time. I'll leave it there."
+  },
+  "close_accepted": {
+   "*": "Wonderful. I'll send the offer letter with {amount} base per year{extras}. Welcome aboard."
+  },
+  "answer_other": {
+   "*": "Thanks. To keep us on track, the offer stands at {amount} base per year. What would you like to change?"
+  },
+  "answer_other_noamount": {
+   "*": "Thanks. What number would work for you?"
+  },
+  "no_range": {
+   "*": "I can't go into internal budgets, but I can tell you the offer is {amount} base per year."
+  },
+  "no_range_noamount": {
+   "*": "I can't go into internal budgets. What number are you looking for?"
+  },
+  "wait_ack": {
+   "*": "Of course, take a moment."
+  },
+  "close_turn_cap": {
+   "*": "I have to wrap up now. The offer is {amount} base per year, and I'd need your answer by the end of the week.",
+   "none": "I have to wrap up now. Please send me your number by the end of the week."
+  },
+  "closed_again": {
+   "*": "We've wrapped up. You can end the session now to see your debrief."
+  },
+  "restate_offer": {
+   "*": "Sorry about that, we got cut off. Where we left it: {amount} base per year.",
+   "none": "Sorry about that, we got cut off. What number would work for you?"
+  },
+  "step_up_grant": {
+   "friendly": "Yes, that's something we can do: {now} now and {later} after {months} months. What would you want to have shown by then?",
+   "firm": "We can look at that: {now} now and {later} after {months} months. What would you want to have shown by then?",
+   "tight": "That's the one thing I can work with: {now} now and {later} after {months} months. What would you want to have shown by then?"
+  },
+  "step_up_months_counter": {
+   "*": "Six months, not three. {now} now and {later} after six months. What would you want to have shown by then?"
+  },
+  "step_up_ask_criteria": {
+   "*": "I can only consider that with clear goals. What would you want to have shown by then?"
+  },
+  "step_up_not_yet": {
+   "*": "Let's settle base first, then we can talk about later."
+  },
+  "step_up_detail": {
+   "*": "Good, that is clear. I'll note those goals."
+  },
+  "step_up_writing": {
+   "*": "Yes. I'll put {later} after {months} months{goals} in the offer letter."
+  },
+  "step_up_rejected": {
+   "*": "I can't do a later raise on that figure. The offer is {amount} base per year."
+  },
+  "pressure": {
+   "deadline_soft": "We'd like to have your answer by the end of next week.",
+   "other_candidates": "I should say we are talking to other candidates too.",
+   "deadline_48h": "This offer is open for 48 hours.",
+   "standard_role": "That figure is standard for the role."
+  },
+  "time_text": {
+   "friendly": "until the end of the week",
+   "firm": "three days",
+   "tight": "48 hours"
+  }
+ },
+ "style_brief": {
+  "friendly": "You are Mike, a warm recruiter. You like the candidate and want to close a fair deal.",
+  "firm": "You are Mike, a polite but steady recruiter. You stay friendly and you do not bend easily.",
+  "tight": "You are Mike, a recruiter with a tight budget. You are polite, brief and keen to close fast."
+ },
+ "reason_words": [
+  "experience",
+  "years?",
+  "\\bled\\b",
+  "\\bbuilt\\b",
+  "shipped",
+  "delivered",
+  "\\bscope\\b",
+  "responsibilit(?:y|ies)",
+  "results?",
+  "posted range",
+  "job post",
+  "my research",
+  "because",
+  "based on",
+  "managed",
+  "launched",
+  "track record",
+  "\\bskills?\\b",
+  "increased",
+  "reduced",
+  "\\bgrew\\b",
+  "saved",
+  "qualifications?",
+  "\\bworth\\b",
+  "deliver",
+  "achievements?"
+ ],
+ "offer_reason_words": [
+  "another offer",
+  "other offer",
+  "competing offer",
+  "offer from",
+  "got an offer",
+  "have an offer",
+  "two offers",
+  "offers? elsewhere",
+  "offer at"
+ ],
+ "criteria_words": [
+  "\\bif i\\b",
+  "goals?",
+  "targets?",
+  "kpis?",
+  "results?",
+  "milestones?",
+  "objectives?",
+  "metrics?",
+  "deliver"
+ ],
+ "lever_keywords": {
+  "sign_on": [
+   "sign[- ]?on",
+   "signing",
+   "\\bbonus\\b"
+  ],
+  "perf_bonus": [
+   "performance bonus",
+   "annual bonus",
+   "yearly bonus",
+   "target bonus",
+   "variable pay",
+   "bonus (?:based|tied)",
+   "performance[- ]based"
+  ],
+  "review": [
+   "review",
+   "salary revisit",
+   "raise (?:in|after)"
+  ],
+  "pto": [
+   "\\bpto\\b",
+   "vacation",
+   "holidays?",
+   "days off",
+   "paid leave",
+   "annual leave",
+   "extra days"
+  ],
+  "remote": [
+   "remote",
+   "work from home",
+   "\\bwfh\\b",
+   "hybrid",
+   "home office"
+  ],
+  "title": [
+   "\\btitle\\b",
+   "seniority",
+   "senior role",
+   "promotion"
+  ],
+  "equity": [
+   "equity",
+   "stock",
+   "\\bshares?\\b",
+   "options",
+   "\\brsus?\\b"
+  ],
+  "package": [
+   "package",
+   "benefits",
+   "total compensation",
+   "total comp",
+   "other (?:parts|things|elements)",
+   "anything else",
+   "non[- ]salary"
+  ]
+ },
+ "lever_labels": {
+  "sign_on": "Sign-on bonus",
+  "perf_bonus": "Performance bonus",
+  "review": "Earlier salary review",
+  "pto": "Extra days off",
+  "remote": "Remote days",
+  "title": "Title",
+  "step_up": "Step-up after probation"
+ }
+}

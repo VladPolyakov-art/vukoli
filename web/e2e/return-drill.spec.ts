@@ -139,7 +139,7 @@ test.describe("US-22 Weak spots and drill", () => {
     await expect(page.getByRole("heading", { name: "What are we practising today?", level: 1 })).toBeVisible();
     const suggestions = page.getByRole("group", { name: "Suggestions" });
     await expect(suggestions.getByRole("button", { name: "General questions" })).toBeVisible();
-    await expect(suggestions.getByRole("button", { name: "Practise English" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Other practice" }).getByRole("button", { name: "Practise English" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Drill my weak spots" })).toHaveCount(0);
     await openMenu(page);
     await expect(page.getByText("Your practice sessions will appear here.").locator("visible=true")).toBeVisible();

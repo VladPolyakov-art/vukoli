@@ -23,6 +23,25 @@ export const S1: HistoryRowModel = {
   question: "Why do you want to move from agency work to a product team?",
 };
 
+/** Tough talk (tough-talk.md §7): the result line reads the verdict into a number. */
+export const T1: HistoryRowModel = {
+  id: "tt1", title: "Tough questions · Money", track: "tough", round: "5 questions",
+  startedAt: "2026-10-19T12:10:00", durationS: 12 * 60, result: "Calm in 3 of 5",
+};
+export const N1: HistoryRowModel = {
+  id: "nn1", title: "Negotiation · Senior Product Designer · Firm", track: "negotiate", round: "Firm",
+  startedAt: "2026-10-19T09:30:00", durationS: 9 * 60, result: "+3,000 EUR now · 30%",
+};
+export const N2: HistoryRowModel = {
+  id: "nn2", title: "Negotiation · Product Designer · Friendly", track: "negotiate", round: "Friendly",
+  startedAt: "2026-10-18T10:00:00", durationS: 10 * 60, result: "91,000 → 98,000 at 3 months",
+};
+export const N3: HistoryRowModel = {
+  id: "nn3", title: "Negotiation · Design Lead · Tight budget", track: "negotiate", round: "Tight budget",
+  startedAt: "2026-10-17T15:00:00", durationS: 3 * 60, result: "No offer yet",
+};
+export const historyTalk: HistoryRowModel[] = [T1, N1, N2, N3, S3, S2];
+
 /** Trash: two deleted chats, one with a long title. Fictional (Alex Morgan, Kestrel Pay). */
 export const trashData: TrashRowModel[] = [
   { id: "t2", title: "Kestrel Pay · Senior Product Designer", startedAt: "2026-10-16T18:30:00", deletedAt: "2026-10-19T09:12:00" },

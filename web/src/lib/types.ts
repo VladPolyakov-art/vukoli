@@ -146,7 +146,7 @@ export interface Vacancy { id: string; title: string; text: string; source: stri
 export interface SessionSummary {
   id: string;
   title: string;
-  mode: "interview" | "english" | "";
+  mode: PracticeMode | "";
   started_at: string;
   duration_s: number | null;
   engine: string;
@@ -160,14 +160,24 @@ export interface SessionSummary {
   first_question?: string;
   /** D80: in the Archive, not in Recents. */
   archived?: boolean;
+  /** Tough talk: the History result in numbers (docs/features/tough-talk/protocol.md); null for other modes. */
+  talk_result?: TalkResult | null;
 }
+/** `GET /api/sessions` row of a tough / negotiate session. Amounts are plain integers; null when no offer was made. */
+export type TalkResult =
+  | { kind: "tough"; calm: number | null; total: number | null }
+  | {
+    kind: "negotiate"; outcome: string | null; currency: string | null; opening: number | null; final_offer: number | null;
+    gain_now: number | null; captured_now_pct: number | null;
+    step_up: { later: number; after_months: number; in_writing: boolean } | null; no_offer: boolean;
+  };
 /** D105: one hit of `GET /sessions/search`. `match.q` is the question number the Debrief shows it under (`?q=n`). */
 export interface SearchResult {
   id: string;
   title: string;
   /** "Job · date" (the job is left out when the title already says it). */
   subtitle: string;
-  mode: "interview" | "english" | "";
+  mode: PracticeMode | "";
   archived: boolean;
   started_at: string;
   match: { field: "title" | "job" | "question" | "answer"; snippet: string; q?: number };
@@ -178,7 +188,7 @@ export interface TranscriptTurn { role: "user" | "model"; text: string; question
 
 export interface SessionRecord {
   id: string;
-  mode: "interview" | "english";
+  mode: PracticeMode;
   round_type?: string;
   engine: string;
   model?: string;
@@ -194,7 +204,12 @@ export interface SessionRecord {
   questions: Question[];
   transcript: TranscriptTurn[];
   feedback: FeedbackRecord[];
-  debrief: Debrief | null;
+  debrief: AnyDebrief | null;
+  /** Tough talk (protocol.md §4): the saved state of a `negotiate` session; carries hidden numbers, so the web reads only
+   * what the debrief and History need and never shows `floor` / `ceiling` / `opening` before the debrief says so. */
+  negotiation?: NegotiationRecord;
+  /** Tough talk: the saved state of a `tough` session. */
+  tough?: ToughRecord;
   stats?: { answers: number; turns: number };
   /** D88: requests this session sent, and how far the plan's own counter moved (Codex, Claude). */
   usage?: SessionUsage;
@@ -356,6 +371,8 @@ export interface VerdictStepData {
   target: 3 | 4 | null;
 }
 export interface Debrief {
+  /** Interview and English debriefs have no `kind`; the tough-talk ones do (`AnyDebrief` narrows on it). */
+  kind?: "interview" | "english";
   verdict: string;
   weak_spots: WeakSpot[];
   /** Interview debriefs only; all three D98 parts are built by the server in code at read time. */
@@ -381,7 +398,7 @@ export interface FocusSpot {
 export interface StartMessage {
   type: "start";
   /** `quick` (D111): Mike asks "interview or English?" first; the answer sets the practice (`mode_selected`). */
-  mode: "interview" | "english" | "quick";
+  mode: "interview" | "english" | "quick" | "tough" | "negotiate";
   round_type?: "hr" | "behavioural" | "mix";
   questions?: number;
   strictness?: number;
@@ -399,6 +416,10 @@ export interface StartMessage {
   engine?: EngineId;
   /** US-13 AC5: continue this saved session (after a dropped connection) instead of starting a new one. */
   resume_session_id?: string;
+  /** `mode: "negotiate"` (protocol.md §1). */
+  negotiate?: NegotiateStart;
+  /** `mode: "tough"`. */
+  tough?: { theme: ToughTheme };
 }
 
 export type ClientMessage =
@@ -411,6 +432,8 @@ export type ClientMessage =
   | { type: "user_turn"; text: string; turn_id: number; source: "text" | "browser_stt" }
   | { type: "redo_answer" }
   | { type: "suggest"; on: boolean }
+  /** Tough talk: ask for a tactic card for this moment (works offline on the server, no model). */
+  | { type: "hint" }
   | { type: "request_stronger"; feedback_id: string }
   | { type: "recheck"; feedback_id: string; text: string; flag_id?: string }
   | { type: "flag_action"; feedback_id: string; flag_id: string; action: "confirm" | "dismiss" | "restore" }
@@ -422,7 +445,10 @@ export type ClientMessage =
 /* ---------- WebSocket: server -> client ---------- */
 
 /** `quick_choice`: only on a user turn, the answer to a quick start's "interview or English?" (not an answer to coach). */
-export type TurnKind = "question" | "follow_up" | "wait" | "repeat" | "closing" | "ack" | "turn" | "quick_choice";
+export type TurnKind =
+  | "question" | "follow_up" | "wait" | "repeat" | "closing" | "ack" | "turn" | "quick_choice"
+  /** Tough: a pushback line, and the neutral line for a personal question. */
+  | "pressure" | "move_on";
 
 export interface ServerError {
   type: "error";
@@ -439,7 +465,7 @@ export type ServerMessage =
   | {
       type: "session_started";
       session_id: string;
-      mode: "interview" | "english";
+      mode: "interview" | "english" | "tough" | "negotiate";
       /** A quick start: `mode` and `questions` are decided by the user's answer (`mode_selected`). */
       quick?: boolean;
       engine: string;
@@ -451,6 +477,13 @@ export type ServerMessage =
       suggester_available: boolean;
       suggest: boolean;
       warnings: string[];
+      /** Tough talk: the Hint button works (`hint_available`) and the Talk-now control is on. */
+      talk?: boolean;
+      hint_available?: boolean;
+      /** `negotiate`: what the call is about. `style` stays "surprise" while hidden. Never any hidden number. */
+      negotiate?: NegotiateStart & { period: "year" };
+      /** `tough`: the theme and how many questions (ids only in `questions`, text is empty). */
+      tough?: { theme: ToughTheme; theme_name: string; total: number };
     }
   | { type: "ready" }
   /** Quick start (D111): the user chose; the session is, from here on, this practice (and is saved under this title). */
@@ -466,6 +499,11 @@ export type ServerMessage =
       thread_id?: string;
       turn_id?: number | null;
       interrupted?: boolean;
+      /** Tough talk: 1-based position of the question and the total (kind `question`), and, with kind `closing` in
+       * `negotiate`, how the call ended. */
+      index?: number;
+      total?: number;
+      outcome?: NegotiateOutcome;
     }
   | { type: "response_complete" }
   /** Speech: Mike's reply is cut off. `turn_id`: the voice turn that proved to be speech (none: all open turns). */
@@ -492,10 +530,12 @@ export type ServerMessage =
   | { type: "suggestion_pending"; question: string }
   | { type: "suggestion"; question: string; story: string; answer: string; points: string[] }
   | { type: "suggestion_unavailable"; question: string; code: string; message: string }
+  /** Tough talk: the answer to `{type:"hint"}`. */
+  | ({ type: "hint" } & HintCard)
   | { type: "saving" }
   | { type: "session_saved"; session_id: string }
   | { type: "debrief_pending"; session_id: string }
-  | { type: "debrief"; session_id: string; debrief: Debrief }
+  | { type: "debrief"; session_id: string; debrief: AnyDebrief }
   | { type: "session_ended"; saved: boolean; reason: string }
   | { type: "save_error"; code: string; message: string }
   | ServerError
@@ -513,3 +553,182 @@ export interface FeedbackBody {
   session_id?: string;
 }
 export interface SessionFinished { count: number; ask: boolean; configured: boolean }
+
+
+/* ---------- Tough talk (modes `tough` and `negotiate`, docs/features/tough-talk/protocol.md) ---------- */
+
+/** Every practice mode a session can have. `quick` is only a start message; the session turns into one of these. */
+export type PracticeMode = "interview" | "english" | "tough" | "negotiate";
+export type NegotiateStyle = "friendly" | "firm" | "tight" | "surprise";
+export type NegotiateOutcome = "accepted" | "time" | "declined" | "turn_cap";
+export type ToughTheme = "money" | "leaving" | "weakness" | "fit" | "english" | "personal" | "mix";
+
+/** `start.negotiate` (protocol.md §1). Amounts are plain integers in the form currency. */
+export interface NegotiateStart {
+  role: string;
+  job_low?: number;
+  job_high?: number;
+  target: number;
+  currency: string;
+  style: NegotiateStyle;
+  has_real_offer: boolean;
+}
+
+/** A tactic card from `GET /api/tough-talk/content` (N1..N10 for negotiate, T1, T2, N3 for tough). */
+export interface TacticCardData {
+  id: string;
+  title: string;
+  rule: string;
+  evidence: string;
+  example: string;
+  modes: Array<"negotiate" | "tough">;
+}
+export interface ToughTalkContent {
+  cards: TacticCardData[];
+  themes: Array<{ id: ToughTheme; name: string; count: number; personal: boolean }>;
+  styles: Array<{ id: NegotiateStyle; name: string; difficulty: string; blurb: string }>;
+  currencies: string[];
+  notes: { no_data: string; practice: string; personal: string };
+  tough_total: number;
+}
+/** `GET /api/vacancies/{id}/salary-range`: nulls when the post lists no annual range. */
+export interface SalaryRange { low: number | null; high: number | null; currency: string | null; title: string }
+
+/** The server's answer to `{type:"hint"}`. `shape` is tough only (the answer-shape line of the current question). */
+export interface HintCard {
+  mode: "negotiate" | "tough";
+  card_id: string;
+  title: string;
+  text: string;
+  example: string;
+  shape?: string;
+  n: number;
+}
+
+export interface HintUsed { card_id: string; turn: number; n?: number }
+/** Saved `negotiation` block; only the fields the web reads are typed. Hidden numbers stay unread until the debrief. */
+export interface NegotiationRecord {
+  style: NegotiateStyle;
+  surprise?: boolean;
+  currency: string;
+  role: string;
+  job_low?: number | null;
+  job_high?: number | null;
+  target: number;
+  has_real_offer?: boolean;
+  offer?: number | null;
+  outcome?: string | null;
+  user_turns?: number;
+  hints_used?: HintUsed[];
+  [key: string]: unknown;
+}
+export interface ToughRecord {
+  theme: ToughTheme;
+  theme_name: string;
+  ids: string[];
+  index?: number;
+  hints_used?: HintUsed[];
+  [key: string]: unknown;
+}
+
+export interface NegotiateDebrief {
+  kind: "negotiate";
+  verdict: string;
+  practice_note: string;
+  source: string;
+  cards: string[];
+  hints_used: Array<{ card_id: string; title: string; turn: number }>;
+  style: NegotiateStyle;
+  style_name: string;
+  surprise: boolean;
+  role: string;
+  currency: string;
+  period: "year";
+  outcome: NegotiateOutcome | "ended";
+  outcome_label: string;
+  no_offer: boolean;
+  summary: {
+    opening: number | null;
+    final_offer: number | null;
+    floor: number | null;
+    ceiling: number | null;
+    captured_pct: number | null;
+    position_pct: number | null;
+    rounds_used: number;
+    round_cap: number;
+    captured_now_pct: number | null;
+    captured_later_pct: number | null;
+    year_one: number | null;
+    target: number;
+    job_low: number | null;
+    job_high: number | null;
+    range_source: "job_range" | "your_target";
+  };
+  hidden_range: { floor: number; ceiling: number; text: string } | null;
+  offer_path: Array<{ turn: number; offer: number; label: string }>;
+  shifts: Array<{ turn: number; from: number; to: number; cause: string; cause_label: string; quote: string }>;
+  deal: {
+    now: number; later: number; after_months: number; in_writing: boolean; criteria_named: boolean; line: string;
+  } | null;
+  levers_won: Array<{ lever: string; label: string; value: string; by: "ask" | "offered"; turn: number }>;
+  missed_levers: Array<{ lever: string; label: string }>;
+  say_it_better: Array<{ id: string; title: string; what_happened: string; you_said: string | null; try: string; card_id: string }>;
+  signals: Array<{ id: string; label: string; good: boolean; quote: string | null }>;
+  pressure_notes: string[];
+  flags: string[];
+  guard_replacements: number;
+  competing_offer_note: string | null;
+}
+
+export interface ToughSignal {
+  id: string;
+  label: string;
+  bad: boolean;
+  source: "model" | "code";
+  may_be_wrong?: boolean;
+  quote: string;
+}
+export interface ToughDebriefQuestion {
+  n: number;
+  question_id: string;
+  theme: ToughTheme;
+  question: string;
+  personal: boolean;
+  answers: Array<{ role: "answer" | "follow_up_answer" | "pressure_answer"; text: string }>;
+  pushes: Array<{ kind: "follow_up" | "pressure"; text: string }>;
+  signals: ToughSignal[];
+  calm: boolean;
+  calmer_answer: string | null;
+  shape: string;
+  checking: string;
+  trap: string;
+  card_ids: string[];
+  lawful_note: string | null;
+  model_checked: boolean;
+}
+export interface ToughDebrief {
+  kind: "tough";
+  verdict: string;
+  practice_note: string;
+  theme: ToughTheme;
+  theme_name: string;
+  source: "code+model" | "code" | string;
+  cards?: string[];
+  hints_used?: Array<{ card_id: string; title: string; turn: number }>;
+  summary: {
+    answered: number;
+    calm: number;
+    show_counts: boolean;
+    hurt_most: { question_no: number; question: string; signal: string; label: string; quote: string } | null;
+  };
+  questions: ToughDebriefQuestion[];
+}
+
+/** What a saved session's `debrief` can be. Interview and English have no `kind`; tough talk has. */
+export type AnyDebrief = Debrief | NegotiateDebrief | ToughDebrief;
+export const isNegotiateDebrief = (d: AnyDebrief | null | undefined): d is NegotiateDebrief => d?.kind === "negotiate";
+export const isToughDebrief = (d: AnyDebrief | null | undefined): d is ToughDebrief => d?.kind === "tough";
+/** The interview / English debrief of a record, or null when it has none or is a tough-talk one. */
+export function interviewDebrief(d: AnyDebrief | null | undefined): Debrief | null {
+  return d && d.kind !== "negotiate" && d.kind !== "tough" ? d : null;
+}

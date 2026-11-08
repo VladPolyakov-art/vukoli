@@ -2,7 +2,7 @@
  * one weak spot per layer (the first of each layer, in the order the server saved them); "Drill these weak spots" in
  * that debrief works on exactly those, not on the shared memory of the last interviews. */
 import { tMaybe } from "../../i18n";
-import type { SessionRecord } from "../../lib/types";
+import { interviewDebrief, type SessionRecord } from "../../lib/types";
 import type { WeakItem } from "./types";
 
 /** A weak spot's name inside a sentence: only a plain capitalised first word loses its capital ("No result" → "no
@@ -15,7 +15,7 @@ export function lowerFirstWord(text: string): string {
 
 export function weakFromSession(record: Pick<SessionRecord, "debrief"> | null | undefined): WeakItem[] {
   const out: WeakItem[] = [];
-  for (const w of record?.debrief?.weak_spots ?? []) {
+  for (const w of interviewDebrief(record?.debrief)?.weak_spots ?? []) {
     if (!w.tag || out.some((o) => o.layer === w.layer)) continue;
     const title = tMaybe(`feedback.tag.${w.tag}`, w.text || w.tag.replace(/_/g, " "));
     const short = lowerFirstWord(title);

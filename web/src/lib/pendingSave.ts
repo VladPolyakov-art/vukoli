@@ -3,12 +3,14 @@
  * at the top of Recents with a loading state (no "Saving…" toast) until the record and its debrief are on disk, then
  * one "ready" toast. Several can run at once: starting a new practice never inherits anything of an older one.
  * Kept in sessionStorage too, so a reload keeps watching; storage may be unavailable. */
+import type { PracticeMode } from "./types";
+
 export interface PendingSave {
   id: string;
   at: number;
   /** What the row says until the server's own title arrives (Recents lists the saved record under its real name). */
   title?: string;
-  track?: "interview" | "english";
+  track?: PracticeMode;
 }
 /** D96: where the server's work after the call stands (answers done of the total; the debrief comes last). The shell
  * polls the record and hands it over here, so the row can say "2 of 5". */

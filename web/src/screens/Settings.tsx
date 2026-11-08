@@ -61,6 +61,7 @@ const SEARCH: SearchItem[] = [
   { id: "voice-stt", section: "voice", label: "settings.voice.sttWhere", keywords: "speech recognition stt microphone mic browser whisper" },
   { id: "voice-pause", section: "voice", label: "settings.voice.pause", description: "settings.voice.pauseHint", keywords: "silence send" },
   { id: "practice-suggester", section: "practice", label: "settings.practice.suggester", description: "settings.practice.suggesterHint", keywords: "sample answer hint" },
+  { id: "practice-tactics", section: "practice", label: "settings.practice.tactics", description: "settings.practice.tacticsHint", keywords: "tough questions negotiate salary tactic cards hide" },
   { id: "practice-order", section: "practice", label: "settings.practice.layerOrder", description: "settings.practice.layerOrderHint", keywords: "feedback content delivery" },
   { id: "practice-strictness", section: "practice", label: "settings.practice.strictness", keywords: "gentle standard tough" },
   { id: "practice-questions", section: "practice", label: "settings.practice.questions", keywords: "count number length" },
@@ -476,6 +477,8 @@ function VoiceSection() {
 function PracticeSection() {
   const { settings } = useApp();
   const { save, view } = useSave();
+  // Tactic cards before Tough questions and Negotiate salary: one switch for both ("Hide tactics" on a plan card turns one off).
+  const [tactics, setTactics] = useState(() => !(prefs.tacticsHidden("tough") && prefs.tacticsHidden("negotiate")));
   if (!settings) return <Skeleton lines={4} />;
   return (
     <>
@@ -483,6 +486,10 @@ function PracticeSection() {
         <SettingRow id="practice-suggester" label={t("settings.practice.suggester")} description={t("settings.practice.suggesterHint")}>
           <Toggle label={t("settings.practice.suggester")} hideLabel track="settings-suggester"
             checked={settings.answer_suggester} onChange={(v) => void save({ answer_suggester: v })} />
+        </SettingRow>
+        <SettingRow id="practice-tactics" label={t("settings.practice.tactics")} description={t("settings.practice.tacticsHint")}>
+          <Toggle label={t("settings.practice.tactics")} hideLabel track="settings-tactics" checked={tactics}
+            onChange={(v) => { prefs.setTacticsHidden("tough", !v); prefs.setTacticsHidden("negotiate", !v); setTactics(v); }} />
         </SettingRow>
         <SettingRow id="practice-order" label={t("settings.practice.layerOrder")} description={t("settings.practice.layerOrderHint")}>
           <Segmented

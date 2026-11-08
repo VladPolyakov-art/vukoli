@@ -212,6 +212,22 @@ Replaced by **Presence** (above): the owner chose the edge glow (A6) over a disc
 - **Motion:** §3.2 Tabs: the selected indicator slides between tabs (`transform` `base`); tab counter pending / new item, §3.2 P3b / P3c.
 - **Story:** `ds-tabs--default`, `--narrow-page`.
 
+### TacticCard · `ds/TacticCard.tsx` — built 2026-11-08 (Tough talk foundation)
+- **Purpose:** one tactic (negotiation or hard-question): title, rule, example in quotes, evidence. Texts come from `api.toughTalkContent()`; the chrome words ("Hint", "Try saying", "Or") from i18n `tactic.*`.
+- **Sizes:** `tile` (plaque on `--note-fill`, `--radius-md`, padding `--space-3`; for a `ScrollStrip`, `as="li"`) · `hint` (`Card padding="sm"` with a head row: bulb, "Hint", `IconButton sm x` = `onHide`; title; rule; "Try saying" + example; optional `alt` = "Or" block after a `--color-border-subtle` hairline) · `inline` (`Disclosure plain`, body rule · example · evidence).
+- **Props:** `size`, `title`, `rule?`, `example?`, `evidence?`, `alt?: {title, example}`, `onHide?`, `headingLevel?` (2–4, default 3), `as?: "div" | "li"`, `className?`. Tiles are not buttons. Tough hint: pass the answer-shape line as `rule`.
+- **Tokens:** `--text-sm|md`, `--weight-semibold`, `--color-text-secondary|tertiary`, `--color-border-subtle`, `--note-fill`. No motion of its own (the Session animates the hint card, motion §3.4 C7).
+- **Stories:** `DS/TacticCard` · Tile, Hint, HintWithoutAlt, Inline, LongText.
+
+### ScrollStrip · `ds/ScrollStrip.tsx` — built 2026-11-08 (Tough talk foundation)
+- **Purpose:** a sideways strip of cards with a header row: label · counter "1–2 of 9" (`aria-live="polite"`) · `IconButton sm` `chevronLeft` / `chevronRight` (disabled at the ends, scroll by 80 % of the width) · `actions` slot ("Hide tactics" link on the plan card).
+- **Anatomy:** `<ul aria-label tabindex=0>` with scroll-snap (children are `li`), edge fade on the side that has more (the QuestionTabs mask rule), item width `--strip-item` (default 4.5 x `--space-16`). Reduced motion: scrolls jump (`scrollBehavior()`).
+- **Props:** `label`, `actions?`, `children`, `className?`. i18n `strip.*`.
+- **Stories:** `DS/ScrollStrip` · Overflow, Fits, Narrow.
+
+### Amount helper · `lib/amount.ts` — built 2026-11-08 (not a component, map §9 gap 6)
+- `parseAmount(raw)` accepts "95000", "95,000", "95 000", "95k", "1.2m" and returns `{ok, value}` or `{ok:false, error: "notNumber" | "notPositive"}`; `formatAmount(n)` gives "95,000" (en-US); `formatAmountText(raw)` for the blur handler; `amountErrorKey(error)` gives the i18n key (`numbers.err.*`). A money Input keeps what was typed, parses on blur and on submit.
+
 ### Toggle · `ds/Toggle.tsx`
 - **Purpose:** on / off setting: answer suggester, Mike speaks, telemetry opt-in.
 - **Anatomy:** label + optional description · `role="switch"` track with thumb.

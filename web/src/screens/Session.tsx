@@ -77,6 +77,10 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   const live = state.phase === "live";
   const voice = state.input !== "text";
   const english = state.mode === "english";
+  const negotiate = state.mode === "negotiate";
+  const tough = state.mode === "tough";
+  /** English and Negotiate count turns ("Turn 3"); Interview, drills and Tough count questions ("Question 2 of 5"). */
+  const turnBased = english || negotiate;
 
   useEffect(() => {
     if (live && startedAt === null) setStartedAt(Date.now());
@@ -96,7 +100,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     const id = state.sessionId;
     if (handedOff.current || !id || userTurns === 0 || !storageOk) return false;
     handedOff.current = true;
-    pendingSave.start(id, { title: state.title || title, track: english ? "english" : "interview" });
+    pendingSave.start(id, { title: state.title || title, track: state.mode === "interview" ? "interview" : state.mode });
     navigate("/", { replace: true });
     // The session reached its debrief: count it, and ask when it is the 1st or the 6th, 11th… (lib/feedback.isAskTurn).
     const asked = endedByUser.current;
@@ -176,10 +180,10 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   useEffect(() => {
     if (!live) return;
     const prev = document.title;
-    const where = english ? t("session.turn", { n: userTurns + 1 }) : total && questionIndex >= 0 ? t("session.progress", { n: questionIndex + 1, total }) : "";
+    const where = turnBased ? t("session.turn", { n: userTurns + 1 }) : total && questionIndex >= 0 ? t("session.progress", { n: questionIndex + 1, total }) : "";
     document.title = [where, title].filter(Boolean).join(" · ");
     return () => { document.title = prev; };
-  }, [live, title, english, userTurns, total, questionIndex]);
+  }, [live, title, turnBased, userTurns, total, questionIndex]);
 
   /* ---------- terminal states ---------- */
   if (state.phase === "failed" && !state.interrupted) {
@@ -223,15 +227,21 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   }
   /* ---------- live: reducer -> view props ---------- */
   const start = config.start;
-  const progress = english
+  const progress = turnBased
     ? t("session.turn", { n: userTurns + 1 })
     : total && questionIndex >= 0 ? t("session.progress", { n: questionIndex + 1, total }) : "";
   const roundLabel = start.round_type ? t(`session.round.${start.round_type}`) : "";
   const strictLabel = start.strictness && STRICT[start.strictness as 1 | 2 | 3] ? t(`session.strict.${STRICT[start.strictness as 1 | 2 | 3]}`) : "";
-  const drill = !english && start.drill === true;
+  const drill = state.mode === "interview" && start.drill === true;
+  // Tough talk (tough-talk.md §4.3): the More header's second line. The negotiate style stays hidden while it is a surprise.
+  const negotiateStart = start.negotiate;
   const sub = english ? undefined
-    : drill && focus ? t("session.focus", { spots: focus })
-      : [roundLabel, strictLabel].filter(Boolean).join(" · ") || undefined;
+    : tough ? t("session.tough.sub", { n: state.questions.length || 5 })
+      : negotiate ? (negotiateStart?.style === "surprise"
+        ? t("session.negotiate.subSurprise")
+        : t("session.negotiate.sub", { style: t(`session.negotiate.style.${negotiateStart?.style ?? "friendly"}`), currency: negotiateStart?.currency ?? "USD" }))
+        : drill && focus ? t("session.focus", { spots: focus })
+          : [roundLabel, strictLabel].filter(Boolean).join(" · ") || undefined;
 
   /* The running transcript (D49): the whole dialogue, newest last. Mike's first line of each thread opens "Question N";
    * follow-ups get their badge. The interim words of the answer being recorded ride on a last user line. */
@@ -239,7 +249,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
   const transcript: TranscriptTurn[] = state.transcript.map((x) => {
     const mike = x.speaker !== "user";
     let question: number | undefined;
-    if (mike && !english && x.kind === "question" && x.threadId && !opened.has(x.threadId)) {
+    if (mike && !turnBased && x.kind === "question" && x.threadId && !opened.has(x.threadId)) {
       opened.add(x.threadId);
       const n = state.threadOrder.indexOf(x.threadId);
       question = n >= 0 ? n + 1 : undefined;
@@ -273,7 +283,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     sub,
     badges: english && start.level ? [{ label: start.level, tone: "outline", icon: "language" }] : undefined,
     progress,
-    step: !english && total && questionIndex >= 0 ? { n: questionIndex + 1, of: total } : undefined,
+    step: !turnBased && total && questionIndex >= 0 ? { n: questionIndex + 1, of: total } : undefined,
     elapsed,
     question: state.currentQuestionText,
     followUp: state.followUps.at(-1),
@@ -282,6 +292,14 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     nextNumber: null,
     suggestion,
     suggestOn: state.suggestOn,
+    hint: tough || negotiate
+      ? {
+        available: state.hintAvailable,
+        open: state.hint !== null,
+        card: state.hint ? { id: state.hint.card_id, title: state.hint.title, text: state.hint.text, example: state.hint.example, shape: state.hint.shape } : undefined,
+        used: state.hintsUsed,
+      }
+      : undefined,
     pauseSec: config.pauseSec,
     notices,
     closing: state.closing,
@@ -308,6 +326,8 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     onTryAgain: actions.retryMic,
     onSendText: actions.sendText,
     onSetSuggest: actions.setSuggest,
+    onToggleHint: tough || negotiate ? actions.toggleHint : undefined,
+    onHideHint: tough || negotiate ? actions.hideHint : undefined,
     onSeeDebrief: end,
   };
 
@@ -315,7 +335,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
     <div className={s.screen}>
       <span className="visually-hidden" role="status" aria-live="polite">{readyMsg}</span>
       <SessionView
-        variant={english ? "english" : drill ? "drill" : "interview"}
+        variant={english ? "english" : negotiate ? "negotiate" : tough ? "tough" : drill ? "drill" : "interview"}
         input={voice ? "voice" : "text"}
         phase={phase}
         overlay={overlay}
@@ -325,7 +345,7 @@ function LiveSession({ config, title, focus }: { config: SessionConfig; title: s
         muted={muted}
         micLevel={0}
         getMicLevel={getLevel}
-        suggester={!english && state.suggesterAvailable && settings?.answer_suggester !== false ? "on" : "off"}
+        suggester={state.mode === "interview" && state.suggesterAvailable && settings?.answer_suggester !== false ? "on" : "off"}
         data={data}
         handlers={handlers}
         entering

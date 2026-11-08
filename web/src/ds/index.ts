@@ -66,3 +66,6 @@ export { Island } from "./Island";
 export type { IslandGroup, IslandProps } from "./Island";
 export { ChatMessage, ChatLog } from "./ChatMessage";
 export type { ChatMessageProps } from "./ChatMessage";
+export { TacticCard } from "./TacticCard";
+export type { TacticCardProps } from "./TacticCard";
+export { ScrollStrip } from "./ScrollStrip";

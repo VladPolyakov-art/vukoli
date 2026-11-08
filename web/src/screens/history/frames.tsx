@@ -3,7 +3,7 @@
 import { MemoryRouter } from "react-router-dom";
 import { AppShellView } from "../../components/AppShell";
 import { SHELL_ENGINE, SHELL_RECENT } from "../debrief/frames";
-import { HISTORY_NOW, RENAMING_ID, RENAMING_VALUE, historyData, historyOverflow, LONG_TITLE, trashData } from "./fixtures";
+import { HISTORY_NOW, RENAMING_ID, RENAMING_VALUE, historyData, historyOverflow, historyTalk, LONG_TITLE, trashData } from "./fixtures";
 import { HistoryView } from "./HistoryView";
 import { TrashView } from "./TrashView";
 import type { HistoryRowModel, HistoryUi, HistoryViewProps, TrackFilter, TrashViewProps } from "./types";
@@ -27,6 +27,10 @@ export const HISTORY_SCENES = {
   /** 375 only: the narrow "more" menu of one row, open. */
   menuOpen: { rows: historyData, trashCount: 1, ui: { menuOpen: "s3" } },
   filteredEmpty: { rows: historyData.filter((r) => r.track === "interview"), trashCount: 1, track: "english", route: "/archive?track=english" },
+  /** Tough talk rows with their result lines (tough-talk.md §7). */
+  talk: { rows: historyTalk, trashCount: 1 },
+  filteredTough: { rows: historyTalk.filter((r) => r.track !== "tough"), trashCount: 1, track: "tough", route: "/archive?track=tough" },
+  filteredNegotiate: { rows: historyTalk.filter((r) => r.track !== "negotiate"), trashCount: 1, track: "negotiate", route: "/archive?track=negotiate" },
   empty: { rows: [] },
   loading: { rows: [], state: "loading" },
   error: { rows: [], state: "error" },

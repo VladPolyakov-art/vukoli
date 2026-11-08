@@ -1,0 +1,25 @@
+/* One item is 4.5 x --space-16 wide (tough-talk map §3): two and a peek on wide screens, one and a peek at 375. */
+.root { --strip-item: calc(var(--space-16) * 4.5); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.list {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: var(--radius-md);
+}
+.list::-webkit-scrollbar { display: none; }
+.list > * { flex: 0 0 var(--strip-item); scroll-snap-align: start; }
+.list:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus-ring); outline-offset: var(--focus-ring-offset); }
+/* Edge fade on the side that has more (alpha mask; any opaque colour works). */
+.fadeStart { mask-image: linear-gradient(to right, transparent, var(--color-canvas) var(--space-10)); }
+.fadeEnd { mask-image: linear-gradient(to left, transparent, var(--color-canvas) var(--space-10)); }
+.fadeBoth {
+  mask-image: linear-gradient(to right, transparent, var(--color-canvas) var(--space-10), var(--color-canvas) calc(100% - var(--space-10)), transparent);
+}
+.head { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.label { flex: 1; min-width: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.counter { margin-inline-end: var(--space-2); font-size: var(--text-sm); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -78,7 +78,14 @@
     "deleteConfirm": "Delete",
     "deleted": "Chat deleted.",
     "pendingProgress": "{done} of {n}",
-    "pendingPreparing": "Preparing feedback"
+    "pendingPreparing": "Preparing feedback",
+    "badge": {
+      "english": "EN",
+      "tough": "TQ",
+      "negotiate": "PAY"
+    },
+    "tough": "Tough questions",
+    "negotiate": "Salary negotiation"
   },
   "search": {
     "nav": "Search",
@@ -614,7 +621,123 @@
       "loading": "Loading your jobs…",
       "level": "Pick your level to start."
     },
-    "disclaimer": "Practice only: no help during real interviews."
+    "disclaimer": "Practice only: no help during real interviews.",
+    "talk": {
+      "chipTough": "Tough questions",
+      "chipNegotiate": "Negotiate salary",
+      "groupSuggestions": "Suggestions",
+      "groupOther": "Other practice",
+      "stepOf": "Step {n} of {total}",
+      "skip": "Skip questions",
+      "practiceOnly": "Practice only: no help during real interviews.",
+      "noted": "Noted. Fill in the numbers above when you're ready.",
+      "planLine": "Here's the plan.",
+      "planTitle": "Here's the plan",
+      "change": "Change",
+      "negotiate": {
+        "role": "Which role are we negotiating for? Pick a saved job and I'll take the range from the post, or type the role.",
+        "noJob": "No job, I'll type it",
+        "rolePlaceholder": "Type the role, e.g. Product Designer",
+        "jobRange": "{company}, {role}. The post says {low}–{high} {currency}.",
+        "jobNoRange": "{company}, {role}. The post doesn't list a range, so add your numbers.",
+        "numbers": "What numbers are we working with? Your target is the yearly base you'd be happy to sign for.",
+        "styleFirst": "How tough should I be? For a first try, Friendly is a good start.",
+        "styleAgain": "Same as last time, {style}?",
+        "styleYes": "Yes, {style}",
+        "styleEasier": "Easier: {style}",
+        "styleHarder": "Harder: {style}",
+        "surprise": "Surprise me",
+        "styleNoMatch": "I didn't catch the style. Pick one:",
+        "answerNoRange": "Target {target} {currency} · {offer}",
+        "start": "Start negotiation",
+        "answer": "{low}–{high} {currency} · target {target} · {offer}",
+        "noOffer": "no competing offer",
+        "hasOffer": "real competing offer",
+        "engineOff": "The AI model is off. Mike will use his scripted lines.",
+        "length": "Up to 12 of your turns, about 10 minutes."
+      },
+      "style": {
+        "friendly": {
+          "easy": "Friendly · easy",
+          "blurb": "Warm, has room, gives a little even without a reason."
+        },
+        "firm": {
+          "medium": "Firm · medium",
+          "blurb": "Polite, holds the line, moves when you give a reason."
+        },
+        "tight": {
+          "hard": "Tight budget · hard",
+          "blurb": "Little room on base. Gives later, not now."
+        },
+        "surprise": {
+          "blurb": "A surprise: you'll see which style after the call."
+        }
+      },
+      "difficulty": {
+        "easy": "Easy",
+        "medium": "Medium",
+        "hard": "Hard"
+      },
+      "numbersCard": {
+        "role": "Role",
+        "from": "Job range, from",
+        "to": "to",
+        "target": "My target",
+        "currency": "Currency",
+        "other": "Other…",
+        "code": "3-letter code",
+        "perYear": "Per year",
+        "realOffer": "I have a real competing offer",
+        "realOfferHint": "Mike counts it as a reason only when it's real.",
+        "note": "Use a number you researched yourself. Vukoli has no salary data. Mike's budget is built from these numbers.",
+        "use": "Use these numbers",
+        "need": "Add the role and your target to continue.",
+        "dialogTitle": "Change your numbers",
+        "save": "Save"
+      },
+      "plan": {
+        "typeRole": "Type a role",
+        "changeLabel": "Change {what}",
+        "role": "Role",
+        "numbers": "Numbers",
+        "numbersRange": "Range {low}–{high} {currency} · your target {target} · per year",
+        "numbersNoRange": "No range in the post · your target {target} {currency} · per year",
+        "mike": "Mike",
+        "offer": "Competing offer",
+        "offerYes": "You have a real offer: Mike counts it as a reason.",
+        "offerNo": "None. If you mention one, Mike won't count it.",
+        "length": "Length",
+        "theme": "Theme",
+        "afterCall": "After the call"
+      },
+      "tough": {
+        "theme": "Which questions should I ask? Pick a theme, or Mix for one from each.",
+        "personal": "In many places an interviewer may not be allowed to ask these. I won't press for details: you practise a short, calm answer.",
+        "noMatch": "I didn't catch the theme. Pick one:",
+        "mike": "Asks a follow-up and pushes back when an answer is long, vague or apologetic. At most two pushes per question.",
+        "length": "{n} questions, about {min} minutes.",
+        "afterCall": "The answer that hurt most, with your own words, and a calmer way to say it.",
+        "start": "Start tough questions",
+        "engineOff": "The AI model is off. The after-call check waits until it's back."
+      },
+      "typeInstead": "Type instead",
+      "typeOnly": "You'll answer by typing.",
+      "themes": {
+        "money": "Money",
+        "leaving": "Leaving and gaps",
+        "weakness": "Weak spots",
+        "fit": "Fit",
+        "english": "English at work",
+        "personal": "Personal questions",
+        "mix": "Mix"
+      },
+      "styleName": {
+        "friendly": "Friendly",
+        "firm": "Firm",
+        "tight": "Tight budget",
+        "surprise": "Surprise me"
+      }
+    }
   },
   "english": {
     "level": "Your level",
@@ -756,7 +879,9 @@
       "text2": "When you're done, press Send (Enter).",
       "text3": "Feedback comes after the call, so Mike stays fast.",
       "text3English": "Corrections come after the call, so Mike stays fast.",
-      "voice1Manual": "Answer aloud when Mike stops. Take your time: Mike waits until you press Send now."
+      "voice1Manual": "Answer aloud when Mike stops. Take your time: Mike waits until you press Send now.",
+      "text3Negotiate": "Your debrief shows how the offer moved.",
+      "text3Tough": "Calmer wording comes in the debrief after the call."
     },
     "controls": {
       "label": "Session controls",
@@ -971,6 +1096,43 @@
       "ready": "Your session is saved",
       "open": "Open debrief",
       "failed": "Couldn't find the saved session yet. Check Recents in a minute."
+    },
+    "tough": {
+      "title": "Tough questions · {theme}",
+      "sub": "{n} questions · pushes back on weak answers",
+      "tab": "Question {n} of {total} · Tough questions",
+      "firstTime": "Mike pushes back on purpose. Press H for a hint.",
+      "notSaved": "Nothing was saved: you didn't answer any questions.",
+      "resume": "Let's pick up at question {n} of {total}.",
+      "pushed": "Mike pushed"
+    },
+    "negotiate": {
+      "title": "Negotiation · {role}",
+      "sub": "{style} · {currency} per year",
+      "subSurprise": "Style revealed after the call",
+      "offer": "Offer on the table: {amount} {currency}",
+      "tab": "Turn {n} · Negotiation",
+      "firstTime": "Say numbers in full, like “ninety-six thousand”, or press T to type them. Press H for a hint.",
+      "notSaved": "Nothing was saved: you didn't reply to Mike yet.",
+      "resume": "Where were we? The offer on the table is {amount} {currency}.",
+      "style": {
+        "friendly": "Friendly",
+        "firm": "Firm",
+        "tight": "Tight budget"
+      },
+      "finished": "Practice finished"
+    },
+    "hint": {
+      "show": "Show a hint (H)",
+      "hide": "Hide the hint (H)",
+      "off": {
+        "connecting": "Hints are ready once Mike starts",
+        "listening": "Hints wait until you stop speaking",
+        "thinking": "A hint is ready after Mike replies",
+        "closing": "Practice finished"
+      },
+      "shortcut": "Show or hide a hint (Tough questions and Negotiation)",
+      "usedLine": "Hints you used: {list}."
     }
   },
   "feedback": {
@@ -1454,6 +1616,118 @@
       "label": "Questions from this interview",
       "prev": "Previous question",
       "next": "Next question"
+    },
+    "talk": {
+      "practiseAgain": "Practise again",
+      "practiseHintNegotiate": "Opens the setup with your last numbers",
+      "practiseHintTough": "Opens the setup with the same theme",
+      "footer": "Practice settings, not real recruiter data.",
+      "mayBeWrong": "May be wrong",
+      "pending": "Writing your debrief. This takes a few seconds…"
+    },
+    "negotiate": {
+      "title": "Negotiation · {role} · {style}",
+      "titleSurprise": "Negotiation · {role} · Surprise ({style})",
+      "meta": "Negotiation · {style}",
+      "missing": "This negotiation was saved without its result.",
+      "result": {
+        "title": "Your result",
+        "moved": "You moved the offer from {from} to {to} {currency}.",
+        "deal": "Now {now} → {later} after {months} months",
+        "dealFlat": "{now} {currency} from the start",
+        "inWriting": "In the offer letter",
+        "notInWriting": "Not in writing",
+        "captured": "of the room captured now",
+        "capturedLater": "after {months} months",
+        "figureTip": "Share of the gap between Mike's first offer and his top of range",
+        "yearOne": "Year one: {amount} {currency}",
+        "firstOffer": "Mike's first offer",
+        "target": "Your target",
+        "range": "Mike's range was",
+        "rangeBuilt": "Mike's range was built from your target",
+        "outcome": "Outcome",
+        "style": "Style",
+        "styleSurprise": "Surprise me: Mike was {style}",
+        "levers": "Bonuses and other levers",
+        "noLevers": "No other levers this time."
+      },
+      "outcome": {
+        "accepted": "You accepted",
+        "time": "You asked for time ({days} days)",
+        "declined": "You declined",
+        "limit": "Mike closed at the turn limit",
+        "ended": "You ended the practice"
+      },
+      "moves": {
+        "title": "What moved the offer",
+        "turn": "Turn {n}",
+        "held": "Offer unchanged · Same number without a new reason",
+        "stepUp": "Goals named: {goals} · In writing: {writing}",
+        "yes": "yes",
+        "no": "no",
+        "asked": "asked",
+        "pressure": "Mike used a {hours}-hour deadline. Real recruiters may or may not.",
+        "offerIgnored": "You mentioned another offer. Mike didn't count it: the practice was set up without one.",
+        "below": "You said {said} before Mike made an offer. He was ready to open at {open}.",
+        "unasked": "Levers you didn't ask about"
+      },
+      "cause": {
+        "reason": "Counter with a reason",
+        "lever": "Lever ask",
+        "stepUp": "Step-up agreed",
+        "offer": "Competing offer"
+      },
+      "better": {
+        "title": "Say it better"
+      },
+      "edge": {
+        "noOfferTitle": "No offer yet",
+        "noOfferBody": "You ended before Mike made an offer. Start with these next time:",
+        "acceptedFirst": "You accepted Mike's first offer: {amount} {currency}.",
+        "noRoom": "Mike had no room to move on base this time.",
+        "declined": "No deal: you declined.",
+        "lastOffer": "Last offer {amount} {currency}"
+      }
+    },
+    "tough": {
+      "title": "Tough questions · {theme}",
+      "meta": "Tough questions",
+      "metaCount": "{n} questions, {pushes} pushes",
+      "missing": "This practice was saved without its summary.",
+      "preparing": "Checking your answers… {n} of {total}",
+      "summary": {
+        "title": "Summary",
+        "calm": "Handled calmly: {n} of {total}",
+        "few": "You answered {n} questions.",
+        "hurt": "The answer that hurt most",
+        "none": "Nothing hurt this time. Every answer stayed calm and on the job.",
+        "go": "Go to question {n}",
+        "one": "You answered 1 question."
+      },
+      "questions": {
+        "title": "Questions"
+      },
+      "q": {
+        "meta": "Question {n} of {total} · {theme} · {pushes}",
+        "pushes_one": "{n} push",
+        "pushes_other": "{n} pushes",
+        "pushed": "Mike pushed:",
+        "answer": "Your answer",
+        "hurt": "What hurt",
+        "calm": "Calm and on the job.",
+        "calmer": "Calmer wording",
+        "shape": "Answer shape",
+        "noCheck": "The after-call check didn't run, so this is the shape of a good answer.",
+        "personal": "In many places this may not be a lawful question to ask. A short answer that steers back to the job is enough."
+      },
+      "signal": {
+        "personal": "Shares personal info",
+        "blame": "Blames others",
+        "argue": "Argues instead",
+        "ramble": "Rambling: {words} words",
+        "apology": "Apologised {n} times",
+        "noExample": "No example"
+      }
     }
   },
   "history": {
@@ -1482,7 +1756,9 @@
     "delete": "Move {title} to trash",
     "mode": {
       "interview": "Interview",
-      "english": "English"
+      "english": "English",
+      "tough": "Tough questions",
+      "negotiate": "Negotiation"
     },
     "noVerdict": "No debrief yet",
     "backToHistory": "Back to Archive",
@@ -1493,7 +1769,9 @@
       "label": "Show",
       "all": "All",
       "interview": "Interview",
-      "english": "English"
+      "english": "English",
+      "tough": "Tough questions",
+      "negotiate": "Negotiation"
     },
     "week": {
       "this": "This week",
@@ -1516,7 +1794,11 @@
       "partial": "No verdict — {answered} of {total} answered",
       "answered_one": "{n} answer",
       "answered_other": "{n} answers",
-      "noDebrief": "No debrief yet"
+      "noDebrief": "No debrief yet",
+      "calm": "Calm in {n} of {total}",
+      "moved": "+{amount} {currency} now · {pct}%",
+      "stepUp": "{now} → {later} at {months} months",
+      "noOffer": "No offer yet"
     },
     "list": "Saved sessions",
     "emptyState": {
@@ -1535,6 +1817,16 @@
         "title": "No interviews yet",
         "body": "An interview is practised against a job you add, with a debrief at the end.",
         "start": "Start an interview"
+      },
+      "tough": {
+        "title": "No tough questions yet",
+        "body": "Mike asks the questions people rehearse least and pushes back on weak answers.",
+        "start": "Start tough questions"
+      },
+      "negotiate": {
+        "title": "No negotiations yet",
+        "body": "Bargain with Mike over your real numbers, then see which moves raised the offer.",
+        "start": "Start a negotiation"
       }
     },
     "error": {
@@ -1553,6 +1845,10 @@
       "show_other": "{n} short sessions",
       "hint": "Fewer than 3 answers, so no verdict",
       "hide": "Hide short sessions"
+    },
+    "rowTitle": {
+      "tough": "Tough questions · {theme}",
+      "negotiate": "Negotiation · {role}"
     }
   },
   "settings": {
@@ -1600,7 +1896,9 @@
       "strictness": "Default strictness",
       "questions": "Questions per interview",
       "defaults": "Interview defaults",
-      "levelHint": "How Mike speaks to you and how much he corrects."
+      "levelHint": "How Mike speaks to you and how much he corrects.",
+      "tactics": "Show tactics before Tough questions and Negotiation",
+      "tacticsHint": "A strip of short tips on the plan card. You can still open a hint during the call."
     },
     "name": {
       "title": "Your name",
@@ -1872,5 +2170,42 @@
       "topics": "Topic",
       "focusMenu": "Focus"
     }
+  },
+  "tactic": {
+    "hint": "Hint",
+    "hideHint": "Hide the hint",
+    "trySaying": "Try saying",
+    "or": "Or",
+    "try": "Try",
+    "youSaid": "What you said",
+    "whyItWorks": "Why it works",
+    "forThisCall": "Tactics for this call",
+    "hide": "Hide tactics",
+    "hidden": "Tactics are hidden.",
+    "show": "Show them",
+    "next": "Start with these next time:"
+  },
+  "strip": {
+    "prev": "Previous tactic",
+    "next": "Next tactic",
+    "range": "{from}–{to} of {total}",
+    "one": "{n} of {total}"
+  },
+  "numbers": {
+    "err": {
+      "notNumber": "Use numbers only, like 95,000 or 95k.",
+      "notPositive": "Use a number above zero.",
+      "role": "Add the role you're negotiating for.",
+      "target": "Add your target.",
+      "rangePair": "Add both ends of the range or leave both empty.",
+      "rangeOrder": "The top of the range is below the bottom. Check the order.",
+      "targetBelow": "Your target is below the range. Use at least {min}.",
+      "code": "Use a 3-letter code, like SEK."
+    },
+    "hint": {
+      "above": "Above the posted range: Mike's budget will stop at the top of the range.",
+      "wide": "These ends are far apart. Check the numbers."
+    },
+    "fromPost": "From the job post — check it"
   }
 }

@@ -2,6 +2,7 @@
  * delete with restore, Delete forever after a confirm: US-23 AC2; the view is `history/TrashView`). Recents in the sidebar hold every other chat. */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
+import { trackOf } from "../components/railItems";
 import { durationMs, useFreshOnce, useToast } from "../ds";
 import { t, tp } from "../i18n";
 import { api } from "../lib/api";
@@ -10,8 +11,9 @@ import { errorMessage } from "../lib/store";
 import type { SessionSummary } from "../lib/types";
 import { renameSession, SESSIONS_CHANGED } from "./debrief/rename";
 import { HistoryView } from "./history/HistoryView";
+import { talkResult } from "./history/talkResult";
 import { TrashView } from "./history/TrashView";
-import type { HistoryRowModel, TrackFilter, TrashRowModel } from "./history/types";
+import { TRACKS, type HistoryRowModel, type TrackFilter, type TrashRowModel } from "./history/types";
 
 /* ---------- row motion (docs/motion.md 3.4: rows enter staggered once, a removed row slides out) ---------- */
 
@@ -59,15 +61,16 @@ function useRowExit(remove: (id: string) => void) {
 /** The saved summary carries a verdict sentence, an answer count and the first question; the row shows what it has.
  * D69: a session with fewer than 3 answers is "short": no verdict sentence, "2 of 5 answered", folded in its week. */
 export function rowFromSummary(x: SessionSummary): HistoryRowModel {
-  const english = x.mode === "english";
-  const short = !english && (Boolean(x.too_short) || (x.answers < 3 && !x.verdict));
+  const track = trackOf(x.mode);
+  // English and the tough-talk modes have their own result line (a verdict, or the answer count): never "short".
+  const short = track === "interview" && (Boolean(x.too_short) || (x.answers < 3 && !x.verdict));
   const result = short
     ? x.planned ? t("history.result.partial", { answered: x.answers, total: x.planned }) : tp("history.result.answered", x.answers)
-    : x.verdict || (x.answers > 0 ? tp("history.result.answered", x.answers) : t("history.result.noDebrief"));
+    : talkResult(x.talk_result) ?? (x.verdict || (x.answers > 0 ? tp("history.result.answered", x.answers) : t("history.result.noDebrief")));
   return {
     id: x.id,
     title: x.title || t("debrief.title"),
-    track: english ? "english" : "interview",
+    track,
     startedAt: x.started_at,
     durationS: x.duration_s ?? undefined,
     result,
@@ -76,7 +79,7 @@ export function rowFromSummary(x: SessionSummary): HistoryRowModel {
   };
 }
 
-const parseTrack = (v: string | null): TrackFilter => (v === "interview" || v === "english" ? v : "all");
+const parseTrack = (v: string | null): TrackFilter => (TRACKS.find((x) => x === v) ?? "all");
 /** Rows stagger in once per visit (motion.md N10), not on every return to the list. */
 const seen = new Set<string>();
 

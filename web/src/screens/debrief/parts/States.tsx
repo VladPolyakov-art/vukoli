@@ -6,13 +6,13 @@ import { Button, Callout, EmptyState, Skeleton, TextShimmer } from "../../../ds"
 import { t, tp } from "../../../i18n";
 import s from "./states.module.css";
 
-export function LoadingBody({ preparing, progress }: { preparing?: boolean; progress?: { done: number; total: number; stage: "feedback" | "debrief" } }) {
+export function LoadingBody({ preparing, progress, talk }: { preparing?: boolean; talk?: boolean; progress?: { done: number; total: number; stage: "feedback" | "debrief" } }) {
   const feedback = progress?.stage === "feedback";
   return (
     <div className={s.loading} aria-busy="true" data-review-id="Debrief/Loading">
       {preparing ? (
         <div className={s.preparing}>
-          <TextShimmer as="p" status size="md">{feedback ? tp("debrief.preparing", progress.total, { done: progress.done }) : t("debrief.pending")}</TextShimmer>
+          <TextShimmer as="p" status size="md">{talk ? t("debrief.talk.pending") : feedback ? tp("debrief.preparing", progress.total, { done: progress.done }) : t("debrief.pending")}</TextShimmer>
           {progress ? <p className={s.preparingHint}>{t("debrief.preparingHint")}</p> : null}
         </div>
       ) : null}

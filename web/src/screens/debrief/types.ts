@@ -2,10 +2,10 @@
  * into it (`mapRecord.ts`), stories and the review page use the fixtures. Text that comes from the model or the
  * user (questions, answers, fixes) is plain English data; every chrome string comes from the locale file. */
 import type { IconName } from "../../ds";
-import type { LayerOrder, ScoreKey } from "../../lib/types";
+import type { LayerOrder, NegotiateDebrief, ScoreKey, SessionRecord, ToughDebrief } from "../../lib/types";
 
 export type Layer = "content" | "language" | "delivery";
-export type DebriefVariant = "interview" | "english" | "example";
+export type DebriefVariant = "interview" | "english" | "example" | "tough" | "negotiate";
 export type DebriefState = "ready" | "loading" | "preparing" | "notFound" | "error";
 
 /** A sentence made of plain text and marked fragments (G20): `fix` in "Say", `heard` in "Heard as", `unsure` for a low-confidence word. */
@@ -262,4 +262,30 @@ export interface DebriefViewProps extends DebriefActions {
 /** Layer order for the weak spots and layer blocks (GR8). */
 export function layerSequence(order: LayerOrder): Layer[] {
   return order === "delivery-first" ? ["delivery", "language", "content"] : ["content", "language", "delivery"];
+}
+
+/** Tough talk (`tough`, `negotiate`): the live container hands the saved record and its debrief straight to the mode's own
+ * page (parts/ToughDebrief*.tsx, parts/NegotiateDebrief*.tsx), which draws the frames of ds/screens/tough-talk.md §5-§6.
+ * They do not go through `mapRecord` / `DebriefView`. `debrief` is null while it is missing (not written, or the check failed). */
+export interface ToughTalkDebriefProps<D extends NegotiateDebrief | ToughDebrief = NegotiateDebrief | ToughDebrief> {
+  record: SessionRecord;
+  debrief: D | null;
+  layerOrder: LayerOrder;
+  /** The Segmented switch "Debrief | Conversation" (`?view=`) and the tough question viewer (`?q=n`) live in the URL. */
+  view: DebriefViewMode;
+  onViewChange: (view: DebriefViewMode) => void;
+  question?: number;
+  onQuestionChange?: (n: number) => void;
+  buildUp?: boolean;
+  /** Storage is not writable (US-23 AC4). */
+  storageError?: boolean;
+  /** An action failed (rename, trash): an error callout under the header. */
+  notice?: string;
+  /** Resolves false when saving the title failed. */
+  onRename?: (title: string) => Promise<boolean>;
+  onDownload?: () => void;
+  onArchive?: () => void;
+  onTrash?: () => void;
+  /** "Practise again": opens the setup with the last numbers / theme (`/?track=negotiate|tough`). */
+  onPractise?: () => void;
 }

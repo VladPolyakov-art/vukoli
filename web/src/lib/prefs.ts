@@ -19,6 +19,7 @@ const KEYS = {
   railCollapsed: "ic.railCollapsed",
   installDismissed: "ic.installDismissed",
   setupStep: "ic.setupStep",
+  tacticsHidden: "ic.tacticsHidden",
 } as const;
 
 function read(key: string): string | null {
@@ -37,7 +38,18 @@ function write(key: string, value: string | null) {
   }
 }
 
+/** The tough-talk practices that show tactic cards before the call (tough-talk.md §3). */
+export type TacticsMode = "tough" | "negotiate";
+
 export const prefs = {
+  /** "Hide tactics" on the plan card = "don't show again for this mode"; Settings → Practice turns them back on. */
+  tacticsHidden(mode: TacticsMode): boolean {
+    return (read(KEYS.tacticsHidden) ?? "").split(",").includes(mode);
+  },
+  setTacticsHidden(mode: TacticsMode, hidden: boolean) {
+    const rest = (read(KEYS.tacticsHidden) ?? "").split(",").filter((m) => m && m !== mode);
+    write(KEYS.tacticsHidden, (hidden ? [...rest, mode] : rest).join(",") || null);
+  },
   /** "Install Vukoli as an app" card on Home: the user said no thanks. */
   installDismissed(): boolean {
     return read(KEYS.installDismissed) === "1";

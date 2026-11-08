@@ -4,9 +4,14 @@
  * runs the script (`script.ts`). Nothing here knows about the network. */
 import type { ReactNode } from "react";
 import type { IconName, WeakSpotLayer } from "../../ds";
-import type { FocusSpot, Level } from "../../lib/types";
+import type { FocusSpot, Level, NegotiateStart, NegotiateStyle, TacticCardData, ToughTalkContent, ToughTheme } from "../../lib/types";
+import type { NumbersValues } from "./numbers";
 
-export type Track = "interview" | "english";
+export type Track = "interview" | "english" | "tough" | "negotiate";
+/** `?track=` on Home (AC5 of US-62): the practice whose setup chat opens. Anything else is the interview home. */
+export function trackFromParam(value: string | null): Track {
+  return value === "english" || value === "tough" || value === "negotiate" ? value : "interview";
+}
 /** Round types (US-12 AC1: four). */
 export type RoundType = "hr" | "behavioural" | "technical" | "mix";
 export type Strictness = 1 | 2 | 3;
@@ -51,8 +56,11 @@ export interface EngineBannerModel {
 /** A start-screen suggestion chip (max 3, home.md §3.3). */
 export type SuggestionId =
   | "again" | "drill" | "english" | "another" | "general" | "example"
-  | "en-free" | "en-work" | "en-small" | "en-phrases";
-export interface Suggestion { id: SuggestionId; icon: IconName; label: string }
+  | "en-free" | "en-work" | "en-small" | "en-phrases"
+  /** Tough talk (tough-talk.md §2.1): the two practice chips next to "Practise English". */
+  | "tough" | "negotiate";
+/** `practice`: the second chip row (Practise English · Tough questions · Negotiate salary, tough-talk.md §2.1). */
+export interface Suggestion { id: SuggestionId; icon: IconName; label: string; group?: "practice" }
 
 export interface SetupReply { id: string; label: string; icon?: IconName }
 
@@ -87,12 +95,39 @@ export interface SetupTurn {
   example?: boolean;
   /** The plan card follows this message. */
   plan?: boolean;
+  /** Negotiate N-2: the numbers card sits inside this message (until it is submitted). */
+  numbers?: NumbersTurn;
 }
 
-export type PlanRow = "job" | "round" | "strictness" | "level" | "topic" | "focus";
+/** The numbers card inside Mike's message (tough-talk.md §2.4). */
+export interface NumbersTurn {
+  values: NumbersValues;
+  /** Prefilled from the job post: "From the job post — check it". */
+  fromPost: boolean;
+  /** The role field is shown only when N-1 did not give the role. */
+  roleField: boolean;
+  currencies: string[];
+  /** Review states: the card opens with its errors shown (as after a press on "Use these numbers"). */
+  showErrors?: boolean;
+}
+
+/** What the setup remembers between visits and the server content it needs (tough-talk.md §2.3, §3). */
+export interface NumbersMemory { role?: string; low?: number; high?: number; target: number; currency: string; hasOffer: boolean }
+export interface TalkContext {
+  /** `GET /api/tough-talk/content`; null while it loads or when the server did not answer. */
+  content: ToughTalkContent | null;
+  /** The style used last time (US-64 AC2); null = first time. */
+  lastStyle: NegotiateStyle | null;
+  /** US-63 AC6: last values per job, else last used. */
+  numbers: { last: NumbersMemory | null; byJob: Record<string, NumbersMemory> };
+  /** "Hide tactics" per mode (Settings → Practice turns them back on). */
+  tacticsHidden: { tough: boolean; negotiate: boolean };
+}
+
+export type PlanRow = "job" | "round" | "strictness" | "level" | "topic" | "focus" | "role" | "style" | "offer" | "theme";
 
 export interface PlanModel {
-  kind: "interview" | "drill" | "english";
+  kind: "interview" | "drill" | "english" | "tough" | "negotiate";
   job: { id: string; company: string; role: string } | null;
   jobStatus: "ready" | "preparing" | "error";
   /** Questions written from the job ("12 questions ready"). */
@@ -111,6 +146,24 @@ export interface PlanModel {
   focus?: { id: "all" | WeakSpotLayer; label: string; spots: string; tags?: FocusSpot[] };
   /** Drill: the Change focus menu ("All 4", "Content 2", …). */
   focusOptions?: { id: "all" | WeakSpotLayer; label: string }[];
+  /** Negotiate salary (kind `negotiate`): the numbers card's values, as the `start.negotiate` block wants them. */
+  negotiate?: NegotiateStart & { company?: string };
+  /** Tough questions (kind `tough`): the chosen theme and its display name ("Money"). */
+  tough?: { theme: ToughTheme; themeName: string };
+  /** Tough talk: the tactic strip above Start (cards from `GET /api/tough-talk/content`, in the order of the call);
+   * `tacticsHidden` is the "Hide tactics" preference (Settings → Practice). */
+  tactics?: TacticCardData[];
+  tacticsHidden?: boolean;
+  /** Tough talk: options for the Change menus and the numbers dialog. */
+  talk?: {
+    styles: { id: NegotiateStyle; label: string; difficulty: string }[];
+    themes: { id: ToughTheme; label: string }[];
+    currencies: string[];
+    /** The range in the numbers came from the job post ("From the job post — check it"). */
+    fromPost: boolean;
+    /** The role is typed, not taken from a saved job: the dialog shows the Role field. */
+    roleEditable: boolean;
+  };
   /** English. */
   level?: Level;
   topic?: string;
@@ -118,10 +171,14 @@ export interface PlanModel {
 }
 
 export interface SetupModel {
+  /** The practice this chat sets up (the chip may switch it away from the page's track). */
+  track?: Track;
   turns: SetupTurn[];
   /** "Step 2 of 3"; none once the plan is shown, or for Again / Drill. */
   step?: { n: number; of: number };
   canSkip: boolean;
+  /** Overrides the composer placeholder of the turn (negotiate: "Type the role, e.g. Product Designer"). */
+  placeholder?: string;
   /** The bottom composer's placeholder follows the chat: job → "Paste a job or a link", reply, plan. */
   stage: "job" | "reply" | "plan";
   plan?: PlanModel;
@@ -162,7 +219,7 @@ export interface HomeViewProps {
   /** Settings: the order of the three layers in the example (GR8). */
   layerOrder?: "content-first" | "delivery-first";
   /** Review states: a menu open on first render. */
-  initialOverlay?: "change-job" | "change-round" | "change-strictness";
+  initialOverlay?: "change-job" | "change-round" | "change-strictness" | "change-numbers" | "change-style" | "change-theme";
   /** Rendered after the column (VacancyEditor dialog). */
   overlay?: ReactNode;
   onComposerChange?: (text: string) => void;
@@ -182,6 +239,10 @@ export interface HomeViewProps {
   onTurnAction?: (turnId: string, actionId: TurnActionId) => void;
   onSkip?: () => void;
   onChange?: (row: PlanRow, value: string) => void;
+  /** Negotiate: the numbers card of Mike's message (turn id) or the plan's "Change your numbers" dialog (null) was submitted. */
+  onNumbers?: (turnId: string | null, values: NumbersValues) => void;
+  /** "Hide tactics" / "Show them" on the plan card of a tough-talk mode. */
+  onTactics?: (hidden: boolean) => void;
   onRemoveNote?: () => void;
   onRetryPrep?: () => void;
   onAddCv?: () => void;

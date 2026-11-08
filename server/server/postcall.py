@@ -236,7 +236,13 @@ def repair(session: dict, layer_order: str) -> bool:
     for record in session.get("feedback", []):
         if not record.get("complete"):
             settle(record, session.get("mode", "interview"), "interrupted")
-    if not session.get("debrief") and session.get("feedback"):
+    if not session.get("debrief") and session.get("mode") in ("tough", "negotiate"):
+        from . import talk
+        try:
+            session["debrief"] = talk.debrief_for(session)         # made in code from the saved state
+        except (KeyError, TypeError, ValueError):
+            pass
+    elif not session.get("debrief") and session.get("feedback"):
         session["debrief"] = feedback.fallback_debrief(session["feedback"], layer_order)
     session.pop("post_call", None)
     return True

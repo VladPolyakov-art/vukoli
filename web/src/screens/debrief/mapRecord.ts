@@ -5,7 +5,7 @@ import { percent, windowName } from "../../components/engine/PlanLimit";
 import { diffMarks, paceVerdict } from "../../components/Feedback";
 import { t, tMaybe, tp } from "../../i18n";
 import { formatClock, formatDateTime, formatDuration } from "../../lib/format";
-import type { FeedbackRecord, LanguageItem, LayerName, LowConfWord, ScoreKey, SessionRecord, WeakSpot } from "../../lib/types";
+import { interviewDebrief, type FeedbackRecord, type LanguageItem, type LayerName, type LowConfWord, type ScoreKey, type SessionRecord, type WeakSpot } from "../../lib/types";
 import { languageCounts, type StrongerState, type Thread } from "../../session/reducer";
 import { verdictModel } from "./verdictStep";
 import type {
@@ -168,7 +168,7 @@ const isRich = (list: WeakSpot[]) => list.some((w) => w.said || w.lands_as);
 
 function weakSpots(record: SessionRecord): WeakSpotModel[] {
   const out: WeakSpotModel[] = [];
-  const list = record.debrief?.weak_spots ?? [];
+  const list = interviewDebrief(record.debrief)?.weak_spots ?? [];
   // D98: with "What you said" / "How it lands" the card needs a short heading and the server's `text` becomes "How to fix";
   // an older debrief keeps its sentence as the heading.
   const rich = isRich(list);
@@ -198,7 +198,7 @@ function weakSpots(record: SessionRecord): WeakSpotModel[] {
 export const SCORE_ORDER: ScoreKey[] = ["structure", "own_part", "result", "relevance", "reflection", "language", "delivery"];
 
 function scorecard(record: SessionRecord): ScoreRowModel[] | undefined {
-  const rows = record.debrief?.scorecard?.rows;
+  const rows = interviewDebrief(record.debrief)?.scorecard?.rows;
   if (!rows?.length) return undefined;
   const out = SCORE_ORDER.flatMap((key) => {
     const row = rows.find((r) => r.key === key);
@@ -213,7 +213,7 @@ function scorecard(record: SessionRecord): ScoreRowModel[] | undefined {
  * model's sentence is the line under it; without one (too short, no scored row, an older server) the sentence is the
  * headline and there is no scale. */
 function verdict(record: SessionRecord): VerdictModel | undefined {
-  const d = record.debrief;
+  const d = interviewDebrief(record.debrief);
   if (!d?.verdict) return undefined;
   const strength = d.strength?.trim() || undefined;
   const value = d.step?.value;
@@ -226,9 +226,9 @@ function verdict(record: SessionRecord): VerdictModel | undefined {
 /** A step shows the title and the questions of ITS weak spot (layer and tag): the weak-spot cards are one per layer, so the
  * card of the layer is the wrong source for a second step of the same layer (C3). */
 function plan(record: SessionRecord): PlanStepModel[] | undefined {
-  const steps = (record.debrief?.plan ?? []).filter((p) => p.text?.trim()).slice(0, 3);
+  const steps = (interviewDebrief(record.debrief)?.plan ?? []).filter((p) => p.text?.trim()).slice(0, 3);
   if (!steps.length) return undefined;
-  const list = record.debrief?.weak_spots ?? [];
+  const list = interviewDebrief(record.debrief)?.weak_spots ?? [];
   const rich = isRich(list);
   // Only the first step carries the drill (US-20 AC8).
   return steps.map((p, i) => {
@@ -391,7 +391,7 @@ export function mapRecord(record: SessionRecord, opts: MapOptions): DebriefModel
   const english = record.mode === "english";
   const total = Math.max(record.questions.length, threads.length);
   const answered = Math.min(answeredQuestions(record), total);
-  const d = record.debrief;
+  const d = interviewDebrief(record.debrief);
   const partial = !english && (Boolean(d?.too_short) || (answered < MIN_ANSWERS && total > 0 && answered < total && !d?.verdict)) ? { answered, total } : undefined;
   const followUps = record.feedback.filter((f) => f.answer_kind === "follow_up").length;
   const spots = partial ? [] : weakSpots(record);

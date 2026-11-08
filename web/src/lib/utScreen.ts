@@ -25,15 +25,17 @@ export function utScreenForPath(pathname: string): string | null {
 }
 
 /** Home: the start screen, the scripted setup chat, or the plan card (English has its own plan name). */
-export function homeUtScreen(setup: { active: boolean; plan?: "interview" | "drill" | "english" | null }): string {
+export function homeUtScreen(setup: { active: boolean; plan?: "interview" | "drill" | "english" | "tough" | "negotiate" | null }): string {
   if (!setup.active) return "/";
   if (setup.plan === "english") return "/home/plan-english";
+  if (setup.plan === "tough") return "/home/plan-tough";
+  if (setup.plan === "negotiate") return "/home/plan-negotiate";
   if (setup.plan) return "/home/plan";
   return "/home/setup-chat";
 }
 
 export function sessionUtScreen(mode: string | undefined): string {
-  return mode === "english" ? "/session/english" : "/session";
+  return mode === "english" || mode === "tough" || mode === "negotiate" ? `/session/${mode}` : "/session";
 }
 
 /** Sets the name. `restore`: on release, put the previous name back (a popup over a page: Settings). Without `restore`

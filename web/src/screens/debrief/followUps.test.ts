@@ -4,7 +4,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { SessionRecord } from "../../lib/types";
+import { interviewDebrief, type SessionRecord } from "../../lib/types";
 import { mapRecord } from "./mapRecord";
 import { rowsLostIn } from "./parts/debriefShared";
 import { Plan } from "./parts/Plan";
@@ -42,7 +42,7 @@ describe("question numbers (R2-1)", () => {
 
   it("an old server (no `questions` on the spot) still reads the evidence ids it sends", () => {
     const old = structuredClone(record);
-    for (const w of old.debrief!.weak_spots) delete w.questions;
+    for (const w of interviewDebrief(old.debrief)!.weak_spots) delete w.questions;
     expect(mapRecord(old, opts).weakSpots.find((w) => w.id === "content-no_result")?.evidence?.ids).toEqual([5, 6, 7]);
   });
 });

@@ -11,7 +11,7 @@ from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from . import (DATA_VERSION, __version__, config, content, debrief_view, engines, feedback, feedback_form, memory, planner,
-               postcall, search, storage, stt, telemetry, tts, usage)
+               postcall, search, storage, stt, talk, telemetry, tts, usage)
 from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
 from .engines import ollama as ollama_engine
@@ -426,6 +426,20 @@ def _vacancy_or_404(vacancy_id: str) -> dict:
         raise fail(404, "not_found", "Job posting not found.")
 
 
+@router.get("/tough-talk/content")
+async def tough_talk_content() -> dict:
+    """Tactic cards, themes, styles and notes for the Tough talk screens (static content, no model)."""
+    return talk.public_content()
+
+
+@router.get("/vacancies/{vacancy_id}/salary-range")
+async def vacancy_salary_range(vacancy_id: str) -> dict:
+    """A pay range found in the saved job text, for prefilling the negotiation form. Plain pattern match, no model."""
+    vacancy = _vacancy_or_404(vacancy_id)
+    low, high, currency = talk.salary_range(vacancy.get("text", ""))
+    return {"low": low, "high": high, "currency": currency, "title": vacancy.get("title", "")}
+
+
 @router.get("/vacancies")
 async def list_vacancies() -> dict:
     items = sorted(storage.list_records("vacancies"), key=lambda v: v.get("created_at", ""), reverse=True)
@@ -544,7 +558,8 @@ async def list_sessions() -> dict:
                           "too_short": bool((s.get("debrief") or {}).get("too_short")),
                           "planned": len(s.get("questions") or []),
                           "archived": bool(s.get("archived")),
-                          "first_question": _first_question(s)} for s in items]}
+                          "first_question": _first_question(s),
+                          "talk_result": talk.talk_result(s)} for s in items]}
 
 
 def _first_question(record: dict) -> str:
@@ -646,6 +661,13 @@ async def rerun_debrief(session_id: str, request: Request) -> dict:
     _not_while_preparing(session_id)
     session = _session_or_404(session_id)
     settings = config.load_settings()
+    if session.get("mode") in talk.TALK_MODES:                  # Tough talk: computed in code, no model
+        try:
+            session["debrief"] = talk.debrief_for(session)
+        except (KeyError, TypeError, ValueError):
+            raise fail(409, "no_state", "This session has no saved practice state to build a debrief from.")
+        storage.save_session(session)
+        return _shown_debrief(session)
     llm = None
     if session.get("mode") == "interview":
         try:

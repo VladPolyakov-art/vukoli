@@ -57,7 +57,7 @@ export function DebriefView(props: DebriefViewProps) {
     return (
       <div className={root} aria-busy="true">
         {heading}
-        <LoadingBody preparing={state === "preparing"} progress={props.progress} />
+        <LoadingBody preparing={state === "preparing"} progress={props.progress} talk={variant === "tough" || variant === "negotiate"} />
       </div>
     );
   }

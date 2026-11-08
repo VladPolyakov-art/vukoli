@@ -56,7 +56,7 @@ Source of truth: `server/ws.py` (socket loop), `server/session.py` (local interv
 
 | Field | Values | Default |
 |---|---|---|
-| `mode` | `interview`, `english`, `quick` (see below) | `interview` |
+| `mode` | `interview`, `english`, `tough`, `negotiate`, `quick` (see below and "Tough talk") | `interview` |
 | `round_type` | `hr`, `behavioural`, `mix` (interview only) | `mix` |
 | `questions` | 1 to 10 main questions | settings `questions_per_session` |
 | `strictness` | 1 gentle, 2, 3 demanding (follow-ups per question: 1, 2, 2) | settings |
@@ -410,3 +410,25 @@ The route is registered before `/api/sessions/{id}`, so `search` is never taken 
   which has no question tabs. The page opens `/sessions/<id>?q=<q>`.
 - A session with a missing or odd field (not a dict, a non-string title, a broken file) is searched with what it has or
   skipped; it never fails the call.
+
+
+## Tough talk (modes `tough` and `negotiate`)
+
+The full contract (start fields, errors, hint, REST, saved blocks, debrief shapes, step-up rules) is `docs/features/tough-talk/protocol.md`. The rows the socket client needs:
+
+- `start`: `mode: "negotiate"` with `negotiate: {role, job_low, job_high, target, currency, style: friendly|firm|tight|surprise, has_real_offer}` or `mode: "tough"` with `tough: {theme: money|leaving|weakness|fit|english|personal|mix}`. Wrong input: `error` `bad_start`, message ends with the field in parentheses, e.g. `(negotiate.target)`. With `resume_session_id` the block may be left out. These modes run on the text driver even when the engine is Gemini Live.
+- `session_started` adds `talk: true`, `hint_available: true`, `suggester_available: false`, and `negotiate: {role, currency, period, style, has_real_offer, job_low, job_high, target}` (style `surprise` stays hidden) or `tough: {theme, theme_name, total}` with `questions` as ids only (`text: ""`).
+- `turn_complete` (Mike) may add `outcome` (negotiate closing: `accepted|time|declined|turn_cap`), `index`, `total`. Kinds: negotiate `turn` / `closing`; tough `question` / `follow_up` / `pressure` / `move_on` / `closing` (and `repeat`).
+- Client `{"type":"hint"}` answers `{"type":"hint","mode","card_id","title","text","example","n","shape"?}` (no model); other modes: `error` `hint_unavailable`.
+- No `feedback` records are made. After End: `session_saved`, tough only `feedback_progress {done,total}` (one model pass per answered question, `debrief_pending`), then `debrief` with `kind: "negotiate"|"tough"` (computed in code).
+- REST: `GET /api/tough-talk/content`, `GET /api/vacancies/{id}/salary-range` (`{low, high, currency, title}`), `POST /api/sessions/{id}/debrief` recomputes in code. History: `mode` is `tough` / `negotiate`.
+- Saved record: `negotiation` or `tough` block (state, also used to resume); a cut-off call is continued with the same offer, round, flags and levers (Mike restates the offer / asks the current question again).
+
+- Negotiate debrief extras: `held[{turn,offer,asked,why,quote}]`, `named_below_opening{turn,your_number,opening,quote}|null`, and `your_number` / `opening` on the say-it-better entry `named_below_opening`. `accepted_first_offer` only without any number, lever, step-up or counter.
+
+- Sessions list (`GET /api/sessions`): each row has `talk_result` = `null` for other modes; tough `{kind:"tough", calm, total}`; negotiate `{kind:"negotiate", outcome, currency, opening, final_offer, gain_now, captured_now_pct, step_up: {later, after_months, in_writing} | null, no_offer}` (amounts are plain integers; `opening`/`final_offer`/`gain_now` are null when no offer was made).
+
+- Say-it-better entries (negotiate and tough rows) always carry a non-empty `why` (the card's evidence line). `try` / hint `example` use real numbers from state (N10 months, N9 offer + later, N5 anchor, N1 range) and fall back to the static card example when unknown.
+- Hint rule: no card for a move the user just made (after `ask_range` or Mike's `press_number` the hint is N1, not N2); a pending/given step-up plus a writing/criteria ask routes to `step_up_detail` (in_writing, criteria_asked) and an amount equal to the step-up later amount is not a counter.
+- Accept closing line names the agreed step-up and levers: "...90,000 USD base per year, rising to 98,000 USD after 6 months tied to the goals".
+- Tough `hurt_most` severity order: blames_others, argues_instead, shares_personal_info, rambling, over_apology, no_example.

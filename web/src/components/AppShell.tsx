@@ -22,7 +22,7 @@ import { feedbackUi } from "../lib/feedbackUi";
 import { pendingSave } from "../lib/pendingSave";
 import { prefs } from "../lib/prefs";
 import { errorMessage, useApp } from "../lib/store";
-import { pendingLabel, railSessions, withPending, type RailSession } from "./railItems";
+import { pendingLabel, railBadge, railSessions, withPending, type RailSession } from "./railItems";
 import { SESSIONS_CHANGED, TITLE_MAX } from "../screens/debrief/rename";
 import { FeedbackHost } from "./FeedbackHost";
 import { LogoMark, Wordmark } from "./Wordmark";
@@ -37,6 +37,12 @@ export const RouterLink: LinkComponent = ({ href, children, ...rest }) => <Link 
 export type NavKey = "practice" | "archive" | "settings";
 /** One chat row: title and track (no date or time: D57). */
 export type RecentSession = RailSession;
+
+/** EN · TQ · PAY at the end of a Recents row (tough-talk.md §7); interviews have none. */
+function RailBadge({ track }: { track: RailSession["track"] }) {
+  const badge = railBadge(track);
+  return badge ? <span className={s.track} title={badge.title}>{badge.text}</span> : null;
+}
 export type RecentState =
   | { status: "loading" }
   | { status: "error" }
@@ -354,7 +360,7 @@ function ChatRow({ item, current, menuOpen, actions, onNavigate }: {
             <>
               {item.progress && item.progress.stage === "feedback"
                 ? <span className={s.track}>{t("rail.pendingProgress", { done: item.progress.done, n: item.progress.total })}</span>
-                : item.track === "english" ? <span className={s.track} title={t("rail.english")}>EN</span> : null}
+                : <RailBadge track={item.track} />}
               <span className="visually-hidden">{pendingLabel(item.progress)}</span>
             </>
           )}
@@ -380,7 +386,7 @@ function ChatRow({ item, current, menuOpen, actions, onNavigate }: {
       <NavRow
         href={`/sessions/${encodeURIComponent(item.id)}`}
         label={item.title}
-        end={item.track === "english" ? <span className={s.track} title={t("rail.english")}>EN</span> : undefined}
+        end={railBadge(item.track) ? <RailBadge track={item.track} /> : undefined}
         current={current}
         linkAs={RouterLink}
         track="rail-session"

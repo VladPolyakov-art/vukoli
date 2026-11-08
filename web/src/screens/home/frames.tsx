@@ -11,8 +11,9 @@ import { HomeView } from "./HomeView";
 import { t } from "../../i18n";
 import { CV_FILE, DICTATED, JOB_FILE, KESTREL_PASTED, PASTED_TEXT } from "./fixtures";
 import {
-  attach, begin, change, pick, removeNote, resolveCv, resolveJob, say, setupModel, skip, suggestionsFor, updateJob,
-  type JobResult, type ScriptContext, type SetupState,
+  attach, begin, change, pick, removeNote, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip,
+  submitNumbers, suggestionsFor, updateJob,
+  type JobResult, type RangeResult, type ScriptContext, type SetupState,
 } from "./script";
 import { quickStartFor } from "./quickStart";
 import { SCENES, type HomeScene, type HomeSceneId, type SceneInput } from "./states";
@@ -93,6 +94,12 @@ export function replay(ctx: ScriptContext, inputs: SceneInput[]): SetupState | n
     else if (step.do === "change") st = change(ctx, st, step.row, step.value);
     else if (step.do === "attach") st = attach(ctx, st, step.file);
     else if (step.do === "resolveCv") st = resolveCv(ctx, st, step.result);
+    else if (step.do === "resolveRange") st = resolveRange(ctx, st, step.result);
+    else if (step.do === "tactics") st = setTacticsHidden(st, step.hidden);
+    else if (step.do === "numbers") {
+      const card = [...st.turns].reverse().find((x) => x.numbers);
+      if (card?.numbers) st = submitNumbers(ctx, st, card.id, { ...card.numbers.values, ...step.values });
+    }
   }
   return st;
 }
@@ -105,7 +112,13 @@ export function HomeHarness({ scene }: { scene: HomeScene }) {
   const p = scene.props ?? {};
   const track = scene.ctx.track;
   const ctx = useMemo<ScriptContext>(() => ({ ...scene.ctx, track }), [scene.ctx, track]);
-  const [setup, setSetup] = useState<SetupState | null>(() => (scene.inputs ? replay(scene.ctx, scene.inputs) : null));
+  const [setup, setSetup] = useState<SetupState | null>(() => {
+    const st = scene.inputs ? replay(scene.ctx, scene.inputs) : null;
+    const view = scene.numbersView;
+    if (!st || !view) return st;
+    // Review only: the open numbers card as it looks after typing (and pressing "Use these numbers").
+    return { ...st, turns: st.turns.map((x) => (x.numbers ? { ...x, numbers: { ...x.numbers, values: { ...x.numbers.values, ...view.values }, showErrors: view.showErrors } } : x)) };
+  });
   const [composer, setComposer] = useState(p.composer ?? { text: "" });
   const [textMode, setTextMode] = useState(Boolean(p.textMode));
   const [starting, setStarting] = useState(Boolean(p.starting));
@@ -134,6 +147,11 @@ export function HomeHarness({ scene }: { scene: HomeScene }) {
     if (!pending || held) return;
     if (pending.kind === "cv") {
       const id = window.setTimeout(() => setSetup((st) => (st ? resolveCv(ctx, st, scene.cvWith ?? "ok") : st)), PENDING_MS);
+      return () => window.clearTimeout(id);
+    }
+    if (pending.kind === "range") {
+      const range: RangeResult = scene.rangeWith ?? { ok: true, low: 85000, high: 98000, currency: "EUR" };
+      const id = window.setTimeout(() => setSetup((st) => (st ? resolveRange(ctx, st, range) : st)), PENDING_MS);
       return () => window.clearTimeout(id);
     }
     const result: JobResult = scene.resolveWith ?? (pending.kind === "link" ? { ok: false } : { ok: true, job: KESTREL_PASTED });
@@ -202,6 +220,8 @@ export function HomeHarness({ scene }: { scene: HomeScene }) {
       }}
       onSkip={() => run((st) => skip(ctx, st))}
       onChange={(row, value) => run((st) => change(ctx, st, row, value))}
+      onNumbers={(turnId, values) => run((st) => submitNumbers(ctx, st, turnId, values))}
+      onTactics={(hidden) => run((st) => setTacticsHidden(st, hidden))}
       onRemoveNote={() => run(removeNote)}
       onRetryPrep={() => run((st) => updateJob(st, { ...KESTREL_PASTED, state: "ready", questions: 12 }))}
       onStart={() => { setStarting(true); later(() => setStarting(false), PREP_MS); }}

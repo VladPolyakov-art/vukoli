@@ -1,7 +1,11 @@
 /* View model of the History list (ds/screens/debrief.md §4). Pure data: the live container maps `SessionSummary` into
  * it, stories and the review page use the fixtures. */
 import type { HTMLAttributes } from "react";
-export type Track = "interview" | "english";
+import type { PracticeMode } from "../../lib/types";
+/** The four practices (interview, English, Tough questions, Negotiate salary). */
+export type Track = PracticeMode;
+/** Filter chips in order, and the `?track=` values. */
+export const TRACKS: readonly Track[] = ["interview", "english", "tough", "negotiate"];
 export type TrackFilter = "all" | Track;
 export type HistoryState = "ready" | "loading" | "error";
 

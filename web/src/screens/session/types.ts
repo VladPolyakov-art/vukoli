@@ -5,7 +5,10 @@
 import type { CaptionTurn, IconName } from "../../ds";
 import type { EngineId } from "../../lib/types";
 
-export type SessionVariant = "interview" | "drill" | "english";
+/** `tough` (uncomfortable questions) counts questions like an interview; `negotiate` counts turns like English. */
+export type SessionVariant = "interview" | "drill" | "english" | "tough" | "negotiate";
+/** Variants that count turns, not questions: no "Next question", no "Question N" headings (English, Negotiate). */
+export const countsTurns = (variant: SessionVariant): boolean => variant === "english" || variant === "negotiate";
 export type SessionInput = "voice" | "text";
 export type SessionPhase =
   | "connecting" | "mike-speaking" | "your-turn" | "listening" | "thinking" | "between" | "feedback" | "interrupted" | "saving";
@@ -26,6 +29,20 @@ export interface SessionSuggestion {
   answer?: string;
   points?: string[];
   message?: string;
+}
+
+/** Tough talk hint (ds/screens/tough-talk.md §4.1-4.2). The card text comes from the server, never from i18n. */
+export interface SessionHint {
+  /** The Hint button works in this phase (the view also gates it by phase; `reason` is the tooltip when it does not). */
+  available: boolean;
+  /** The card is open (the button is `aria-pressed`). */
+  open: boolean;
+  /** The server's card; `shape` is the tough answer-shape line. */
+  card?: { id: string; title: string; text: string; example: string; shape?: string };
+  /** A second card shown after a hairline under the first ("Or"). Optional: only the fixtures use it. */
+  alt?: { id: string; title: string; example: string };
+  /** Hints asked so far. */
+  used: number;
 }
 
 export interface SessionData {
@@ -55,6 +72,8 @@ export interface SessionData {
   suggestion?: SessionSuggestion;
   /** The suggester toggle starts on (default true). */
   suggestOn?: boolean;
+  /** Tough talk (`tough`, `negotiate`): the Hint button and card. Absent: the mode has no hint (the island draws no button). */
+  hint?: SessionHint;
   /** Seconds of quiet that end a voice answer; 0 = manual. */
   pauseSec: number;
   /** Notices from the app that don't change the layout (live container only). */
@@ -89,6 +108,10 @@ export interface SessionHandlers {
   onNext?: () => void;
   onSeeDebrief?: () => void;
   onSetSuggest?: (on: boolean) => void;
+  /** Tough talk: H / the Hint button (shows the card for this moment, or hides it when open). */
+  onToggleHint?: () => void;
+  /** Tough talk: the × on the hint card. */
+  onHideHint?: () => void;
   onDismissBanner?: () => void;
   onUseText?: () => void;
   onFixSettings?: () => void;

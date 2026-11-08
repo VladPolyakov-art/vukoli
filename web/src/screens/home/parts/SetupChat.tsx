@@ -11,6 +11,7 @@ import { durationMs, scrollBehavior, usePresence } from "../../../ds/motion";
 import { t } from "../../../i18n";
 import type { HomeViewProps, SetupReply, SetupTurn } from "../types";
 import { ExampleCard } from "./ExampleCard";
+import { NumbersCard } from "./NumbersForm";
 import { PlanCard } from "./PlanCard";
 import s from "./parts.module.css";
 
@@ -199,6 +200,18 @@ export function SetupChat(props: SetupChatProps) {
             {turn.example ? (
               <div className={isFresh ? "motion-card" : undefined}><ExampleCard order={props.layerOrder} /></div>
             ) : null}
+            {turn.numbers ? (
+              <div className={isFresh ? "motion-card" : undefined}>
+                <NumbersCard
+                  initial={turn.numbers.values}
+                  roleField={turn.numbers.roleField}
+                  fromPost={turn.numbers.fromPost}
+                  currencies={turn.numbers.currencies}
+                  showErrors={turn.numbers.showErrors}
+                  onSubmit={(values) => props.onNumbers?.(turn.id, values)}
+                />
+              </div>
+            ) : null}
             {turn.plan && setup?.plan ? (
               <div className={isFresh ? "motion-card" : undefined}>
                 <PlanCard
@@ -210,6 +223,8 @@ export function SetupChat(props: SetupChatProps) {
                   initialOverlay={props.initialOverlay}
                   headingRef={heading}
                   onChange={props.onChange}
+                  onNumbers={props.onNumbers}
+                  onTactics={props.onTactics}
                   onRemoveNote={props.onRemoveNote}
                   onRetryPrep={props.onRetryPrep}
                   onAddCv={props.onAddCv}

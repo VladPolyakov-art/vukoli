@@ -9,9 +9,11 @@ import { useDocumentTitle } from "../lib/documentTitle";
 import { useInterval, useLoad } from "../lib/hooks";
 import { useStorageWritable } from "../lib/storageProbe";
 import { errorMessage, useApp } from "../lib/store";
-import type { SessionRecord } from "../lib/types";
+import { isNegotiateDebrief, isToughDebrief, type SessionRecord } from "../lib/types";
 import type { StrongerState } from "../session/reducer";
 import { DebriefView } from "./debrief/DebriefView";
+import { NegotiateDebriefPage } from "./debrief/talk/NegotiateDebriefPage";
+import { ToughDebriefPage } from "./debrief/talk/ToughDebriefPage";
 import type { DebriefViewMode } from "./debrief/types";
 import { DEFAULT_OPEN, exampleSam } from "./debrief/fixtures";
 import { feedbackOfFlag, mapRecord, threadsFromRecord } from "./debrief/mapRecord";
@@ -123,9 +125,11 @@ function LiveDebrief() {
   }, preparing ? 2000 : 3000, waiting);
   useEffect(() => { setPolls(0); setStronger({}); setNotice(""); setRechecking(null); }, [id]);
 
+  // Tough talk records have their own page (no feedback records, no weak spots): they skip the interview mapping.
+  const toughTalk = record?.mode === "tough" || record?.mode === "negotiate";
   const model = useMemo(
-    () => (record ? mapRecord(record, { obsidian: Boolean(settings?.obsidian_dir), stronger, waiting }) : undefined),
-    [record, settings?.obsidian_dir, stronger, waiting],
+    () => (record && !toughTalk ? mapRecord(record, { obsidian: Boolean(settings?.obsidian_dir), stronger, waiting }) : undefined),
+    [record, toughTalk, settings?.obsidian_dir, stronger, waiting],
   );
 
   /* The feedback and the debrief are still being made: say how far it is (the model below is not shown until it is done). */
@@ -133,7 +137,7 @@ function LiveDebrief() {
     const { done, total, stage } = record.post_call;
     return (
       <DebriefView
-        variant={record.mode === "english" ? "english" : "interview"}
+        variant={record.mode === "interview" ? "interview" : record.mode}
         state="preparing"
         progress={{ done, total, stage }}
         layerOrder={settings?.layer_order ?? "content-first"}
@@ -244,8 +248,23 @@ function LiveDebrief() {
       return false;
     }
   };
-  const practise = () => navigate(record.mode === "english" ? "/?track=english" : "/");
-  const drill = () => navigate(record.mode === "english" ? "/?track=english" : `/?drill=1&session=${encodeURIComponent(record.id)}${record.vacancy_id ? `&job=${encodeURIComponent(record.vacancy_id)}` : ""}`);
+  // Every practice opens its own setup: English, Tough questions and Negotiate salary by `?track=`, interviews at Home.
+  const practise = () => navigate(record.mode === "interview" ? "/" : `/?track=${record.mode}`);
+  const drill = () => navigate(record.mode !== "interview" ? `/?track=${record.mode}` : `/?drill=1&session=${encodeURIComponent(record.id)}${record.vacancy_id ? `&job=${encodeURIComponent(record.vacancy_id)}` : ""}`);
+
+  /* Tough talk (tough-talk.md §5, §6): own pages, fed straight from the saved debrief. */
+  if (record.mode === "negotiate" || record.mode === "tough") {
+    const common = {
+      record,
+      layerOrder: settings?.layer_order ?? "content-first",
+      view, onViewChange: setView, question, onQuestionChange: setQuestion,
+      buildUp: fresh, storageError: !storageWritable, notice: notice || undefined,
+      onRename: rename, onDownload: download, onArchive: () => void archive(), onTrash: () => void trash(), onPractise: practise,
+    } as const;
+    return record.mode === "negotiate"
+      ? <NegotiateDebriefPage {...common} debrief={isNegotiateDebrief(record.debrief) ? record.debrief : null} />
+      : <ToughDebriefPage {...common} debrief={isToughDebrief(record.debrief) ? record.debrief : null} />;
+  }
 
   return (
     <DebriefView

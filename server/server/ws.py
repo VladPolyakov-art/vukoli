@@ -5,12 +5,14 @@ import asyncio
 import datetime
 import json
 import logging
+import random
 import secrets
 import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from . import __version__, config, content, debrief_view, engines, feedback, memory, planner, postcall, storage, stt, telemetry, tts, usage
+from . import (__version__, config, content, debrief_view, engines, feedback, memory, negotiation, planner, postcall, storage,
+               stt, talk, telemetry, tough, tts, usage)
 from .engines.base import BACKGROUND, EngineError, LLMEngine
 from .engines.gemini_live import GeminiLiveDriver, basic_status
 from .priority import ModelGate
@@ -22,7 +24,7 @@ router = APIRouter()
 MAX_AUDIO_PACKET = 65536
 MAX_MESSAGE = 12000
 MAX_TEXT_TURN = 4000
-MODES = ("interview", "english")
+MODES = ("interview", "english", *talk.TALK_MODES)
 START_MODES = (*MODES, "quick")      # D111: "quick" starts a call where Mike asks which of the two to practise
 ROUND_TYPES = tuple(content.ROUND_TYPES)
 
@@ -54,6 +56,51 @@ def asks_for_answer(kind: str | None, text: str) -> bool:
     return kind is None and "?" in text
 
 
+def _number(value, path: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= talk.MAX_MONEY:
+        raise ValueError(path)
+    return int(round(value))
+
+
+def parse_negotiate(block) -> dict:
+    """The `negotiate` block of a start message (protocol: docs/features/tough-talk/protocol.md). Errors name the field."""
+    if not isinstance(block, dict):
+        raise ValueError("negotiate")
+    role = block.get("role")
+    if not isinstance(role, str) or not 1 <= len(role.strip()) <= talk.MAX_ROLE:
+        raise ValueError("negotiate.role")
+    target = _number(block.get("target"), "negotiate.target")
+    low, high = block.get("job_low"), block.get("job_high")
+    if (low is None) != (high is None):
+        raise ValueError("negotiate.range")
+    if low is not None:
+        low, high = _number(low, "negotiate.job_low"), _number(high, "negotiate.job_high")
+        if high < low or target < low:
+            raise ValueError("negotiate.range")
+    currency = block.get("currency") or "USD"
+    if not isinstance(currency, str) or not talk.CURRENCY.fullmatch(currency):
+        raise ValueError("negotiate.currency")
+    style = block.get("style") or "friendly"
+    if style not in (*talk.STYLE_IDS, "surprise"):
+        raise ValueError("negotiate.style")
+    real = block.get("has_real_offer", False)
+    if not isinstance(real, bool):
+        raise ValueError("negotiate.has_real_offer")
+    return {"role": role.strip(), "job_low": low, "job_high": high, "target": target, "currency": currency,
+            "style": style, "has_real_offer": real}
+
+
+def parse_tough(block) -> dict:
+    if block is None:
+        block = {}
+    if not isinstance(block, dict):
+        raise ValueError("tough")
+    theme = block.get("theme") or "mix"
+    if theme not in talk.THEME_IDS:
+        raise ValueError("tough.theme")
+    return {"theme": theme}
+
+
 def parse_start(data: dict, settings: dict) -> dict:
     mode = data.get("mode", "interview")
     if mode not in START_MODES:
@@ -80,6 +127,9 @@ def parse_start(data: dict, settings: dict) -> dict:
     if vacancy_id and not storage.RECORD_ID.fullmatch(str(vacancy_id)):
         raise ValueError("vacancy_id")
     topic = str(data.get("topic") or "")[:80]
+    resume_given = bool(data.get("resume_session_id"))
+    negotiate_form = parse_negotiate(data.get("negotiate")) if mode == "negotiate" and not resume_given else None
+    tough_form = parse_tough(data.get("tough")) if mode == "tough" and not resume_given else None
     drill = data.get("drill") is True and mode == "interview"      # a weak-spot drill: its name, and its focus (C1b)
     focus = planner.parse_focus(data.get("focus")) if drill else []
     resume_id = str(data.get("resume_session_id") or "")
@@ -90,7 +140,8 @@ def parse_start(data: dict, settings: dict) -> dict:
             "strictness": strictness, "input": input_mode, "vacancy_id": vacancy_id, "topic": topic,
             "drill": drill, "focus": focus, "level": config.normalize_level(data.get("level") or settings["level"]),
             "voice": voice, "speak": data.get("speak", True) is not False,
-            "suggest": bool(data.get("suggest", False)), "resume": resume_id, "quick": quick and not resume_id}
+            "suggest": bool(data.get("suggest", False)) and mode not in talk.TALK_MODES, "resume": resume_id,
+            "quick": quick and not resume_id, "negotiate": negotiate_form, "tough": tough_form}
 
 
 # US-13 AC5: a session cut off by the connection can be picked up again from its saved record.
@@ -140,6 +191,34 @@ def resume_records(saved: dict, history: list[dict]) -> list[dict]:
         record["history_index"] = index
         records.append(record)
     return records
+
+
+def talk_mode_of(driver) -> bool:
+    return driver is not None and getattr(driver, "mode", "") in talk.TALK_MODES
+
+
+def talk_questions(driver) -> list[dict]:
+    """Tough: ids and count only (no question text, no spoilers). Negotiate: none."""
+    st = getattr(driver, "tough", None)
+    if driver is None or st is None or driver.mode != "tough":
+        return []
+    return [{"id": qid, "competency": talk.question(qid)["theme"], "text": ""} for qid in st["ids"]]
+
+
+def talk_started(driver, opts: dict) -> dict:
+    """Extra `session_started` fields for the Tough talk modes."""
+    if opts["mode"] not in talk.TALK_MODES:
+        return {}
+    out = {"talk": True, "hint_available": True}
+    if opts["mode"] == "negotiate":
+        st = driver.neg
+        out["negotiate"] = {"role": st["role"], "currency": st["currency"], "period": st["period"],
+                            "style": "surprise" if st["surprise"] else st["style"], "has_real_offer": st["has_real_offer"],
+                            "job_low": st["job_low"], "job_high": st["job_high"], "target": st["target"]}
+    else:
+        st = driver.tough
+        out["tough"] = {"theme": st["theme"], "theme_name": st["theme_name"], "total": tough.TOTAL}
+    return out
 
 
 async def load_resume(session_id: str) -> dict:
@@ -222,7 +301,7 @@ async def session_socket(websocket: WebSocket) -> None:
 
     def turn_complete(speaker: str, text: str, meta: dict | None = None) -> None:
         meta = dict(meta or {})
-        payload = {k: meta.get(k) for k in ("kind", "question_id", "thread_id", "turn_id", "interrupted")
+        payload = {k: meta.get(k) for k in ("kind", "question_id", "thread_id", "turn_id", "interrupted", "outcome", "index", "total")
                    if meta.get(k) is not None}
         if speaker == "user" and payload.get("turn_id") is None and state["pending_voice"]:
             payload["turn_id"] = state["voice_turn"]
@@ -236,13 +315,16 @@ async def session_socket(websocket: WebSocket) -> None:
         if meta.get("kind") == "quick_choice":         # "interview or English?": not an answer, no feedback
             release_audio(meta.get("transcript"))
             return
+        if opts.get("mode") in talk.TALK_MODES:         # tough / negotiate: no feedback records, the debrief is made from state
+            release_audio(meta.get("transcript"))
+            return
         history = driver.transcript_history
         if not meta.get("question"):
             meta["question"] = next((t["text"] for t in reversed(history[:-1]) if t["role"] == "model"), "")
         record = {"id": "fb-" + secrets.token_hex(4), "history_index": len(history) - 1,
                   "turn_id": payload.get("turn_id"), "question": meta.get("question", ""),
                   "question_id": meta.get("question_id", ""), "competency": meta.get("competency", ""),
-                  "answer_kind": meta.get("answer_kind") or ("main" if opts.get("mode") == "interview" else "turn"),
+                  "answer_kind": meta.get("answer_kind") or {"interview": "main"}.get(opts.get("mode"), "turn"),
                   "answer": text, "source": meta.get("source", "voice"), "created_at": storage.now_iso(),
                   "layers": {}, "complete": False}
         transcript = meta.get("transcript")
@@ -488,6 +570,12 @@ async def session_socket(websocket: WebSocket) -> None:
                     raise ValueError("invalid_input_mode")
                 if wanted == "voice" and isinstance(driver, TextDriver):
                     driver.enable_stt(stt.get_stt(settings))
+            elif kind == "hint":
+                payload = driver.hint() if isinstance(driver, TextDriver) else None
+                if payload is None:
+                    error("hint_unavailable", "Hints are only available in Tough talk practice.", retryable=False)
+                else:
+                    emit("hint", **payload)
             elif kind == "silence":
                 if isinstance(driver, TextDriver):
                     await driver.say_silence()
@@ -520,14 +608,14 @@ async def session_socket(websocket: WebSocket) -> None:
                   hint_command=status.hint_command, fix_url=status.fix_url, engine=engine_id)
             return
         if opts["resume"]:
-            if engine_id == "gemini_live":
-                error("resume_unavailable", "Gemini Live can't pick a session up again. Your answers are saved: "
-                      "see the debrief or start a new session.", retryable=False)
-                return
             try:
                 resume_saved = await load_resume(opts["resume"])
             except ResumeError as exc:
                 error("resume_unavailable", exc.message, retryable=exc.retryable)
+                return
+            if engine_id == "gemini_live" and resume_saved.get("mode") not in talk.TALK_MODES:
+                error("resume_unavailable", "Gemini Live can't pick a session up again. Your answers are saved: "
+                      "see the debrief or start a new session.", retryable=False)
                 return
             opts.update(mode=resume_saved.get("mode", opts["mode"]), round_type=resume_saved.get("round_type", "mix"),
                         level=resume_saved.get("level", opts["level"]),
@@ -563,10 +651,24 @@ async def session_socket(websocket: WebSocket) -> None:
         resume_info = None
         if resume_saved:
             plan, resume_info = resume_state(resume_saved)
+            if opts["mode"] in talk.TALK_MODES:
+                block = resume_saved.get("negotiation" if opts["mode"] == "negotiate" else "tough")
+                if not block:
+                    error("resume_unavailable", "This session can't be continued.", retryable=False)
+                    return
+                resume_info["negotiation" if opts["mode"] == "negotiate" else "tough"] = block
         else:
             plan = planner.plan_questions(opts["round_type"], opts["questions"], extra=extra, focus=opts["focus"]) \
                 if opts["mode"] == "interview" else []      # quick: the interview plan is ready; English drops it
-        state["suggest"] = opts["suggest"] and settings["answer_suggester"]
+        state["suggest"] = opts["suggest"] and settings["answer_suggester"] and opts["mode"] not in talk.TALK_MODES
+        neg_state = tough_state = None
+        if opts["mode"] == "negotiate" and not resume_saved:
+            form = opts["negotiate"]
+            surprise = form["style"] == "surprise"
+            neg_state = negotiation.new_state(form, random.choice(talk.STYLE_IDS) if surprise else form["style"], surprise)
+        elif opts["mode"] == "tough" and not resume_saved:
+            tough_state = tough.new_state(opts["tough"]["theme"], tough.pick_questions(opts["tough"]["theme"]))
+        talk_mode = opts["mode"] in talk.TALK_MODES
         callbacks = dict(
             on_audio_chunk=audio,
             on_turn_start=lambda speaker: emit("turn_start", speaker=speaker),
@@ -577,7 +679,7 @@ async def session_socket(websocket: WebSocket) -> None:
             on_ready=lambda: emit("ready"),
             on_response_complete=lambda: emit("response_complete"),
         )
-        if engine_id == "gemini_live":
+        if engine_id == "gemini_live" and not talk_mode:      # Tough talk runs on the text model (standard driver)
             block = settings["gemini_live"]
             if opts["mode"] == "interview":
                 plan_text = "\n".join(f"{i}. {q.text}" for i, q in enumerate(plan, 1))
@@ -601,7 +703,7 @@ async def session_socket(websocket: WebSocket) -> None:
                 llm, mode=opts["mode"], plan=plan, strictness=opts["strictness"], level=opts["level"],
                 voice=opts["voice"], speed=settings["kokoro_speed"], speak=opts["speak"], stt=recogniser,
                 settings=settings, topic=opts["topic"], focus_gaps=planner.focus_gaps(opts["focus"]),
-                quick=opts["quick"], on_mode=mode_selected,
+                quick=opts["quick"], on_mode=mode_selected, neg=neg_state, tough_state=tough_state,
                 on_notice=lambda code, text: emit("notice", code=code, message=text),
                 on_preview=lambda text: emit("speech_preview", turn_id=state["voice_turn"], text=text),
                 on_error=lambda code, message, hint, retryable: error(code, message, hint, retryable),
@@ -615,6 +717,10 @@ async def session_socket(websocket: WebSocket) -> None:
                    "vacancy_title": vacancy_title, "started_at": started_at, "app_version": __version__,
                    "questions": [q.public() for q in plan],
                    "title": storage.session_title(opts["mode"], vacancy_title, opts["drill"])}
+        if talk_mode:
+            session["feedback"] = []
+            session["title"] = (talk.start_title("negotiate", role=driver.neg["role"], style=driver.neg["style"])
+                                if opts["mode"] == "negotiate" else talk.start_title("tough", theme=driver.tough["theme"]))
         if opts["focus"]:
             session["focus"] = opts["focus"]            # what this drill worked on (a resumed session keeps it)
         if resume_saved:                                # continue the saved record: same id, same start, time adds up
@@ -624,11 +730,12 @@ async def session_socket(websocket: WebSocket) -> None:
         SAVED[session["id"]] = saved_event
         OWNER[session["id"]] = state["owner"]
         emit("session_started", session_id=session["id"], mode=opts["mode"], engine=engine_id,
-             model=session["model"], questions=[] if opts["quick"] else session["questions"],
+             model=session["model"], questions=[] if opts["quick"] else session["questions"] or talk_questions(driver),
+             **talk_started(driver, opts),
              **({"quick": True} if opts["quick"] else {}), speaks=bool(driver.produces_audio),
              **({"focus": opts["focus"]} if opts["focus"] else {}),
              audio={"sample_rate_out": tts.SAMPLE_RATE, "sample_rate_in": stt.SAMPLE_RATE},
-             stt=stt_info, suggester_available=settings["answer_suggester"], suggest=state["suggest"],
+             stt=stt_info, suggester_available=settings["answer_suggester"] and not talk_mode, suggest=state["suggest"],
              warnings=status.warnings)
         telemetry.record("session_started", settings, engine=engine_id, mode=opts["mode"],
                          round_type=opts["round_type"], input=opts["input"], level=opts["level"])
@@ -667,6 +774,12 @@ async def session_socket(websocket: WebSocket) -> None:
             task.cancel()
         await asyncio.gather(*tasks, *side_tasks, return_exceptions=True)
         history = list(driver.transcript_history) if driver is not None else []
+        if session and talk_mode_of(driver):
+            if driver.mode == "negotiate":
+                session["negotiation"] = driver.neg
+                session["title"] = talk.start_title("negotiate", role=driver.neg["role"], style=driver.neg["style"])
+            else:
+                session["tough"] = driver.tough
 
         def release_session() -> None:
             saved_event.set()
@@ -750,7 +863,7 @@ async def save_and_debrief(session: dict, history: list[dict], records: list[dic
     """After the call (D96): save the session at once, make the feedback of every answer in order (saving after each),
     then the debrief. Runs as its own task (see the end of `session_socket`)."""
     sid = session["id"]
-    total = len(backlog)
+    total = tough.check_total(session["tough"]) if session["mode"] == "tough" else len(backlog)
     live = postcall.status(0, total) if total else None
     emit("saving")
     session.update({"ended_at": storage.now_iso(), "duration_s": round(time.perf_counter() - t_start),
@@ -778,7 +891,21 @@ async def _save_and_debrief(session, history, records, backlog, llm, settings, e
         return
     state["saved"].set()                               # a resume may read the record now
     emit("session_saved", session_id=sid)
-    if backlog:
+    if session["mode"] == "tough" and live is not None:
+        async def save_tough_progress(done: int) -> bool:
+            if ctx.owner_ok() is False or not await asyncio.to_thread(sync_user_edits, session):
+                return False
+            live["done"] = done
+            try:
+                await asyncio.to_thread(storage.save_session, session)
+            except Exception as exc:
+                log.warning("Saving progress failed: %s", type(exc).__name__)
+            return True
+        if not await tough.run_checks(session["tough"], llm, ctx, save_tough_progress):
+            return
+        live["stage"] = "debrief"
+        await save_tough_progress(live["total"])
+    elif backlog:
         async def save_progress(done: int) -> bool:
             if ctx.owner_ok() is False:
                 return False
@@ -798,13 +925,18 @@ async def _save_and_debrief(session, history, records, backlog, llm, settings, e
         await save_progress(len(backlog))
     emit("debrief_pending", session_id=sid)
     try:
-        past = await asyncio.to_thread(memory.past_weak_spots_text, sid)
-        result = await asyncio.wait_for(feedback.debrief(
-            llm if session["mode"] == "interview" else None, session["feedback"],
-            layer_order=settings["layer_order"], past=past), timeout=150)
+        if session["mode"] in talk.TALK_MODES:                  # made in code from the saved state, no model
+            result = talk.debrief_for(session)
+        else:
+            past = await asyncio.to_thread(memory.past_weak_spots_text, sid)
+            result = await asyncio.wait_for(feedback.debrief(
+                llm if session["mode"] == "interview" else None, session["feedback"],
+                layer_order=settings["layer_order"], past=past), timeout=150)
     except Exception as exc:
         log.warning("Debrief failed: %s", type(exc).__name__)
-        result = feedback.fallback_debrief(session["feedback"], settings["layer_order"])
+        result = ({"kind": session["mode"], "verdict": "The debrief could not be prepared.", "source": "code",
+                   "practice_note": talk.data()["notes"]["practice"]} if session["mode"] in talk.TALK_MODES
+                  else feedback.fallback_debrief(session["feedback"], settings["layer_order"]))
     if OWNER.get(sid) is not state["owner"]:
         return                                         # the session was continued on a new socket: it writes the record now
     session["debrief"] = result

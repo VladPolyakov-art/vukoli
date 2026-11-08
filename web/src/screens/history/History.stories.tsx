@@ -27,6 +27,12 @@ export const Overflow = desktop("overflow");
 export const OverflowMobile = mobile("overflow");
 /** `?track=english` with no English sessions. */
 export const FilteredEmpty = desktop("filteredEmpty");
+/** Tough talk and negotiation rows: "Calm in 3 of 5", "+3,000 EUR now · 30%", a step-up, "No offer yet". */
+export const Talk = desktop("talk");
+export const TalkMobile = mobile("talk");
+/** `?track=tough` / `?track=negotiate` with no such sessions. */
+export const FilteredEmptyTough = desktop("filteredTough");
+export const FilteredEmptyNegotiate = desktop("filteredNegotiate");
 export const Empty = desktop("empty");
 export const EmptyMobile = mobile("empty");
 export const Loading = desktop("loading");

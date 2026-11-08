@@ -4,12 +4,25 @@
  * renamed are kept as they are. */
 import { t } from "../i18n";
 import type { PendingSave, SaveProgress } from "../lib/pendingSave";
-import type { SessionSummary } from "../lib/types";
+import type { PracticeMode, SessionSummary } from "../lib/types";
+
+/** The practice a saved session belongs to; an unknown or missing mode reads as an interview. */
+export function trackOf(mode: SessionSummary["mode"] | undefined): PracticeMode {
+  return mode === "english" || mode === "tough" || mode === "negotiate" ? mode : "interview";
+}
+
+/** The small text at the end of a Recents row: EN · TQ · PAY (none for interviews) with the full word as its title. */
+export function railBadge(track: PracticeMode): { text: string; title: string } | null {
+  if (track === "english") return { text: t("rail.badge.english"), title: t("rail.english") };
+  if (track === "tough") return { text: t("rail.badge.tough"), title: t("rail.tough") };
+  if (track === "negotiate") return { text: t("rail.badge.negotiate"), title: t("rail.negotiate") };
+  return null;
+}
 
 export interface RailSession {
   id: string;
   title: string;
-  track: "interview" | "english";
+  track: PracticeMode;
   /** After End the session is still being saved and its debrief written: the row loads (shimmer) until it is ready. */
   pending?: boolean;
   /** How far the server's work is (answers done of the total; the debrief last), when it has said. */
@@ -34,7 +47,7 @@ export function railSessions(sessions: SessionSummary[], untitled: string): Rail
     .map((x) => ({
       id: x.id,
       title: railTitle(x.title, untitled),
-      track: x.mode === "english" ? "english" : "interview",
+      track: trackOf(x.mode),
     }));
 }
 

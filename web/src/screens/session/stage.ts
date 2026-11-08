@@ -5,7 +5,7 @@
  * glow (D50). Everything else is idle (no glow): muted, paused, connecting, between questions. */
 import type { PresenceState, StatusPillState } from "../../ds";
 import { t } from "../../i18n";
-import type { SessionViewProps } from "./types";
+import { countsTurns, type SessionViewProps } from "./types";
 
 export interface Stage {
   presence: PresenceState; pill: StatusPillState; label: string; sub?: string; live: boolean;
@@ -49,6 +49,6 @@ export function stageFor(p: SessionViewProps): Stage {
 }
 
 function betweenLine(p: SessionViewProps): string | undefined {
-  if (p.variant === "english") return undefined;
+  if (countsTurns(p.variant)) return undefined;
   return p.data.nextNumber ? t("session.sub.between", { n: p.data.nextNumber }) : t("session.sub.betweenLast");
 }
