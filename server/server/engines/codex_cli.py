@@ -7,14 +7,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import tempfile
 from typing import AsyncIterator
 
 from .. import usage
 from .base import EngineDescriptor, EngineError, EngineStatus, LLMEngine, Msg
-from .claude_cli import child_env, to_prompt
-from .locate import find_program
+from .claude_cli import child_env, stderr_tail, to_prompt
+from .locate import command, find_program
 
 INSTALL_URL = "https://github.com/openai/codex"
 TERMS_NOTE = "Uses your own ChatGPT plan via the Codex CLI; check OpenAI's terms. Each request counts against your Codex limits."
@@ -54,7 +55,7 @@ def find_codex() -> str | None:
 def signed_in(binary: str) -> bool:
     """`codex login status` exits 0 when signed in. Local and free: no request is sent."""
     try:
-        return subprocess.run([binary, "login", "status"], env=child_env(), capture_output=True,
+        return subprocess.run([*command(binary), "login", "status"], env=child_env(), capture_output=True,
                               timeout=10).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
@@ -67,7 +68,7 @@ def remember_sign_in(ok: bool | None) -> None:
 
 
 def build_command(binary: str, model: str, workdir: str) -> list[str]:
-    cmd = [binary, *BASE_FLAGS, "-C", workdir]
+    cmd = [*command(binary), *BASE_FLAGS, "-C", workdir]
     if model:
         cmd += ["-m", model]
     return [*cmd, "-"]
@@ -132,10 +133,15 @@ class CodexCLIEngine(LLMEngine):
         system = NO_TOOLS + ("\n\n" + system.strip() if system.strip() else "")
         full = f"{system}\n\n---\n\n{prompt}"
         with tempfile.TemporaryDirectory(prefix="vukoli-codex-") as workdir:
-            proc = await asyncio.create_subprocess_exec(
-                *build_command(self._bin(), self._model, workdir), cwd=workdir, env=child_env(),
-                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-                limit=4 * 1024 * 1024)
+            errfile = open(os.path.join(workdir, "stderr.txt"), "w+b")
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *build_command(self._bin(), self._model, workdir), cwd=workdir, env=child_env(),
+                    stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=errfile,
+                    limit=4 * 1024 * 1024)
+            except BaseException:
+                errfile.close()
+                raise
             usage.count(self.id)
             text, error, blocked = "", "", False
             try:
@@ -164,6 +170,8 @@ class CodexCLIEngine(LLMEngine):
                 if proc.returncode is None and error:
                     proc.kill()
                 await proc.wait()
+                if not error and not text:
+                    error = stderr_tail(errfile)
                 if blocked:
                     raise EngineError("engine_error", error, "Try again. If it repeats, pick another engine.")
                 if error and not text and is_quota_error(error):
@@ -180,6 +188,7 @@ class CodexCLIEngine(LLMEngine):
                 if proc.returncode is None:
                     proc.kill()
                     await proc.wait()
+                errfile.close()
 
     async def test(self) -> EngineStatus:
         """Real round trip: costs one small request on the user's ChatGPT plan."""
@@ -189,8 +198,8 @@ class CodexCLIEngine(LLMEngine):
             return EngineStatus(code="unauthorized" if exc.code == "unauthorized" else "error",
                                 message=exc.message, hint=exc.hint,
                                 hint_command=LOGIN if exc.code == "unauthorized" else "", warnings=[TERMS_NOTE])
-        except (asyncio.TimeoutError, OSError) as exc:
-            return EngineStatus(code="error", message=f"Codex CLI did not answer ({type(exc).__name__}).")
+        except (asyncio.TimeoutError, OSError, NotImplementedError) as exc:
+            return EngineStatus(code="error", message=f"Codex CLI did not answer ({type(exc).__name__}: {exc})"[:300])
         if not reply.strip():
             return EngineStatus(code="error", message="Codex answered with nothing.", warnings=[TERMS_NOTE])
         return EngineStatus(code="ready", ready=True, message="Codex answered.", model=self._model,

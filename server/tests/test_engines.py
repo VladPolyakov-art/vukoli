@@ -117,8 +117,9 @@ async def test_claude_cli_not_installed_and_command(monkeypatch):
     status = await claude_cli.ClaudeCLIEngine().status()
     assert status.code == "not_installed" and claude_cli.TERMS_NOTE in status.warnings
     assert claude_cli.DESCRIPTOR.terms_note == claude_cli.TERMS_NOTE
-    cmd = claude_cli.build_command("claude", "haiku", "sys", True)
+    cmd = claude_cli.build_command("claude", "haiku", "/tmp/sys.txt", True)
     assert cmd[:2] == ["claude", "-p"] and "--output-format" in cmd and "stream-json" in cmd
+    assert cmd[cmd.index("--system-prompt-file") + 1] == "/tmp/sys.txt" and "--system-prompt" not in cmd
     assert not any(part.startswith("/Users/") for part in cmd)
     system, prompt = claude_cli.to_prompt([{"role": "system", "content": "S"}, {"role": "user", "content": "U"}])
     assert (system, prompt) == ("S", "U")
@@ -707,3 +708,53 @@ def test_kill_group_windows_uses_taskkill(monkeypatch):
     Done.returncode = 128
     with pytest.raises(ProcessLookupError):
         antigravity_cli.kill_group(123)
+
+
+def test_npm_cmd_wrapper_is_skipped(tmp_path):
+    """Windows: an npm .cmd wrapper goes through cmd.exe, which cuts multi-line arguments; its target runs directly."""
+    from server.engines.locate import command
+    pkg = tmp_path / "node_modules" / "@anthropic-ai" / "claude-code"
+    pkg.mkdir(parents=True)
+    (pkg / "cli.js").write_text("")
+    shim = tmp_path / "claude.cmd"
+    shim.write_text('@ECHO off\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  '
+                    '"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n')
+    (tmp_path / "node.exe").write_text("")
+    assert command(str(shim)) == [str(tmp_path / "node.exe"), str(pkg / "cli.js")]
+    (pkg / "bin").mkdir()
+    (pkg / "bin" / "claude.exe").write_text("")
+    shim.write_text('"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe"   %*\r\n')
+    assert command(str(shim)) == [str(pkg / "bin" / "claude.exe")]
+    shim.write_text("@echo off\r\nsomething else %*\r\n")
+    assert command(str(shim)) == [str(shim)]
+    assert command("/usr/local/bin/claude") == ["/usr/local/bin/claude"]
+
+
+async def test_cli_error_text_comes_from_stderr(tmp_path, monkeypatch):
+    """A CLI that prints nothing on stdout: the user sees its stderr, not "answered with nothing"."""
+    import sys
+    fake = tmp_path / "fake_claude.py"
+    fake.write_text("import sys\nsys.stdin.read()\nsys.stderr.write('Error: something broke on this computer\\n')\nsys.exit(1)\n")
+    monkeypatch.setattr(claude_cli, "command", lambda b: [sys.executable, str(fake)])
+    status = await claude_cli.ClaudeCLIEngine(binary="claude").test()
+    assert status.code == "error" and "something broke" in status.message
+
+
+def test_voice_check_reports_a_broken_recogniser(monkeypatch):
+    """Windows 09.11: the mic check spun on "Recognising" and ended in a bare error. Now it says why."""
+    import base64
+    from fastapi.testclient import TestClient
+    from server import stt
+    from server.main import create_app
+
+    class Broken:
+        available = True
+
+        def transcribe(self, pcm, words=True):
+            raise RuntimeError("model.bin is missing")
+
+    monkeypatch.setattr(stt, "get_stt", lambda settings: Broken())
+    with TestClient(create_app()) as c:
+        r = c.post("/api/check/voice", json={"audio": base64.b64encode(b"\0" * 32000).decode()},
+                   headers={"Origin": "http://testserver"})
+    assert r.status_code == 200 and r.json()["code"] == "stt_error" and "model.bin is missing" in r.json()["message"]

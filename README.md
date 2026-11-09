@@ -56,11 +56,18 @@ curl -fsSL https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/instal
 irm https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/install/install.ps1 | iex
 ```
 
-It installs its own private Python, offers to install Ollama (the free local AI engine), downloads the speech
-models (Kokoro voice, Whisper recognition) and the AI model for your memory size, then opens the app on its
-first-run setup. It shows each step and the size of each download. If a step fails, run the same command again:
-finished steps are skipped. Use `--yes` to accept all defaults (macOS: `... | bash -s -- --yes`; Windows:
-set `$env:VUKOLI_YES=1` before the command).
+It installs its own private Python, then asks before each big or lasting step, with the size of each download:
+
+1. **Speech models** (Kokoro voice, Whisper recognition, about 1 GB). Without them you type your answers.
+2. **How to run the AI:** locally with Ollama (free and private), or another engine you connect in the app
+   (Claude Code, Codex, an API key). If Ollama is missing, it offers to install it.
+3. **Start Ollama when you log in**, so the app is ready right away. Turn it off any time.
+4. **The AI model:** the one recommended for your memory size, only the smaller `qwen3:4b-instruct`, a model you
+   already have in Ollama (nothing is downloaded twice), or none for now.
+
+Then it opens the app on its first-run setup. At the end it lists everything it created on your computer and how
+to remove it. If a step fails, run the same command again: finished steps are skipped. Use `--yes` to accept all
+defaults without questions (macOS: `... | bash -s -- --yes`; Windows: set `$env:VUKOLI_YES=1` before the command).
 
 - **Where it goes.** macOS: `~/.vukoli` (app, Python, logs) and `~/Applications/Vukoli.app`. Windows: `%LOCALAPPDATA%\Vukoli`,
   with a Vukoli shortcut in the Start menu and on the Desktop. Your sessions and settings are kept in your
@@ -68,14 +75,13 @@ set `$env:VUKOLI_YES=1` before the command).
 - **Start it later.** macOS: open Vukoli from Launchpad or your Applications folder (in your home folder).
   Windows: Start menu, Vukoli. To stop it on macOS: `~/.vukoli/bin/vukoli stop`.
 - **Uninstall.** macOS: `bash ~/.vukoli/app/install/install.sh --uninstall` (add `--purge` to also delete your sessions
-  and settings). Windows: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/install/install.ps1))) -Uninstall`
-  (add `-Purge`). Ollama and its models are never removed; to remove Ollama, quit it and delete the app, then delete
-  the `.ollama` folder in your home folder.
-- **Ollama starts with your computer.** If the installer installs or finds Ollama, it sets Ollama to start when you
-  log in, so the app is ready right away. Turn it off on macOS: System Settings > General > Login Items
+  and settings). Windows: Settings > Apps > Vukoli > Uninstall, or `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/install/install.ps1))) -Uninstall`
+  (add `-Purge`). Ollama and its models are never removed; to remove a model run `ollama rm <model>`. To remove Ollama,
+  quit it and delete the app, then delete the `.ollama` folder in your home folder.
+- **Ollama starts with your computer** only if you say yes. Turn it off on macOS: System Settings > General > Login Items
   (under "Allow in the Background"), or run `~/.vukoli/bin/vukoli autostart off`.
   Windows: Settings > Apps > Startup > Ollama.
-- **No Ollama?** Say no when asked. The first-run setup then lists every way to connect an AI engine.
+- **No Ollama?** Choose "another engine" when asked. The first-run setup then lists every way to connect an AI engine.
 
 macOS options (after `bash -s --`): `--yes`, `--from <vukoli.zip>` (install from a local file), `--no-ollama`,
 `--no-models`, `--no-launch`, `--prefix <folder>`. The Windows script has the same options as parameters

@@ -21,6 +21,7 @@ from contextvars import ContextVar
 from pathlib import Path
 
 from . import config
+from .engines.locate import command
 
 KEEP_S = 8 * 86400
 SESSIONS_KEPT = 30
@@ -133,7 +134,7 @@ async def read_codex(binary: str, *, fresh: bool = False) -> dict | None:
         return cached[1]
     from .engines.claude_cli import child_env
     try:
-        proc = await asyncio.create_subprocess_exec(binary, "app-server", stdin=asyncio.subprocess.PIPE,
+        proc = await asyncio.create_subprocess_exec(*command(binary), "app-server", stdin=asyncio.subprocess.PIPE,
                                                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
                                                     env=child_env(), limit=4 * 1024 * 1024)
     except OSError:

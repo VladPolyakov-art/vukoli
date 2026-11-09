@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import time
 from typing import Literal, Optional
 
@@ -16,6 +17,8 @@ from .documents import DocumentError, read_file, read_url
 from .engines import antigravity_cli, claude_cli, codex_cli
 from .engines import ollama as ollama_engine
 from .engines.base import EngineError
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -305,7 +308,12 @@ async def voice_check(body: VoiceCheckBody, request: Request) -> dict:
             pcm = base64.b64decode(body.audio, validate=True)
         except ValueError:
             raise fail(422, "bad_audio", "The recording could not be read.")
-        heard = (await asyncio.to_thread(recogniser.transcribe, pcm, False)).text.strip()
+        try:
+            heard = (await asyncio.to_thread(recogniser.transcribe, pcm, False)).text.strip()
+        except Exception as exc:   # a model that won't load or download: say why instead of a bare 500
+            log.warning("voice check: speech recognition failed: %s: %s", type(exc).__name__, exc)
+            return {"ok": False, "code": "stt_error", "heard": "",
+                    "message": f"Speech recognition failed on this computer ({type(exc).__name__}: {exc})"[:300]}
     if not heard:
         return {"ok": False, "code": "not_heard", "heard": "", "message": "Mike didn't catch anything."}
     llm = engines.make_llm(settings, voice=True)
@@ -319,6 +327,10 @@ async def voice_check(body: VoiceCheckBody, request: Request) -> dict:
     except (EngineError, asyncio.TimeoutError) as exc:
         return {"ok": False, "code": getattr(exc, "code", "timeout"), "heard": heard,
                 "message": getattr(exc, "message", "The engine did not answer in time.")}
+    except (OSError, NotImplementedError) as exc:   # the engine's program could not start
+        log.warning("voice check: engine failed: %s: %s", type(exc).__name__, exc)
+        return {"ok": False, "code": "engine_error", "heard": heard,
+                "message": f"The AI engine could not start ({type(exc).__name__}: {exc})"[:300]}
     reply = reply.strip() or "I can hear you. Everything works."
     audio = None
     if tts.status(settings)["available"]:

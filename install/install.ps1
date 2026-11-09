@@ -10,6 +10,8 @@ or with parameters when the script is run as a file or as a scriptblock:
 
   -From <zip-or-folder>   use a local archive or unpacked folder instead of downloading the release   (VUKOLI_FROM)
   -Yes                    accept the defaults, no questions (installs Ollama if missing)               (VUKOLI_YES=1)
+                          Without it the installer asks before the speech models, Ollama, its startup
+                          shortcut and the AI model download.
   -NoOllama               do not install Ollama and do not pull language models                        (VUKOLI_NO_OLLAMA=1)
   -NoModels               skip speech models (Kokoro, Whisper) and Ollama model downloads              (VUKOLI_NO_MODELS=1)
   -NoLaunch               do not start the app / open its window at the end                           (VUKOLI_NO_LAUNCH=1)
@@ -63,6 +65,7 @@ $null = & {
     $S = @{
         Step = 0; StepTitle = ''; ModelSeconds = 0.0; EnvBackup = @{}; DataDir = ''; Ollama = ''
         OllamaOk = $false; Models = @(); ChangedOllamaStartup = ''; NoRecord = $false
+        OllamaStatus = 'not set up'; SpeechStatus = 'downloaded earlier'; ModelsStatus = 'downloaded earlier'; StartupLnk = ''
     }
 
     # ------------------------------------------------------------------ small helpers
@@ -154,6 +157,20 @@ $null = & {
         if (-not (Test-Interactive)) { Note 'No terminal to ask on - using the default answer (yes).'; return $true }
         $a = Read-Host ('      ' + $Question + ' [Y/n]')
         return ([string]::IsNullOrWhiteSpace($a) -or $a.Trim().ToLower().StartsWith('y'))
+    }
+    function Select-Option([string]$Question, [string[]]$Options) {
+        # A numbered menu; returns the chosen number. 1 is the default (Enter, -Yes, or no terminal to ask on).
+        Note $Question
+        for ($i = 0; $i -lt $Options.Count; $i++) { Note ('  {0}) {1}' -f ($i + 1), $Options[$i]) }
+        if ($S.Yes) { Note '-> 1 (-Yes)'; return 1 }
+        if (-not (Test-Interactive)) { Note '-> 1 (no terminal to ask on - using the default answer)'; return 1 }
+        while ($true) {
+            $a = Read-Host '      Type a number and press Enter [1]'
+            if ([string]::IsNullOrWhiteSpace($a)) { return 1 }
+            $n = 0
+            if ([int]::TryParse($a.Trim(), [ref]$n) -and $n -ge 1 -and $n -le $Options.Count) { return $n }
+            Note ('Please type a number from 1 to {0}.' -f $Options.Count)
+        }
     }
     function Get-Url200([string]$Url, [int]$TimeoutSec = 3) {
         try {
@@ -569,13 +586,26 @@ $null = & {
 
     # ------------------------------------------------------------------ step 4: speech models
     function Step-Models {
-        if ($S.NoModels) { $S.NoRecord = $true; Note 'Skipped (-NoModels). Text answers work; speech models can be added later.'; return }
+        if ($S.NoModels) { $S.NoRecord = $true; $S.SpeechStatus = 'not downloaded (typed answers)'; Note 'Skipped (-NoModels). Text answers work; speech models can be added later.'; return }
         $data = Get-DataDir
         if (-not $data) { Fail 'Could not find the data folder of the app.' ('Look at ' + (Join-Path $S.Logs 'install.log') + ' and run the same command again.') }
         Note ('Your data folder: {0}' -f $data)
+        $kdir = Join-Path (Join-Path $data 'models') 'kokoro'
+        $haveVoice = $true
+        foreach ($f in @('kokoro-v1.0.onnx', 'voices-v1.0.bin')) {
+            $dest = Join-Path $kdir $f
+            if (-not ((Test-Path -LiteralPath $dest) -and ((Get-Item -LiteralPath $dest).Length -gt 1MB))) { $haveVoice = $false }
+        }
+        if (-not $haveVoice) {
+            if (-not (Confirm-Default 'Download the speech models (about 1 GB), so you can talk with Mike out loud? Without them you type your answers.')) {
+                $S.NoRecord = $true
+                $S.SpeechStatus = 'not downloaded (typed answers)'
+                Note 'Skipped. You type your answers; to add the voice later, run the install command again and answer yes.'
+                return
+            }
+        }
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         try {
-            $kdir = Join-Path (Join-Path $data 'models') 'kokoro'
             foreach ($f in @('kokoro-v1.0.onnx', 'voices-v1.0.bin')) {
                 $dest = Join-Path $kdir $f
                 if ((Test-Path -LiteralPath $dest) -and ((Get-Item -LiteralPath $dest).Length -gt 1MB)) {
@@ -597,6 +627,7 @@ $null = & {
             if ($rc -ne 0) {
                 Fail 'The speech recognition model could not be downloaded.' 'Check your connection and free disk space, then run the same command again. The app also works without it (typed answers).'
             }
+            $S.SpeechStatus = ('Kokoro voice + Whisper (in {0} and %USERPROFILE%\.cache\huggingface)' -f $kdir)
         }
         finally {
             $S.ModelSeconds += $sw.Elapsed.TotalSeconds
@@ -634,6 +665,11 @@ $null = & {
                 if ($run -and ($run.PSObject.Properties | Where-Object { $_.Name -like '*llama*' })) { $has = $true }
             } catch { $null = $_ }
         }
+        if ($has) { Note 'Ollama already starts with Windows.'; return }
+        if (-not (Confirm-Default 'Start Ollama when you sign in to Windows, so Vukoli is ready right away? (a Startup shortcut; remove it any time)')) {
+            Note 'OK. Open Ollama before you practise; the app tells you if it is not running.'
+            return
+        }
         if (-not $has) {
             $dir = Split-Path -Parent $OllamaExe
             $target = Join-Path $dir 'ollama app.exe'
@@ -647,6 +683,7 @@ $null = & {
                 $lnk.Description = 'Ollama (added by the Vukoli installer)'
                 $lnk.Save()
                 $S.ChangedOllamaStartup = 'added a shortcut to the Startup folder'
+                $S.StartupLnk = (Join-Path $startupDir 'Ollama.lnk')
             } catch {
                 Warn ('Could not add Ollama to Windows startup: {0}' -f $_.Exception.Message)
                 return
@@ -655,14 +692,25 @@ $null = & {
         Note 'Ollama now starts with Windows. To turn that off: Settings > Apps > Startup > Ollama.'
     }
     function Step-Ollama {
-        if ($S.NoOllama) { Note 'Skipped (-NoOllama). The wizard will let you connect another engine.'; return }
+        if ($S.NoOllama) { $S.OllamaStatus = 'skipped (-NoOllama)'; Note 'Skipped (-NoOllama). The wizard will let you connect another engine.'; return }
+        $how = Select-Option 'How should Vukoli run the AI?' @(
+            'On this computer with Ollama: free and private (may download 2.5 to 8 GB of AI models)',
+            'I''ll connect another engine in the app (Claude Code, Codex or an API key): no AI download')
+        if ($how -eq 2) {
+            $S.NoOllama = $true
+            $S.OllamaStatus = 'not used (you chose another engine; connect it in the app)'
+            Note 'OK. The first-run wizard shows every way to connect an engine.'
+            return
+        }
         $exe = Find-Ollama
         if ($exe) {
             Note ('Ollama found: {0} (reusing it).' -f $exe)
+            $S.OllamaStatus = 'reused'
         } else {
             Note 'Ollama is not installed. It runs the language model on your computer (free, no account).'
             if (-not (Confirm-Default 'Install Ollama now from ollama.com (about 1.7 GB, no admin rights)?')) {
                 Note 'Not installing Ollama. You can connect another service in the first-run wizard, or install Ollama later from https://ollama.com/download'
+                $S.OllamaStatus = 'declined'
                 return
             }
             $setup = Join-Path $S.Tmp 'OllamaSetup.exe'
@@ -683,6 +731,7 @@ $null = & {
             $exe = Find-Ollama
             if (-not $exe) { Fail 'Ollama was installed but ollama.exe was not found.' 'Open a new PowerShell window and run the same command again.' }
             Note ('Ollama installed: {0}' -f $exe)
+            $S.OllamaStatus = 'installed'
         }
         $S.Ollama = $exe
         if (-not (Get-Url200 'http://127.0.0.1:11434' 2)) {
@@ -713,24 +762,89 @@ $null = & {
         } catch { $null = $_ }
         return $name
     }
+    function Set-OllamaSettings([string]$Model, [string]$Voice) {
+        # Saves the chosen Ollama model in the app's settings (the same file Settings > AI engine writes).
+        $script = Join-Path $S.Tmp 'setollama.py'
+        Write-TextFile $script "import sys`nsys.path.insert(0, sys.argv[1])`nfrom server import config`nconfig.update_settings({'ollama': {'model': sys.argv[2], 'voice_model': sys.argv[3]}})`n"
+        $rc = Invoke-Native $S.VenvPy @($script, $S.AppServer, $Model, $Voice)
+        if ($rc -ne 0) { Warn ('Could not save the model choice; pick {0} in the app''s Settings.' -f $Model) }
+    }
     function Step-Pull {
         $S.NoRecord = $true
-        if ($S.NoOllama) { Note 'Skipped (-NoOllama).'; return }
+        $S.ModelsStatus = 'not downloaded'
+        if ($S.NoOllama) {
+            if ($S.OllamaStatus -like 'not used*') { Note 'Skipped: you chose another engine.' } else { Note 'Skipped (-NoOllama).' }
+            return
+        }
         if ($S.NoModels) { Note 'Skipped (-NoModels).'; return }
         if (-not $S.OllamaOk) { Note 'Skipped: Ollama is not set up (you can pick another engine in the wizard).'; return }
+        $voice = 'qwen3:4b-instruct'
         $rec = Get-RecommendedModel
-        $want = @('qwen3:4b-instruct')
-        if ($rec -ne 'qwen3:4b-instruct') { $want += $rec }
-        $sizes = @{ 'qwen3:4b-instruct' = '~2.5 GB'; 'qwen3:8b' = '~5.2 GB' }
-        Note ('Recommended for this computer: {0}. Voice sessions use qwen3:4b-instruct.' -f $rec)
+        $want = @($voice)
+        if ($rec -ne $voice) { $want += $rec }
+        $sizes = @{ 'qwen3:4b-instruct' = 2.5; 'qwen3:8b' = 5.2 }
+        Note ('Recommended for this computer: {0}. Voice sessions use {1}, it answers faster.' -f $rec, $voice)
+        $have = @()
+        foreach ($l in (Invoke-NativeCapture $S.Ollama @('list'))) {
+            $t = ([string]$l).Trim()
+            if ($t -eq '' -or $t -like 'NAME*') { continue }
+            $have += ($t -split '\s+')[0]
+        }
+        $missing = @($want | Where-Object { $have -notcontains $_ })
+        $others = @($have | Where-Object { ($want -notcontains $_) -and ($_ -notmatch 'embed|minilm|bge') })
+        $pull = @()
+        if ($missing.Count -eq 0) {
+            Note ('Already downloaded: {0}. Nothing to download.' -f ($want -join ', '))
+            $S.ModelsStatus = ('{0} (already in Ollama)' -f ($want -join ', '))
+            $S.NoRecord = $false
+            return
+        }
+        $total = 0.0; $known = $true
+        foreach ($m in $missing) { if ($sizes.ContainsKey($m)) { $total += $sizes[$m] } else { $known = $false } }
+        $tsize = 'size shown by Ollama'
+        if ($known) { $tsize = ('about {0} GB' -f $total.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)) }
+        $keys = @('rec')
+        $opts = @(('Download {0} ({1}): recommended' -f ($missing -join ' and '), $tsize))
+        if ($rec -ne $voice) {
+            $keys += 'small'
+            if ($have -contains $voice) { $opts += ('Use only {0}, which you already have (no download): faster, slightly simpler answers' -f $voice) }
+            else { $opts += ('Download only {0} (about 2.5 GB): faster, slightly simpler answers' -f $voice) }
+        }
+        if ($others.Count -gt 0) {
+            $keys += 'own'
+            $opts += ('Use a model you already have in Ollama, no download ({0}). Vukoli is tuned for Qwen 3; other models may stay in role less well' -f ($others -join ', '))
+        }
+        $keys += 'none'
+        $opts += 'Don''t download now: I''ll connect another engine in the app (Claude Code, Codex or an API key)'
+        $pick = $keys[(Select-Option 'Vukoli needs an AI model in Ollama. Which one?' $opts) - 1]
+        switch ($pick) {
+            'rec' {
+                $pull = $missing
+                $S.ModelsStatus = ('{0} (in Ollama; remove one: ollama rm <name>)' -f ($want -join ', '))
+            }
+            'small' {
+                if ($have -notcontains $voice) { $pull = @($voice) }
+                Set-OllamaSettings $voice $voice
+                $S.ModelsStatus = ('{0} (in Ollama; remove: ollama rm {0})' -f $voice)
+            }
+            'own' {
+                $own = $others[0]
+                if ($others.Count -gt 1) { $own = $others[(Select-Option 'Which model?' $others) - 1] }
+                Set-OllamaSettings $own $own
+                Note ('Vukoli will use {0}. Change it any time in Settings > AI engine.' -f $own)
+                $S.ModelsStatus = ('{0} (yours, nothing downloaded)' -f $own)
+            }
+            'none' {
+                Note ('OK. The first-run wizard shows every way to connect an engine. To use Ollama later: ollama pull {0}' -f $voice)
+                $S.ModelsStatus = 'none downloaded (you''ll connect an engine in the app)'
+                return
+            }
+        }
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         try {
-            $installed = Invoke-NativeCapture $S.Ollama @('list')
-            foreach ($m in $want) {
-                $have = @($installed | Where-Object { $_ -match ('^' + [regex]::Escape($m) + '\s') })
-                if ($have.Count -gt 0) { Note ('{0} is already downloaded.' -f $m); continue }
-                $sz = 'size varies'
-                if ($sizes.ContainsKey($m)) { $sz = $sizes[$m] }
+            foreach ($m in $pull) {
+                $sz = 'size shown by Ollama'
+                if ($sizes.ContainsKey($m)) { $sz = ('about {0} GB' -f ([double]$sizes[$m]).ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)) }
                 Note ('Downloading {0} ({1}) with Ollama...' -f $m, $sz)
                 $rc = Invoke-Native $S.Ollama @('pull', $m)
                 if ($rc -ne 0) {
@@ -858,6 +972,16 @@ $null = & {
                 if ($mine) { Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue; Note ('Removed shortcut {0}' -f $lnk) }
             }
         }
+        try {
+            $ourStartup = Join-Path ([Environment]::GetFolderPath('Startup')) 'Ollama.lnk'
+            if (Test-Path -LiteralPath $ourStartup) {
+                $sh = New-Object -ComObject WScript.Shell
+                if (($sh.CreateShortcut($ourStartup).Description) -eq 'Ollama (added by the Vukoli installer)') {
+                    Remove-Item -LiteralPath $ourStartup -Force -ErrorAction SilentlyContinue
+                    Note 'Removed the Ollama startup shortcut the installer had added.'
+                }
+            }
+        } catch { $null = $_ }
         if (Test-Path -LiteralPath $S.UrlKey) {
             $cmd = (Get-ItemProperty -Path ($S.UrlKey + '\shell\open\command') -ErrorAction SilentlyContinue).'(default)'
             if (-not $cmd -or $cmd -like ('*' + $S.Prefix + '*')) { Remove-Item -Path $S.UrlKey -Recurse -Force -ErrorAction SilentlyContinue }
@@ -970,6 +1094,18 @@ $null = & {
         if ($S.NoOllama) {
             Write-Host '  No local language model was installed; the wizard shows how to connect an engine.'
         }
+        Write-Host ('  Ollama:   {0}' -f $S.OllamaStatus)
+        Write-Host ('  AI model: {0}' -f $S.ModelsStatus)
+        Write-Host ('  Voice:    {0}' -f $S.SpeechStatus)
+        Write-Host ''
+        Write-Host 'What the installer created on this computer:'
+        Write-Host ('  - {0} : the app, its own Python and logs' -f $S.Prefix)
+        foreach ($l in (Get-ShortcutPaths)) { if (Test-Path -LiteralPath $l) { Write-Host ('  - {0} : a Vukoli shortcut' -f $l) } }
+        Write-Host ('  - {0} : the command to start and stop Vukoli' -f (Join-Path $S.Bin 'Vukoli.cmd'))
+        Write-Host '  - a "Vukoli" entry in Settings > Apps and the vukoli:// link (your user only)'
+        if ($S.StartupLnk) { Write-Host ('  - {0} : starts Ollama when you sign in (delete it to turn that off)' -f $S.StartupLnk) }
+        Write-Host '  Remove all of it: Settings > Apps > Vukoli > Uninstall (your sessions stay).'
+        Write-Host '  Ollama and its models stay: ollama rm <model> removes a model.'
     }
     catch {
         $msg = $_.Exception.Message

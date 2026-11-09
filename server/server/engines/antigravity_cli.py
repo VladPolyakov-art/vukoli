@@ -24,7 +24,7 @@ from typing import AsyncIterator
 from .. import usage
 from .base import BACKGROUND, EngineDescriptor, EngineError, EngineStatus, LLMEngine, Msg
 from .claude_cli import child_env, to_prompt
-from .locate import find_program
+from .locate import command, find_program
 
 INSTALL_URL = "https://antigravity.google/docs/cli"
 INSTALL = "curl -fsSL https://antigravity.google/cli/install.sh | bash"
@@ -64,7 +64,7 @@ def signed_in(binary: str, fresh: bool = False) -> bool:
         return hit[1]
     try:
         with tempfile.TemporaryDirectory(prefix="vukoli-agy-") as workdir:
-            ok = subprocess.run([binary, "models"], cwd=workdir, env=child_env(), stdin=subprocess.DEVNULL,
+            ok = subprocess.run([*command(binary), "models"], cwd=workdir, env=child_env(), stdin=subprocess.DEVNULL,
                                 capture_output=True, timeout=20).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
@@ -310,7 +310,7 @@ def is_quota_error(message: str) -> bool:
 
 
 def build_command(binary: str, model: str) -> list[str]:
-    cmd = [binary, *BASE_FLAGS]
+    cmd = [*command(binary), *BASE_FLAGS]
     return [*cmd, "--model", model] if model else cmd
 
 

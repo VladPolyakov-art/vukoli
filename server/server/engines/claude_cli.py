@@ -14,7 +14,7 @@ from typing import AsyncIterator
 
 from .. import usage
 from .base import EngineDescriptor, EngineError, EngineStatus, LLMEngine, Msg
-from .locate import find_program
+from .locate import command, find_program
 
 INSTALL_URL = "https://docs.claude.com/en/docs/claude-code/setup"
 TERMS_NOTE = ("Uses your own Claude subscription via the Claude Code CLI; check Anthropic's terms. "
@@ -70,15 +70,29 @@ def remember_sign_in(ok: bool | None) -> None:
         config.update_settings({"claude_cli": {"verified": ok}})
 
 
-def build_command(binary: str, model: str, system: str, stream: bool) -> list[str]:
-    cmd = [binary, "-p", "--model", model, *BASE_FLAGS]
-    if system:
-        cmd += ["--system-prompt", system]
+def build_command(binary: str, model: str, system_file: str | None, stream: bool) -> list[str]:
+    """The instructions travel in a file, never as an argument: on Windows a multi-line argument is cut at its
+    first line break (seen live: Connect said "answered with nothing", 09.11)."""
+    cmd = [*command(binary), "-p", "--model", model, *BASE_FLAGS]
+    if system_file:
+        cmd += ["--system-prompt-file", system_file]
     if stream:
         cmd += ["--output-format", "stream-json", "--include-partial-messages", "--verbose"]
     else:
         cmd += ["--output-format", "json"]
     return cmd
+
+
+def stderr_tail(errfile, limit: int = 300) -> str:
+    """The last words the CLI wrote to stderr, for the error the user sees (no prompt text goes there)."""
+    try:
+        errfile.flush()
+        errfile.seek(0)
+        text = errfile.read().decode("utf-8", errors="replace")
+    except (OSError, ValueError):
+        return ""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return " ".join(lines[-3:])[-limit:]
 
 
 def to_prompt(messages: list[Msg]) -> tuple[str, str]:
@@ -139,10 +153,19 @@ class ClaudeCLIEngine(LLMEngine):
         else:
             system += ("\n\nOUTPUT FORMAT: plain spoken text only. No markdown, no lists, no emojis, "
                        "no stage directions, no speaker name.")
-        proc = await asyncio.create_subprocess_exec(
-            *build_command(self._bin(), self._model, system, True), cwd=tempfile.gettempdir(), env=child_env(),
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-            limit=4 * 1024 * 1024)
+        workdir = tempfile.TemporaryDirectory(prefix="vukoli-claude-")
+        system_file = os.path.join(workdir.name, "system.txt")
+        with open(system_file, "w", encoding="utf-8") as f:
+            f.write(system)
+        errfile = open(os.path.join(workdir.name, "stderr.txt"), "w+b")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *build_command(self._bin(), self._model, system_file, True), cwd=tempfile.gettempdir(), env=child_env(),
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=errfile, limit=4 * 1024 * 1024)
+        except BaseException:
+            errfile.close()
+            workdir.cleanup()
+            raise
         self._proc = proc
         usage.count(self.id)
         text, error, rejected = "", "", False
@@ -175,6 +198,8 @@ class ClaudeCLIEngine(LLMEngine):
             if error and not text and (rejected or "usage limit" in error.lower()):
                 raise EngineError("rate_limited", "Your Claude limit is used up.",
                                   "Settings → AI engine shows when it resets. Pick another engine meanwhile.")
+            if not error and not text:
+                error = stderr_tail(errfile)
             if error and not text:
                 low = error.lower()
                 code = "unauthorized" if ("login" in low or "auth" in low) else "engine_error"
@@ -184,6 +209,9 @@ class ClaudeCLIEngine(LLMEngine):
         finally:
             if proc.returncode is None:
                 proc.kill()
+                await proc.wait()
+            errfile.close()
+            workdir.cleanup()
 
     async def test(self) -> EngineStatus:
         """Real round trip: costs one small request on the user's plan."""
@@ -192,8 +220,8 @@ class ClaudeCLIEngine(LLMEngine):
         except EngineError as exc:
             return EngineStatus(code="unauthorized" if exc.code == "unauthorized" else "error",
                                 message=exc.message, hint=exc.hint, warnings=[TERMS_NOTE])
-        except (asyncio.TimeoutError, OSError) as exc:
-            return EngineStatus(code="error", message=f"Claude CLI did not answer ({type(exc).__name__}).")
+        except (asyncio.TimeoutError, OSError, NotImplementedError) as exc:
+            return EngineStatus(code="error", message=f"Claude CLI did not answer ({type(exc).__name__}: {exc})"[:300])
         if not reply.strip():
             return EngineStatus(code="error", message="Claude Code answered with nothing.", warnings=[TERMS_NOTE])
         return EngineStatus(code="ready", ready=True, message="Claude answered.", model=self._model,
