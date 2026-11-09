@@ -5,14 +5,35 @@
   </picture>
 </h1>
 
-Practise job interviews out loud with **Mike**, an AI interviewer, on your own computer.
-Mike asks real interview questions (general ones, or questions built from your CV and a job posting), follows up
-like a real interviewer, and when the call ends you get feedback on every answer: content, English and delivery.
-There is also an English conversation mode.
+Practise job interviews out loud with **Mike**, an AI recruiter, on your own computer. Free and open source.
 
-- Runs locally. With Ollama, nothing leaves your computer.
-- Bring your own AI: Ollama, any OpenAI-compatible server (LM Studio, llama.cpp, Jan, OpenRouter, OpenAI),
-  your Claude Code CLI, or Gemini Live with your own Google AI Studio key.
+Interviews are hard to rehearse. You can't memorise every answer, a mentor costs money, and a chatbot playing a
+recruiter loses the context after a few questions. Vukoli gives you a recruiter who remembers the whole call.
+
+## What you can practise
+
+- **Job interviews.** HR, behavioural or mixed rounds. Paste a job posting and add your CV, and Mike asks questions
+  for that role, follows up when an answer is vague, and moves on like a real interviewer.
+- **Tough questions.** Five themes: money, leaving and gaps, weak spots, fit, English at work (plus personal
+  questions, if you choose them). Mike pushes back on purpose.
+- **Salary talks.** A screening call, an offer call, internship to full-time, a counteroffer, or asking your lead
+  for a raise. Mike bargains: he raises objections, makes small concessions and holds a budget you can't see.
+  Before the call you can take a 3-minute course and write down your case (results with numbers, why this number,
+  what else you'd accept).
+- **English conversation.** Talk about anything at your level and get your mistakes corrected after the call.
+
+**Hints during the call.** Stuck? Press H. You get a tactic card, and its example line is written from what you
+have already said, not generic advice.
+
+**Feedback after the call.** Every answer gets feedback on content, English and delivery. Salary talks show how
+the offer moved, which objections you answered, and what to prepare before the real talk.
+
+## How it runs
+
+- Locally. With Ollama, nothing leaves your computer.
+- Bring your own AI: Ollama, any OpenAI-compatible server (LM Studio, llama.cpp, Jan, OpenRouter, OpenAI and
+  others), your Claude Code, Codex or Antigravity CLI, or Gemini Live with your own Google AI Studio key.
+  You can pick a different engine for the feedback after the call.
 - Voice in: local Whisper (mlx-whisper on Apple Silicon, faster-whisper elsewhere) or your browser's recogniser.
   Voice out: Kokoro (local). Without speech models the app works with typed answers.
 - Your sessions are saved as JSON and Markdown in your OS app-data folder.
@@ -67,29 +88,11 @@ default browser. To always get a browser tab, set `VUKOLI_APP_WINDOW=0` (or star
 Chrome and Edge also offer to install Vukoli as an app (a card on Home, or Settings > General > Install Vukoli as an app),
 which gives it its own Dock / taskbar icon. If the app is closed, clicking that icon shows "Start Vukoli".
 
-## What's free
+## Free
 
-Everything you need to practise is free forever, with no account and no key. The free core is never a demo.
-
-| Feature | Free forever | Premium (coming later) |
-|---|---|---|
-| Interview practice with Mike | ✓ | ✓ |
-| English practice | ✓ | ✓ |
-| Prep from your CV and the job description | ✓ | ✓ |
-| Question bank | ✓ | ✓ |
-| Debrief after every session | ✓ | ✓ |
-| Mistake memory | ✓ | ✓ |
-| Weak-spot drill | ✓ | ✓ |
-| Zero setup | Set up a local engine once | ✓ |
-| Best live voice | Voice on this computer | ✓ |
-| Trends across sessions | — | ✓ |
-| History on all your devices | This computer only | ✓ |
-
-Premium isn't available yet and has no price. When it comes, it adds to the free core and takes nothing away.
+Everything is free, with no account and no key. Set up a local engine once, or connect one you already have.
 
 **Practice only.** This app is for rehearsal, never for help during a real interview.
-
-<!-- Keep this table identical to Settings → About and what's free (web/src/i18n/en.json, settings.about; US-30). -->
 
 ## Quick start (development)
 
@@ -131,7 +134,8 @@ test the microphone, model and voice, optionally add your CV and the job, then s
 ```
 .
   server/
-    server/            FastAPI app: engines/, session.py (Mike), feedback.py, ws.py, api.py, storage.py
+    server/            FastAPI app: engines/, session.py (Mike), feedback.py, ws.py, api.py, storage.py,
+                       bargain.py (salary talks), tough.py (tough questions), hintgen.py (hint lines)
     content/           prompts, JSON schemas, feedback rubric, question bank, UI copy
     tests/             pytest suite
     scripts/pii_scan.py  release check for personal data (patterns kept outside the repo)
