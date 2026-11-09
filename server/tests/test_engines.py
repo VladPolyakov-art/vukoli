@@ -829,3 +829,11 @@ def test_sign_in_opens_a_terminal_with_the_found_program(monkeypatch):
         assert c.post("/api/engines/claude_cli/sign-in", headers={"Origin": "https://evil.example"}).status_code == 403
     assert signin.command_line("C:/a b/it's/claude.exe", ["auth", "login"], "win32") == "& 'C:/a b/it''s/claude.exe' auth login"
     assert signin.command_line("/a b/claude", ["login"], "darwin") == "'/a b/claude' login"
+
+
+def test_pull_error_says_what_to_do_when_ollama_lost_its_files():
+    """09.11: ~/.ollama deleted under a running Ollama; the pull failed with a raw file error."""
+    from server.engines import ollama
+    text = ollama.pull_error_text("pull model manifest: open .ollama/id_ed25519: no such file or directory")
+    assert "Quit Ollama" in text and "id_ed25519" not in text
+    assert ollama.pull_error_text("something else") == "something else"

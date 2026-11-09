@@ -119,6 +119,18 @@ async def start(url: str, wait_s: float = 15.0) -> bool:
 MODEL_SIZES_GB = {MODEL_SMALL: 2.5, MODEL_LARGE: 5.2}
 
 
+def pull_error_text(error: str) -> str:
+    """Ollama's own words, plus what to do for the errors we have seen (09.11: ~/.ollama was deleted while Ollama
+    ran, so its key file was gone and every download stopped at "pull model manifest")."""
+    low = error.lower()
+    if "id_ed25519" in low or ".ollama" in low and "no such file" in low:
+        return ("Ollama's own files are missing (its .ollama folder was probably deleted while it was running). "
+                "Quit Ollama (menu bar or tray icon > Quit), open it again, then download.")
+    if "no space left" in low:
+        return "Not enough free disk space for this model. Free some space, then download again."
+    return error[:300]
+
+
 class Pull:
     """One model download at a time, run in the background; the app polls its progress."""
 
@@ -167,7 +179,7 @@ class Pull:
 
     def _step(self, event: dict) -> None:
         if event.get("error"):
-            raise EngineError("pull_failed", str(event["error"])[:300])
+            raise EngineError("pull_failed", pull_error_text(str(event["error"])))
         status = str(event.get("status", ""))
         if event.get("digest") and event.get("total"):
             self._layers[event["digest"]] = (int(event.get("completed") or 0), int(event["total"]))
