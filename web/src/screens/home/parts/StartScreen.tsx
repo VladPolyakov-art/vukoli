@@ -1,14 +1,15 @@
 /* Start screen (home.md v2 §3, D47a/b): a text greeting (no orb), one composer, up to three suggestions
  * (the footer line is pinned to the bottom of <main> by HomeView).
- * Calm like a chat start page: nothing else on screen. The composer carries a "+" for a job file (D112: no practice-type dropdown; English is the chip under the field). The composer carries the fast path like the Gemini input (D52, chosen in D53):
- * "+" then Quick start on the left, a round unlabelled mic on the right (= Start now, D51 item 1; a keyboard icon when
- * answers are typed). Text or a file turns the mic into the Send arrow (motion D6), and Send opens the setup chat.
+ * Calm like a chat start page: nothing else on screen. The composer carries a "+" for a job file (D112: no practice-type dropdown; English is the chip under the field)
+ * and the "Quick start" button (D111) on the left; the round button at the end is the dictation mic (D90, as in the setup chat):
+ * it speaks into the field. Text or a file turns it into the Send arrow (motion D6), and Send opens the setup chat.
+ * A session starts only from "Quick start", a suggestion or Send; never from the mic.
  * Under the composer: the suggestions only. */
 import type { KeyboardEvent, Ref } from "react";
-import type { ComposerSend } from "../../../ds";
 import { Button, Chip, ChipGroup, Composer, ComposerAttachment, Icon, IconButton, Skeleton } from "../../../ds";
 import { t } from "../../../i18n";
 import type { HomeViewProps, Suggestion, Track } from "../types";
+import { endButton, isHearing } from "./dictationSend";
 import s from "./parts.module.css";
 
 export function Footer({ track }: { track: Track }) {
@@ -45,27 +46,15 @@ export function StartScreen(props: StartScreenProps) {
   const title = english
     ? name ? t("chat.start.englishName", { name }) : t("chat.start.english")
     : name ? t("chat.start.greetingName", { name }) : t("chat.start.greeting");
-  const placeholder = english ? t("chat.start.placeholderEnglish") : narrow ? t("chat.start.placeholderNarrow") : t("chat.start.placeholder");
+  const dictation = props.dictation;
+  const idlePlaceholder = english ? t("chat.start.placeholderEnglish") : narrow ? t("chat.start.placeholderNarrow") : t("chat.start.placeholder");
+  const placeholder = dictation?.state === "listening" ? t("chat.dictate.listening")
+    : dictation?.state === "transcribing" ? t("chat.dictate.working") : idlePlaceholder;
   const hasInput = Boolean(composer.text.trim() || composer.file);
-  const quick = props.quickStart;
-  const sendMessage: ComposerSend = { label: t("chat.start.send"), icon: "arrowRight", variant: "action", hidden: !hasInput, track: "composer-send", onSend: props.onSend };
-  /* With nothing typed the end button is the quick start (no label; the name and tooltip say what it starts). */
-  const typed = (quick?.answer ?? (props.textMode ? "text" : "voice")) === "text";
-  const send: ComposerSend = quick && !hasInput
-    ? {
-      label: t(typed ? "chat.quick.textButton" : "chat.quick.voiceButton"),
-      title: quick.detail || undefined,
-      icon: typed ? "keyboard" : "mic",
-      // D59: no white fill under the mic: a grey chip, so the icon reads clearly in both themes.
-      variant: "quiet",
-      disabled: props.loading || !props.engineReady || quick.wait,
-      busy: props.starting,
-      track: "quick-start",
-      onSend: props.onQuickStart,
-    }
-    : sendMessage;
-  // Empty field: Enter must not start a session (only the button does); Shift+Enter still adds a line.
-  const holdEnter = quick && !hasInput
+  const hearing = isHearing(dictation);
+  const send = endButton(props, hasInput);
+  // Empty field: Enter must not switch the mic on (only the button does); Shift+Enter still adds a line.
+  const holdEnter = !hasInput
     ? (e: KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }
     : undefined;
   const addFile = english ? null : <IconButton icon="plus" size="sm" outlined label={t("chat.start.addFile")} data-track="composer-add-file" onClick={props.onAddFile} />;
@@ -86,7 +75,9 @@ export function StartScreen(props: StartScreenProps) {
           value={composer.text}
           minRows={1}
           maxRows={8}
-          submitOnEnter
+          submitOnEnter={!hearing}
+          readOnly={hearing}
+          error={dictation?.error}
           busy={props.loading}
           onChange={(e) => props.onComposerChange?.(e.target.value)}
           onFiles={english ? undefined : props.onFiles}

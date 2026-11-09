@@ -228,8 +228,6 @@ export interface HomeViewProps {
   /** The browser can install Vukoli as an app and the user has not said no: a quiet card on the start screen. */
   installCard?: boolean;
   suggestions: Suggestion[];
-  /** Quick start (D51 item 1): what the round mic at the composer's end starts (its tooltip). None: not offered (English). */
-  quickStart?: { detail: string; answer?: "voice" | "text"; /** The remembered job's questions are still being written (QA-02): the button waits. */ wait?: boolean } | null;
   composer: { text: string; file?: { name: string; size: string } };
   setup?: SetupModel;
   /** Saved jobs, for the plan's Change job listbox. */
@@ -255,7 +253,6 @@ export interface HomeViewProps {
   onRemoveFile?: () => void;
   onSend?: () => void;
   onSuggestion?: (id: SuggestionId) => void;
-  onQuickStart?: () => void;
   /** D111: the "Quick start" button next to the composer: a call right away, Mike asks "interview or English?". */
   onQuickCall?: () => void;
   onReply?: (turnId: string, replyId: string) => void;

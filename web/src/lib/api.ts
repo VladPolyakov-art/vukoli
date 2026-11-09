@@ -1,6 +1,6 @@
 /* Typed REST client for app/server (all routes under /api). Errors become ApiError with the server's code. */
 import type {
-  Debrief, EngineId, EngineLimits, EngineStatus, EnginesResponse, EngineConnectResult, EngineTestResult, Health, MemorySummary, OllamaModelsResponse, OllamaPull,
+  Debrief, EngineId, EngineLimits, EngineStatus, EnginesResponse, EngineConnectResult, EngineSignInResult, EngineTestResult, Health, MemorySummary, OllamaModelsResponse, OllamaPull,
   Profile, Question, SessionRecord, SessionSummary, Settings, SettingsPatch, SttInfo, StrongerVersion, TelemetryInfo, VoiceCheckResult,
   TrashItem, SearchResult, Vacancy, FeedbackBody, FeedbackConfig, SessionFinished, VacancySummary, VoicesResponse, LanguageItem, LanguageLayer, FeedbackRecord, TranscriptTurn,
   ToughTalkContent, SalaryRange, NegotiatePrep,
@@ -70,6 +70,7 @@ export const api = {
   ollamaModels: () => request<OllamaModelsResponse>("/engines/ollama/models"),
   testEngine: (id: EngineId) => post<EngineTestResult>(`/engines/${id}/test`),
   connectEngine: (id: EngineId) => post<EngineConnectResult>(`/engines/${id}/connect`),
+  engineSignIn: (id: EngineId) => post<EngineSignInResult>(`/engines/${id}/sign-in`),
   ollamaPull: () => request<OllamaPull>("/engines/ollama/pull"),
   startOllamaPull: (model: string) => post<OllamaPull>("/engines/ollama/pull", { model }),
   cancelOllamaPull: () => request<OllamaPull>("/engines/ollama/pull", { method: "DELETE" }),

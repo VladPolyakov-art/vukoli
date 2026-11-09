@@ -45,7 +45,8 @@ def login_command(binary: str | None) -> str:
     """The sign-in command to show: `claude` when it is on PATH, else the full path of the copy we found."""
     if not binary or Path(binary).name in ("claude", "claude.exe", "claude.cmd") and find_program("claude") == binary:
         return "claude auth login"
-    return (f'& "{binary}" auth login' if sys.platform == "win32" else f'"{binary}" auth login')
+    from .signin import command_line
+    return command_line(binary, ["auth", "login"])
 
 
 def _version_key(path: Path) -> tuple:

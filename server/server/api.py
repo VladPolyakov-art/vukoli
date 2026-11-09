@@ -171,6 +171,25 @@ async def engine_connect(engine_id: str, request: Request) -> dict:
     return {"status": (await engines.engine_status(engine_id, settings)).model_dump(), "started": started}
 
 
+@router.post("/engines/{engine_id}/sign-in")
+async def engine_sign_in(engine_id: str, request: Request) -> dict:
+    """Open a terminal that runs the CLI's own sign-in (09.11: on Windows the user had to type a long path).
+    `opened` false = no terminal could be opened (or test mode): the app shows `command` to copy instead."""
+    check_origin(request)
+    if engine_id == "claude_cli":
+        binary, args, env = claude_cli.find_claude(), ["auth", "login"], claude_cli.child_env()
+    elif engine_id == "codex_cli":
+        binary, args, env = codex_cli.find_codex(), ["login"], claude_cli.child_env()
+    else:
+        raise fail(404, "unknown_engine", "This engine has no sign-in command.")
+    if not binary:
+        raise fail(409, "not_installed", "The program was not found on this computer.")
+    from .engines import signin
+    line = signin.command_line(binary, args)
+    opened = False if config.e2e_enabled() else await asyncio.to_thread(signin.open_terminal, binary, args, env)
+    return {"opened": opened, "command": line}
+
+
 @router.post("/engines/{engine_id}/disconnect")
 async def engine_disconnect(engine_id: str, request: Request) -> dict:
     """"Disconnect" (D84): Ollama / Claude Code / Codex / Antigravity are switched off in the app only (Ollama keeps running for other apps);

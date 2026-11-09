@@ -143,14 +143,10 @@ export const SCENES = {
     recent: { status: "error" },
   },
   overflowStart: { ...ret, ctx: CTX_OVERFLOW, label: "Overflow, text +30%", props: { name: LONG_NAME }, recent: RECENT_LONG },
-  quickTextMode: { ...ret, label: "Quick start, answering by typing", props: { name: "Alex", textMode: true } },
-  quickStarting: { ...ret, label: "Start mic pressed", props: { name: "Alex", starting: true } },
-  /* QA-02: the remembered job's questions are still being written: the mic waits, as Start does in the plan. */
-  quickWaiting: {
-    ...ret,
-    label: "Start mic waits for the job's questions",
-    props: { name: "Alex", quickStart: { detail: "Kestrel Pay · Behavioural · 5 questions · voice", answer: "voice", wait: true } },
-  },
+  /* The start-screen mic dictates (D90): listening, and nothing caught. */
+  startDictating: { ...ret, label: "Dictating on the start screen", dictate: "listening" },
+  startDictationError: { ...ret, label: "Start dictation caught nothing", dictate: "no_speech" },
+  startNoRecogniser: { ...ret, label: "No speech recogniser: Send only", props: { name: "Alex", dictation: { available: false, state: "idle" } } },
 
   /* ---------- setup chat ---------- */
   jobReading: { ...ret, label: "Reading a pasted job", inputs: [{ do: "begin", input: { kind: "text", text: PASTED_TEXT } }], hold: true },

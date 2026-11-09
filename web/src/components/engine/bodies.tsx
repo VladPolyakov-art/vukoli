@@ -6,7 +6,7 @@ import { t } from "../../i18n";
 import { api } from "../../lib/api";
 import { useLoad } from "../../lib/hooks";
 import { errorMessage, useApp } from "../../lib/store";
-import type { EngineId, EngineInfo, EngineStatus, OllamaPull } from "../../lib/types";
+import type { EngineId, EngineInfo, EngineSignInResult, EngineStatus, OllamaPull } from "../../lib/types";
 import { PRESETS, cliKey, engineName, isCli } from "./meta";
 import { OllamaDownload } from "./OllamaDownload";
 import { buildOptions, modelToPull, settle, type ModelSlot, type PendingPick } from "./ollamaModels";
@@ -44,8 +44,37 @@ function useConnect(id: EngineId) {
   return { connect: () => void connect(), busy, failed };
 }
 
-function ConnectButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
-  return <Button variant="primary" size="sm" data-track="engine-connect" loading={busy} onClick={onClick}>{t("engines.connect")}</Button>;
+function ConnectButton({ busy, onClick, variant = "primary" }: { busy: boolean; onClick: () => void; variant?: "primary" | "secondary" }) {
+  return <Button variant={variant} size="sm" data-track="engine-connect" loading={busy} onClick={onClick}>{t("engines.connect")}</Button>;
+}
+
+/** "Sign in" (Claude Code, Codex): the server opens a terminal window that runs the CLI's own sign-in (the CLI opens the
+ * browser). `opened: false` = no terminal could be opened → the command to copy. Never calls Connect by itself (it costs a
+ * request on the user's plan); when the app window is focused again it only re-reads the engine status. */
+function useSignIn(id: EngineId) {
+  const { refreshEngines } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<EngineSignInResult | null>(null);
+  const [error, setError] = useState("");
+  const opened = result?.opened === true;
+  useEffect(() => {
+    if (!opened) return;
+    const onFocus = () => { void refreshEngines(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [opened, refreshEngines]);
+  const signIn = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      setResult(await api.engineSignIn(id));
+    } catch (e) {
+      setResult(null);
+      setError(errorMessage(e));
+    }
+    setBusy(false);
+  };
+  return { signIn: () => void signIn(), busy, result, error };
 }
 
 /** D84: switched off with Disconnect; Connect brings it back (and starts Ollama if it isn't running). */
@@ -270,6 +299,7 @@ function CliBody({ engine, login }: { engine: EngineInfo; login: string }) {
   const code = engine.status.code;
   const k = cliKey(engine.id);
   const { connect, busy, failed } = useConnect(engine.id);
+  const si = useSignIn(engine.id);
   const terms = engine.terms_note ? <p className={s.note}><Icon name="info" size="sm" /> {engine.terms_note}</p> : null;
   if (code === "ready") {
     return <><Callout tone="success" title={t(`engines.${k}.signedIn`)} />{terms}</>;
@@ -298,20 +328,30 @@ function CliBody({ engine, login }: { engine: EngineInfo; login: string }) {
   }
   const signedOut = code === "unauthorized" || failed?.code === "unauthorized";
   const errored = Boolean(failed && failed.code !== "unauthorized");
+  const canSignIn = (engine.id === "claude_cli" || engine.id === "codex_cli") && signedOut;
+  const command = si.result?.command || failed?.hint_command || engine.status.hint_command || login;
+  const signInNote = si.result?.opened ? t("engines.signIn.opened") : si.result ? t("engines.signIn.notOpened") : canSignIn ? t("engines.signIn.intro") : t(`engines.${k}.signInHint`);
   return (
     <>
       <Callout tone={errored ? "error" : signedOut ? "warning" : "info"} live={failed ? "alert" : undefined}
         title={signedOut ? t(`engines.${k}.signedOut`) : t(`engines.${k}.unverified`)}
-        actions={<ConnectButton busy={busy} onClick={connect} />}>
+        actions={canSignIn ? (
+          <>
+            <Button variant="primary" size="sm" data-track="engine-sign-in" loading={si.busy} onClick={si.signIn}>{t("engines.signIn.button")}</Button>
+            <ConnectButton variant="secondary" busy={busy} onClick={connect} />
+          </>
+        ) : <ConnectButton busy={busy} onClick={connect} />}>
         {busy ? t(`engines.${k}.checking`)
           : errored ? t(`engines.${k}.failed`, { message: failed?.message ?? "" })
           : signedOut ? (
             <>
-              <p>{t(`engines.${k}.signInHint`)}</p>
-              <CopyField value={engine.status.hint_command || login} copyLabel={t("common.copyCommand")} copiedLabel={t("common.copied")} label={t("common.command")} />
+              <p aria-live="polite">{signInNote}</p>
+              {canSignIn && si.result?.opened !== false ? <p className={s.note}>{t("engines.signIn.orRun")}</p> : null}
+              <CopyField value={command} copyLabel={t("common.copyCommand")} copiedLabel={t("common.copied")} label={t("common.command")} />
             </>
           ) : t(`engines.${k}.connectNote`)}
       </Callout>
+      {si.error ? <Callout tone="error" live="alert">{si.error}</Callout> : null}
       {terms}
     </>
   );

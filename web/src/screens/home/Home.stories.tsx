@@ -34,13 +34,10 @@ export const StartBrowserUnsupported = desktop("browserUnsupported");
 export const StartStorageUnreadable = desktop("storageError");
 export const StartOverflow = desktop("overflowStart");
 export const StartOverflowMobile = mobile("overflowStart");
-/* Quick start (D51 item 1, Gemini layout D52/D53): the round mic at the composer's end — on StartReturning (Kestrel Pay ·
- * Behavioural) and StartFirstVisit (General questions · Unseen mix); text or a file turns it into Send (StartTyped,
- * StartFileAttached); typing → keyboard icon; disabled on StartLoading / StartEngineNotRunning; none in StartEnglish. */
-export const QuickStartTextMode = desktop("quickTextMode");
-export const QuickStartPressed = desktop("quickStarting");
-/* QA-02: the remembered job's questions are still being written: the mic is off until they are ready. */
-export const QuickStartWaiting = desktop("quickWaiting");
+/* Start-screen mic = dictation (D90): listening, nothing caught, and no recogniser (Send only). Quick start is the toolbar button (D111). */
+export const StartDictating = desktop("startDictating");
+export const StartDictationError = desktop("startDictationError");
+export const StartNoRecogniser = desktop("startNoRecogniser");
 
 /* ---- setup chat (§4) ---- */
 export const SetupJobReading = desktop("jobReading");

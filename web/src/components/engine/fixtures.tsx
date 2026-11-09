@@ -174,6 +174,8 @@ const DEFAULT_LIMITS: Partial<Record<EngineId, EngineLimits>> = {
 let stubModels: OllamaModelsResponse = MODELS;
 let stubPull: OllamaPull = PULL_IDLE;
 let stubStart: "ok" | "busy" = "ok";
+/** "Sign in" in stories: a terminal window opened, or none could be opened (the command is shown). */
+let stubSignIn: "opened" | "closed" = "opened";
 export const MODELS_WITHOUT_BIG: OllamaModelsResponse = { ...MODELS, models: MODELS.models.filter((m) => m.name !== "qwen3:8b") };
 
 let stubbed = false;
@@ -195,6 +197,8 @@ function installStub() {
     }
     // "Disconnect" in stories: the server answers; the fixture list stays as it is.
     if (/\/api\/engines\/[a-z_]+\/disconnect$/.test(url)) return json({ status: status("disconnected", "") });
+    const signIn = /\/api\/engines\/([a-z_]+)\/sign-in$/.exec(url);
+    if (signIn) return json({ opened: stubSignIn === "opened", command: signIn[1] === "codex_cli" ? "codex login" : "claude auth login" });
     // "Connect" in stories: still not found, so the story shows the follow-up hint.
     const connect = /\/api\/engines\/([a-z_]+)\/connect$/.exec(url);
     if (connect) return json({ started: false, status: status(connect[1] === "claude_cli" || connect[1] === "codex_cli" || connect[1] === "antigravity_cli" ? "not_installed" : "not_running", "") });
@@ -222,14 +226,15 @@ function installStub() {
 }
 
 /** Wraps a story / review state: live-looking store without a server. Switching and saving change local state only. */
-export function EngineFixture({ engines, settings = SETTINGS, pull, models, startAnswer = "ok", limits, children }: {
-  engines: EnginesResponse; settings?: Settings; pull?: OllamaPull; models?: OllamaModelsResponse; startAnswer?: "ok" | "busy";
+export function EngineFixture({ engines, settings = SETTINGS, pull, models, startAnswer = "ok", signIn = "opened", limits, children }: {
+  engines: EnginesResponse; settings?: Settings; pull?: OllamaPull; models?: OllamaModelsResponse; startAnswer?: "ok" | "busy"; signIn?: "opened" | "closed";
   limits?: Partial<Record<EngineId, EngineLimits>>; children: ReactNode;
 }) {
   installStub();
   stubModels = models ?? MODELS;
   stubPull = pull ?? PULL_IDLE;
   stubStart = startAnswer;
+  stubSignIn = signIn;
   const [list, setList] = useState(engines);
   const [cfg, setCfg] = useState(settings);
   const value = useMemo<AppStore>(() => {

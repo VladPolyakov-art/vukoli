@@ -809,6 +809,23 @@ def test_claude_from_the_desktop_app_is_found(tmp_path):
 def test_sign_in_command_names_the_copy_we_found(monkeypatch):
     monkeypatch.setattr(claude_cli, "find_program", lambda name, extra=(): None)
     cmd = claude_cli.login_command("/x/Claude/claude-code/2.1.321/d0/claude.app/Contents/MacOS/claude")
-    assert cmd.endswith('claude" auth login') and "claude-code" in cmd
+    assert cmd.endswith("claude' auth login") and "claude-code" in cmd
     monkeypatch.setattr(claude_cli, "find_program", lambda name, extra=(): "/usr/local/bin/claude")
     assert claude_cli.login_command("/usr/local/bin/claude") == "claude auth login"
+
+
+def test_sign_in_opens_a_terminal_with_the_found_program(monkeypatch):
+    from fastapi.testclient import TestClient
+    from server.engines import signin
+    from server.main import create_app
+    opened = []
+    monkeypatch.setattr(claude_cli, "find_claude", lambda: "C:/Users/me/AppData/Roaming/Claude/claude-code/2.1.321/d0/claude.exe")
+    monkeypatch.setattr(signin, "open_terminal", lambda binary, args, env=None: opened.append((binary, args)) or True)
+    with TestClient(create_app()) as c:
+        r = c.post("/api/engines/claude_cli/sign-in", headers={"Origin": "http://testserver"})
+        assert r.status_code == 200 and r.json()["opened"] is True and "auth login" in r.json()["command"]
+        assert opened == [("C:/Users/me/AppData/Roaming/Claude/claude-code/2.1.321/d0/claude.exe", ["auth", "login"])]
+        assert c.post("/api/engines/ollama/sign-in", headers={"Origin": "http://testserver"}).status_code == 404
+        assert c.post("/api/engines/claude_cli/sign-in", headers={"Origin": "https://evil.example"}).status_code == 403
+    assert signin.command_line("C:/a b/it's/claude.exe", ["auth", "login"], "win32") == "& 'C:/a b/it''s/claude.exe' auth login"
+    assert signin.command_line("/a b/claude", ["login"], "darwin") == "'/a b/claude' login"

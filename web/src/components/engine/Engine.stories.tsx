@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { EnginePanel, type EnginePanelProps } from "../EnginePanel";
 import type { EngineId, EngineLimits, OllamaModelsResponse, OllamaPull } from "../../lib/types";
 import { EngineFixture, LIMITS, MODELS_WITHOUT_BIG, NONE_READY, PULL_DOWNLOADING, SETTINGS, makeEngines } from "./fixtures";
@@ -11,13 +11,21 @@ export default meta;
 type Story = StoryObj;
 
 type Limits = Partial<Record<EngineId, EngineLimits>>;
-interface Ollama { models?: OllamaModelsResponse; pull?: OllamaPull; startAnswer?: "ok" | "busy" }
+interface Ollama { models?: OllamaModelsResponse; pull?: OllamaPull; startAnswer?: "ok" | "busy"; signIn?: "opened" | "closed" }
 function Stage({ engines, settings, limits, ollama, children }: { engines: ReturnType<typeof makeEngines>; settings?: typeof SETTINGS; limits?: Limits; ollama?: Ollama; children: ReactNode }) {
   return (
     <EngineFixture engines={engines} settings={settings} limits={limits} {...ollama}>
       <div style={{ maxWidth: "calc(var(--layout-narrow) + var(--space-16))" }}>{children}</div>
     </EngineFixture>
   );
+}
+/** Story helper: presses "Sign in" once the panel is on screen, so the story shows the state after the press. */
+function PressSignIn({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const id = window.setTimeout(() => document.querySelector<HTMLButtonElement>('[data-track="engine-sign-in"]')?.click(), 150);
+    return () => window.clearTimeout(id);
+  }, []);
+  return <>{children}</>;
 }
 const panel = (engines: ReturnType<typeof makeEngines>, props: EnginePanelProps, settings?: typeof SETTINGS, limits?: Limits, ollama?: Ollama): Story => ({
   render: () => <Stage engines={engines} settings={settings} limits={limits} ollama={ollama}><EnginePanel {...props} /></Stage>,
@@ -39,6 +47,21 @@ export const SettingsOllamaNoModel: Story = panel(makeEngines({ ollama: "no_mode
 export const SettingsGemini: Story = panel(makeEngines({ gemini_live: "ready" }, "gemini_live"), {});
 export const SettingsSetUpOpenAi: Story = panel(makeEngines(), { initialPick: "openai_compatible" });
 export const SettingsSetUpClaude: Story = panel(makeEngines({ claude_cli: "not_installed" }), { initialPick: "claude_cli" });
+/** Claude Code is installed but signed out: "Sign in" is the primary action; the command stays under it as a fallback. */
+export const SettingsClaudeSignedOut: Story = panel(makeEngines({ claude_cli: "signed_out" }), { initialPick: "claude_cli" });
+/** Same, after pressing "Sign in": the terminal window opened. (The story presses it for you.) */
+export const SettingsClaudeSignInOpened: Story = {
+  render: () => (
+    <Stage engines={makeEngines({ claude_cli: "signed_out" })} ollama={{ signIn: "opened" }}><PressSignIn><EnginePanel initialPick="claude_cli" /></PressSignIn></Stage>
+  ),
+};
+/** Same, but no terminal could be opened: the command to copy. */
+export const SettingsClaudeSignInNoTerminal: Story = {
+  render: () => (
+    <Stage engines={makeEngines({ claude_cli: "signed_out" })} ollama={{ signIn: "closed" }}><PressSignIn><EnginePanel initialPick="claude_cli" /></PressSignIn></Stage>
+  ),
+};
+export const SettingsCodexSignedOut: Story = panel(makeEngines({ codex_cli: "signed_out" }), { initialPick: "codex_cli" });
 export const SettingsDisconnected: Story = panel(makeEngines({ ollama: "disconnected" }), {});
 export const SettingsSetUpGemini: Story = panel(makeEngines(), { initialPick: "gemini_live" });
 

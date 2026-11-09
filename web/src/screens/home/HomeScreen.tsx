@@ -5,8 +5,8 @@
  * user's note (UI only, B3), no questions status (we track the prepare call, B5), the last interview's job and round
  * are not in SessionSummary (remembered job + remembered round, B8), Drill = a 3-question mixed session (B7), no
  * recurring-phrases data (English phrases empty). The greeting uses `settings.name` (Q4, US-08 AC3).
- * Quick start (D51 item 1, quickStart.ts): the round mic at the composer's end (D53) opens the session straight away with the last settings.
- * D90: in the chat with Mike that mic dictates into the field instead (audio/dictation.ts); the words join what's typed. */
+ * D90: the round mic at the composer's end (start screen and setup chat) dictates into the field (audio/dictation.ts); the words join what's typed.
+ * A session never starts from the mic. Quick start (D111) is its own button by the composer: a call at once, no plan. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { durationMs, motionMemory, shouldBuildUp } from "../../ds";
@@ -24,7 +24,6 @@ import { homeUtScreen, useUtScreen } from "../../lib/utScreen";
 import type { NegotiatePrep, NegotiateScenario, Vacancy } from "../../lib/types";
 import { buildSessionConfig } from "../../session/startConfig";
 import { homePrefs, shortDate } from "./homePrefs";
-import { quickStartFor } from "./quickStart";
 import { HomeView } from "./HomeView";
 import {
   attach, begin, change, pick, planFor, removeNote, resolveCv, resolveJob, resolveRange, say, setTacticsHidden, setupModel, skip,
@@ -342,22 +341,6 @@ export function HomeScreen() {
   const shown = setup ? setupModel(ctx, setup) : undefined;
   // User-test screen name (13b): start screen, setup chat, or the plan card.
   useUtScreen(homeUtScreen({ active: Boolean(setup), plan: shown?.plan?.kind ?? null }));
-  /* Quick start (D51 item 1): one click, the last settings (general questions on a first visit), no setup chat. */
-  // While Home loads the row keeps its place (disabled, no detail) so it doesn't jump in later.
-  const quick = setup || loading ? null : quickStartFor(ctx, textMode || unsupportedSpeech);
-  // QA-02: the remembered job is still getting its questions: the mic waits as Start does in the plan.
-  const quickWaits = Boolean(quick?.jobId && prep[quick.jobId] === "preparing");
-  const quickStart = () => {
-    if (!quick || !engineReady || quickWaits) return;
-    homePrefs.setRound(quick.round);
-    const config = buildSessionConfig({
-      mode: "interview", answer: quick.answer, roundType: quick.roundType, strictness: quick.strictness,
-      questions: quick.questions, vacancyId: quick.jobId ?? undefined,
-    }, settings, stt.data);
-    const title = sessionName(list.find((v) => v.id === quick.jobId)?.title ?? "", false);
-    leave(() => navigate("/session", { state: { config, title, roundType: config.start.round_type } }));
-  };
-
   /* D111: "Quick start" next to the composer: a call at once, no plan; Mike asks "interview or English?" and the
    * server picks the newest saved job for an interview. Voice unless typed answers are on or the browser cannot listen. */
   const quickCall = () => {
@@ -386,8 +369,6 @@ export function HomeScreen() {
         storageError={Boolean(sessions.error)}
         installCard={installOffer.showCard}
         suggestions={loading ? [] : suggestionsFor(ctx)}
-        quickStart={quick ? { detail: quick.detail, answer: quick.answer, wait: quickWaits } : loading && track === "interview" ? { detail: "" } : null}
-        onQuickStart={quickStart}
         onQuickCall={quickCall}
         composer={composer}
         setup={shown}

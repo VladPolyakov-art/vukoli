@@ -10,10 +10,11 @@
  *   dictates into the field. The chat scrolls under the composer (it floats on a short fade), so messages stay in view
  *   down to the composer instead of being cut off above it. */
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Composer, ComposerAttachment, IconButton, type ComposerSend } from "../../ds";
+import { Composer, ComposerAttachment, IconButton } from "../../ds";
 import { durationMs } from "../../ds/motion";
 import { t } from "../../i18n";
 import { Banners } from "./parts/Banners";
+import { endButton, isHearing } from "./parts/dictationSend";
 import { SetupChat, SetupHeader } from "./parts/SetupChat";
 import { Footer, StartScreen } from "./parts/StartScreen";
 import type { HomeViewProps } from "./types";
@@ -99,7 +100,7 @@ export function HomeView(props: HomeViewProps) {
     />
   );
   const dictation = props.dictation;
-  const hearing = dictation?.state === "listening" || dictation?.state === "transcribing";
+  const hearing = isHearing(dictation);
   const placeholder = dictation?.state === "listening" ? t("chat.dictate.listening")
     : dictation?.state === "transcribing" ? t("chat.dictate.working")
       : setup?.stage === "plan" ? t("chat.setup.placeholderPlan")
@@ -107,16 +108,7 @@ export function HomeView(props: HomeViewProps) {
         : setup?.stage === "job" ? t("chat.setup.placeholderJob") : t("chat.setup.placeholderReply");
   const hasInput = Boolean(composer.text.trim() || composer.file);
   /* The end button: Send with text or a file, otherwise the mic (stop while it listens), as on the start screen. */
-  const send: ComposerSend = (hasInput && !hearing) || !dictation?.available
-    ? { label: t("chat.start.send"), icon: "arrowRight", variant: "action", hidden: !hasInput, track: "composer-send", onSend: props.onSend }
-    : {
-      label: t(hearing ? "chat.dictate.stop" : "chat.dictate.start"),
-      icon: hearing ? "stop" : "mic",
-      variant: hearing ? "action" : "quiet",
-      busy: dictation.state === "transcribing",
-      track: hearing ? "composer-dictate-stop" : "composer-dictate",
-      onSend: props.onDictate,
-    };
+  const send = endButton(props, hasInput);
   // English and the tough-talk modes take no job or CV file in the chat.
   const english = track === "english" || setup?.track === "tough" || setup?.track === "negotiate";
   const addFile = english ? null : (

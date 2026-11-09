@@ -45,6 +45,12 @@ export interface OllamaModelsResponse {
 }
 
 /** POST /engines/{id}/connect (D83): the fresh status after looking for the installed engine (and starting Ollama). */
+/** Answer of "Sign in" (Claude Code, Codex): `opened` = a terminal window runs the CLI's own sign-in; otherwise show `command`. */
+export interface EngineSignInResult {
+  opened: boolean;
+  command: string;
+}
+
 export interface EngineConnectResult {
   status: EngineStatus;
   started: boolean;
