@@ -1376,7 +1376,11 @@ class TextDriver:
                 if size - done < 16000:
                     continue
                 done = size
+                t0 = time.perf_counter()
                 result = await asyncio.to_thread(self.stt.transcribe_if_idle, bytes(self._buffer[-window:]))
+                spent = time.perf_counter() - t0
+                if spent > 1.0:          # a slow computer: give the CPU back before the next caption pass
+                    await asyncio.sleep(min(spent, 4.0))
                 if result is None or not self._recording or self._turn != turn:
                     continue
                 empty = 0 if result.text else empty + 1

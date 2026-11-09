@@ -84,3 +84,4 @@
 /* D85: the model download — progress bar, the numbers under it, the note. */
 .pull { display: grid; gap: var(--space-2); }
 .pullLine { font-variant-numeric: tabular-nums; color: var(--color-text-secondary); font-size: var(--text-sm); }
+.modelPicker { display: flex; flex-direction: column; gap: var(--space-3); }

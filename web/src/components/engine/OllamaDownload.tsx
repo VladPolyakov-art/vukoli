@@ -3,12 +3,12 @@
  * turns Ready. A machine with 16 GB+ is offered the smaller model as well (slow connection, little disk).
  * The Terminal command stays behind "Use Terminal instead". */
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Button, Callout, CopyField, Disclosure, Progress } from "../../ds";
+import { Button, Callout, CopyField, Disclosure } from "../../ds";
 import { t } from "../../i18n";
 import { api } from "../../lib/api";
-import { formatBytes } from "../../lib/format";
 import { errorMessage, useApp } from "../../lib/store";
 import type { EngineInfo, OllamaPull } from "../../lib/types";
+import { PullProgress } from "./PullProgress";
 import s from "./engine.module.css";
 
 const POLL_MS = 700;
@@ -70,23 +70,7 @@ export function OllamaDownload({ engine, initial: given }: OllamaDownloadProps) 
   const first = resume || recommended;
   const second = pull?.options.find((o) => o.model !== first && (o.model === recommended || (recSize !== undefined && o.size_gb < recSize)));
 
-  if (pull && pulling) {
-    const share = pull.total ? pull.completed / pull.total : undefined;
-    const line = pull.phase === "verify" ? t("engines.ollama.pull.verifying")
-      : !pull.total ? t("engines.ollama.pull.preparing")
-      : t("engines.ollama.pull.progress", { done: formatBytes(pull.completed) || "0 MB", total: formatBytes(pull.total),
-        pct: Math.floor((share ?? 0) * 100) });
-    return (
-      <Callout tone="info" icon="download" title={t("engines.ollama.pull.downloading", { model: pull.model })}
-        actions={<Button variant="ghost" size="sm" data-track="ollama-pull-cancel" onClick={() => void cancel()}>{t("common.cancel")}</Button>}>
-        <div className={s.pull}>
-          <Progress label={t("engines.ollama.pull.label")} value={pull.phase === "verify" ? 1 : share} valueText={line} />
-          <p className={s.pullLine}>{line}</p>
-          <p className={s.note}>{t("engines.ollama.pull.keepsGoing")}</p>
-        </div>
-      </Callout>
-    );
-  }
+  if (pull && pulling) return <PullProgress pull={pull} onCancel={() => void cancel()} />;
 
   const failure = error || (pull?.state === "error" ? pull.error : "");
   return (

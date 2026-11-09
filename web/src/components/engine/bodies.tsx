@@ -1,15 +1,16 @@
 /* The connection UI of each engine (step B, and the "Models" disclosure in the summary card).
  * Moved as is from the old EnginePanel: same forms, same calls, same copy. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Callout, Chip, CopyField, Icon, IconButton, Input, Select, SettingRow } from "../../ds";
 import { t } from "../../i18n";
 import { api } from "../../lib/api";
-import { formatBytes } from "../../lib/format";
 import { useLoad } from "../../lib/hooks";
 import { errorMessage, useApp } from "../../lib/store";
-import type { EngineId, EngineInfo, EngineStatus } from "../../lib/types";
+import type { EngineId, EngineInfo, EngineStatus, OllamaPull } from "../../lib/types";
 import { PRESETS, cliKey, engineName, isCli } from "./meta";
 import { OllamaDownload } from "./OllamaDownload";
+import { buildOptions, modelToPull, settle, type ModelSlot, type PendingPick } from "./ollamaModels";
+import { PullProgress } from "./PullProgress";
 import s from "./engine.module.css";
 
 export function StatusHint({ engine }: { engine: EngineInfo }) {
@@ -111,34 +112,89 @@ export function OllamaBody({ engine }: { engine: EngineInfo }) {
   return <StatusHint engine={engine} />;
 }
 
+/** Both dropdowns also list the models Mike can download. Picking one that isn't on the computer starts the download
+ * (the server runs one at a time); the old choice stays saved until it finishes, then the new one is saved. */
+const POLL_MS = 700;
+
 export function OllamaModelPicker() {
   const { settings, updateSettings } = useApp();
-  const { data } = useLoad(() => api.ollamaModels());
-  if (!data) return null;
-  if (!data.models.length) return <p className={s.note}>{t("engines.ollama.noModels")}</p>;
-  const options = (auto: string) => [
-    { value: "", label: t("engines.ollama.auto", { model: auto }) },
-    ...data.models.map((m) => ({
-      value: m.name,
-      label: [m.name, formatBytes(m.size), m.thinking_only ? t("engines.ollama.thinkingOnly") : "",
-        m.name === auto ? t("engines.ollama.recommended") : ""].filter(Boolean).join(" · "),
-    })),
-  ];
-  const save = async (patch: { model?: string; voice_model?: string }) => {
-    await updateSettings({ ollama: patch });
+  const { data, reload } = useLoad(() => api.ollamaModels());
+  const [pull, setPull] = useState<OllamaPull | null>(null);
+  const [pending, setPending] = useState<PendingPick | null>(null);
+  const [error, setError] = useState("");
+  const live = useRef({ pending, updateSettings, reload });
+  live.current = { pending, updateSettings, reload };
+  const pulling = pull?.state === "pulling";
+
+  useEffect(() => { void api.ollamaPull().then(setPull, () => {}); }, []);
+
+  const follow = async (next: OllamaPull) => {
+    setPull(next);
+    const { pending: pick, updateSettings: save, reload: refresh } = live.current;
+    const outcome = settle(next, pick);
+    if (outcome === "wait") return;
+    setPending(null);
+    if (outcome === "fail") setError(next.error);
+    if (next.state === "done") {
+      try {
+        if (outcome === "save" && pick) await save({ ollama: { [pick.slot]: pick.value } });
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+      refresh();
+    }
   };
+  useEffect(() => {
+    if (!pulling) return;
+    const id = window.setInterval(() => { void api.ollamaPull().then(follow, () => {}); }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [pulling]);
+
+  if (!data) return null;
+  if (!data.models.length && !pull?.options.length) return <p className={s.note}>{t("engines.ollama.noModels")}</p>;
+
+  const pick = async (slot: ModelSlot, value: string, auto: string) => {
+    setError("");
+    const model = modelToPull(value, data.models, auto);
+    if (!model) {
+      setPending(null);
+      await updateSettings({ ollama: { [slot]: value } });
+      return;
+    }
+    try {
+      const started = await api.startOllamaPull(model);
+      live.current.pending = { slot, value, model };
+      setPending({ slot, value, model });
+      await follow(started);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  const cancel = async () => {
+    try {
+      setPending(null);
+      setPull(await api.cancelOllamaPull());
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+
   // D79: one row per model choice — name and hint left, the dropdown right (like every other setting).
   return (
-    <div className={s.modelRows}>
-      <SettingRow label={t("engines.ollama.modelLabel")}
-        description={[t("engines.ollama.modelHint", { model: data.recommended }), data.ram_gb ? t("engines.ollama.ram", { gb: data.ram_gb }) : ""].filter(Boolean).join(" ")}>
-        <Select track="engine-model" label={t("engines.ollama.modelLabel")} hideLabel width="content" value={settings?.ollama.model ?? ""}
-          options={options(data.recommended)} onChange={(v) => void save({ model: v })} />
-      </SettingRow>
-      <SettingRow label={t("engines.ollama.voiceModelLabel")} description={t("engines.ollama.voiceModelHint", { model: data.recommended_voice })}>
-        <Select track="engine-voice-model" label={t("engines.ollama.voiceModelLabel")} hideLabel width="content" value={settings?.ollama.voice_model ?? ""}
-          options={options(data.recommended_voice)} onChange={(v) => void save({ voice_model: v })} />
-      </SettingRow>
+    <div className={s.modelPicker}>
+      <div className={s.modelRows}>
+        <SettingRow label={t("engines.ollama.modelLabel")}
+          description={[t("engines.ollama.modelHint", { model: data.recommended }), data.ram_gb ? t("engines.ollama.ram", { gb: data.ram_gb }) : ""].filter(Boolean).join(" ")}>
+          <Select track="engine-model" label={t("engines.ollama.modelLabel")} hideLabel width="content" value={settings?.ollama.model ?? ""}
+            options={buildOptions(data.models, pull, data.recommended)} onChange={(v) => void pick("model", v, data.recommended)} />
+        </SettingRow>
+        <SettingRow label={t("engines.ollama.voiceModelLabel")} description={t("engines.ollama.voiceModelHint", { model: data.recommended_voice })}>
+          <Select track="engine-voice-model" label={t("engines.ollama.voiceModelLabel")} hideLabel width="content" value={settings?.ollama.voice_model ?? ""}
+            options={buildOptions(data.models, pull, data.recommended_voice)} onChange={(v) => void pick("voice_model", v, data.recommended_voice)} />
+        </SettingRow>
+      </div>
+      {pull && pulling ? <PullProgress pull={pull} onCancel={() => void cancel()} /> : null}
+      {error ? <Callout tone="error" live="alert">{t("engines.ollama.pull.failed", { message: error })}</Callout> : null}
     </div>
   );
 }

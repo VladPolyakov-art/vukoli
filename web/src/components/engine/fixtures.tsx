@@ -170,6 +170,12 @@ const DEFAULT_LIMITS: Partial<Record<EngineId, EngineLimits>> = {
   codex_cli: LIMITS.codex, claude_cli: LIMITS.claude, antigravity_cli: LIMITS.antigravity, gemini_live: LIMITS.gemini,
 };
 
+/** Per-story knobs of the fetch stub: which models are "installed", the download state, and how starting a download answers. */
+let stubModels: OllamaModelsResponse = MODELS;
+let stubPull: OllamaPull = PULL_IDLE;
+let stubStart: "ok" | "busy" = "ok";
+export const MODELS_WITHOUT_BIG: OllamaModelsResponse = { ...MODELS, models: MODELS.models.filter((m) => m.name !== "qwen3:8b") };
+
 let stubbed = false;
 function installStub() {
   if (stubbed || typeof window === "undefined") return;
@@ -178,8 +184,15 @@ function installStub() {
   const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } }));
   window.fetch = (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (url.endsWith("/api/engines/ollama/models")) return json(MODELS);
-    if (url.endsWith("/api/engines/ollama/pull")) return json(PULL_IDLE);
+    if (url.endsWith("/api/engines/ollama/models")) return json(stubModels);
+    if (url.endsWith("/api/engines/ollama/pull")) {
+      if (init?.method === "POST" && stubStart === "busy") {
+        return Promise.resolve(new Response(JSON.stringify({ detail: { code: "pull_busy", message: "Another model is downloading. Wait for it or cancel it first." } }),
+          { status: 409, headers: { "Content-Type": "application/json" } }));
+      }
+      if (init?.method === "POST") { stubPull = { ...PULL_DOWNLOADING }; return json(stubPull); }   // like the server: it keeps pulling
+      return json(stubPull);
+    }
     // "Disconnect" in stories: the server answers; the fixture list stays as it is.
     if (/\/api\/engines\/[a-z_]+\/disconnect$/.test(url)) return json({ status: status("disconnected", "") });
     // "Connect" in stories: still not found, so the story shows the follow-up hint.
@@ -209,10 +222,14 @@ function installStub() {
 }
 
 /** Wraps a story / review state: live-looking store without a server. Switching and saving change local state only. */
-export function EngineFixture({ engines, settings = SETTINGS, pull, limits, children }: {
-  engines: EnginesResponse; settings?: Settings; pull?: OllamaPull; limits?: Partial<Record<EngineId, EngineLimits>>; children: ReactNode;
+export function EngineFixture({ engines, settings = SETTINGS, pull, models, startAnswer = "ok", limits, children }: {
+  engines: EnginesResponse; settings?: Settings; pull?: OllamaPull; models?: OllamaModelsResponse; startAnswer?: "ok" | "busy";
+  limits?: Partial<Record<EngineId, EngineLimits>>; children: ReactNode;
 }) {
   installStub();
+  stubModels = models ?? MODELS;
+  stubPull = pull ?? PULL_IDLE;
+  stubStart = startAnswer;
   const [list, setList] = useState(engines);
   const [cfg, setCfg] = useState(settings);
   const value = useMemo<AppStore>(() => {

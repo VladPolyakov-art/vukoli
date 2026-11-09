@@ -226,6 +226,8 @@
       "thinkingOnly": "thinking model, slower",
       "recommended": "recommended",
       "auto": "Automatic ({model})",
+      "autoMissing": "Automatic ({model}, not downloaded)",
+      "notDownloaded": "not downloaded",
       "noModels": "No models installed yet.",
       "pick": "Free, runs on this computer",
       "connectFailed": "Ollama didn't start. Open the Ollama app yourself, or paste this into Terminal:",

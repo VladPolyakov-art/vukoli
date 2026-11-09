@@ -23,6 +23,10 @@ import numpy as np
 log = logging.getLogger("uvicorn.error")
 SAMPLE_RATE = 16000
 MLX_DEFAULT = "mlx-community/whisper-large-v3-turbo"
+# Live captions on the CPU (faster-whisper): a small model with its own lock, so a caption pass never holds up the
+# answer's own recognition. Windows 09.11: small.en took 4-7 s for 2 s of speech (Whisper always encodes 30 s),
+# captions queued in front of the final pass and the user's words appeared only together with Mike's reply.
+CPU_CAPTION_MODEL = "base.en"
 LOW_CONFIDENCE = 0.5   # word probability below this is "possibly misheard" (GR9)
 # Whisper's own non-speech rule (its defaults for the two thresholds): a segment is no speech when the model
 # thinks so AND is unsure of what it wrote. Kept here too because the backends skip only whole windows.
@@ -232,13 +236,33 @@ def default_model(backend: str) -> str:
     return "small.en" if ram >= 8 else "base.en"
 
 
+def cpu_threads() -> int:
+    """CTranslate2 uses 4 threads by default; use the physical cores, leaving one for the app."""
+    try:
+        import psutil
+        cores = psutil.cpu_count(logical=False) or 0
+    except Exception:  # pragma: no cover
+        cores = 0
+    import os
+    cores = cores or max(1, (os.cpu_count() or 2) // 2)
+    return max(1, min(cores - 1 if cores > 2 else cores, 8))
+
+
 class STT:
     def __init__(self, backend: str | None, model: str = ""):
         self.backend = backend
         self.model_name = model or (default_model(backend) if backend else "")
         self._lock = threading.Lock()
-        self._fw_model = None
+        self._caption_lock = threading.Lock()
+        self._fw_models: dict[str, object] = {}
         self._warm = False
+
+    @property
+    def caption_model(self) -> str:
+        """The model for live captions: a lighter one on the CPU, the main one elsewhere."""
+        if self.backend == "faster_whisper" and self.model_name not in ("tiny.en", "tiny", CPU_CAPTION_MODEL):
+            return CPU_CAPTION_MODEL
+        return self.model_name
 
     @property
     def available(self) -> bool:
@@ -248,13 +272,14 @@ class STT:
         return {"available": self.available, "backend": self.backend or "none", "model": self.model_name,
                 "installed_backends": available_backends(), "word_confidence": self.available}
 
-    def _faster_whisper(self):
-        if self._fw_model is None:
+    def _faster_whisper(self, name: str = ""):
+        name = name or self.model_name
+        if name not in self._fw_models:
             from faster_whisper import WhisperModel
-            self._fw_model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
-        return self._fw_model
+            self._fw_models[name] = WhisperModel(name, device="cpu", compute_type="int8", cpu_threads=cpu_threads())
+        return self._fw_models[name]
 
-    def transcribe(self, pcm16k: bytes, words: bool = True) -> Transcript:
+    def transcribe(self, pcm16k: bytes, words: bool = True, caption: bool = False) -> Transcript:
         """16 kHz mono int16 PCM -> English transcript, with per-word timestamps and probability when `words`.
 
         Word timing costs about 0.5 s more on Apple Silicon, so the interviewer reply starts from a text-only
@@ -263,10 +288,12 @@ class STT:
         if not self.backend or duration < 0.5:
             return Transcript(text="", duration_s=duration, backend=self.backend or "none")
         audio = np.frombuffer(pcm16k, dtype=np.int16).astype(np.float32) / 32768.0
-        started = time.perf_counter()
+        asked = time.perf_counter()
         words: list[Word] = []
         segments: list[Segment] = []
-        with self._lock:   # MLX and CTranslate2 models are not shared across threads here
+        own = caption and self.caption_model != self.model_name
+        with (self._caption_lock if own else self._lock):   # one pass per model at a time
+            started = time.perf_counter()
             if self.backend == "mlx":
                 import mlx_whisper
                 result = mlx_whisper.transcribe(audio, path_or_hf_repo=self.model_name, language="en",
@@ -281,7 +308,7 @@ class STT:
                               float(item.get("end", 0)), float(item.get("probability", 1)))
                          for item in seg.get("words", []) or []]))
             else:
-                found, _info = self._faster_whisper().transcribe(
+                found, _info = self._faster_whisper(self.caption_model if own else "").transcribe(
                     audio, language="en", word_timestamps=words, beam_size=1, condition_on_previous_text=False)
                 for seg in found:
                     segments.append(Segment(
@@ -294,8 +321,10 @@ class STT:
             log.info("STT dropped %d of %d segments as no speech", len(segments) - len(kept), len(segments))
             text = " ".join(seg.text.strip() for seg in kept).strip()
         words = [w for seg in kept for w in seg.words]
-        log.info("STT %s%s: %.1f s of audio in %.2f s", self.backend, "" if words else " (text)", duration,
-                 time.perf_counter() - started)
+        waited = started - asked
+        log.info("STT %s%s%s: %.1f s of audio in %.2f s%s", self.backend, "" if words else " (text)",
+                 " (caption)" if caption else "", duration, time.perf_counter() - started,
+                 f" (waited {waited:.1f} s for the previous pass)" if waited >= 0.3 else "")
         voiced_s, level = speech_levels(pcm16k)
         if reason := non_speech_reason(text, voiced_s, level):
             # Never the words themselves: the log holds no user speech.
@@ -309,10 +338,11 @@ class STT:
 
     def transcribe_if_idle(self, pcm16k: bytes) -> Transcript | None:
         """Live captions only: skip instead of queueing behind another transcription (the final one wins)."""
-        if not self._lock.acquire(blocking=False):
+        lock = self._caption_lock if self.caption_model != self.model_name else self._lock
+        if not lock.acquire(blocking=False):
             return None
-        self._lock.release()
-        return self.transcribe(pcm16k, words=False)
+        lock.release()
+        return self.transcribe(pcm16k, words=False, caption=True)
 
     def warm_up(self) -> None:
         """Load the model and run both passes once (the first call compiles kernels: about 3 s on Apple
@@ -324,6 +354,8 @@ class STT:
             tone = (0.2 * np.sin(2 * np.pi * 220 * t) * (1 + np.sin(2 * np.pi * 3 * t)) * 16000).astype(np.int16)
             self.transcribe(tone.tobytes(), words=False)
             self.transcribe(tone.tobytes(), words=True)
+            if self.caption_model != self.model_name:   # load (and on first use download, ~150 MB) the caption model
+                self.transcribe(tone.tobytes(), words=False, caption=True)
             self._warm = True
         except Exception as exc:  # model download problems surface on first real use
             log.warning("STT warm-up failed: %s", type(exc).__name__)

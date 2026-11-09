@@ -14,7 +14,7 @@ from typing import AsyncIterator
 
 from .. import usage
 from .base import EngineDescriptor, EngineError, EngineStatus, LLMEngine, Msg
-from .locate import command, find_program
+from .locate import command, find_program, search_path
 
 INSTALL_URL = "https://docs.claude.com/en/docs/claude-code/setup"
 TERMS_NOTE = ("Uses your own Claude subscription via the Claude Code CLI; check Anthropic's terms. "
@@ -60,6 +60,8 @@ def child_env() -> dict[str, str]:
     env.setdefault("USER", name)
     env.setdefault("LOGNAME", name)
     env.setdefault("HOME", home)
+    if sys.platform == "win32":   # the CLI may need node or Git Bash installed after the app started
+        env["PATH"] = search_path()
     return env
 
 

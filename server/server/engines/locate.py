@@ -12,16 +12,48 @@ import sys
 from pathlib import Path
 
 COMMON_DIRS = ("/opt/homebrew/bin", "/usr/local/bin", "~/.local/bin", "~/bin", "~/.npm-global/bin", "~/.bun/bin",
-               "~/.volta/bin", "~/AppData/Roaming/npm", "~/AppData/Local/Programs/Ollama")
+               "~/.volta/bin", "~/AppData/Roaming/npm", "~/AppData/Local/Programs/Ollama",
+               "~/AppData/Local/Microsoft/WinGet/Links", "~/scoop/shims", "~/AppData/Local/pnpm")
 WINDOWS_SUFFIXES = (".exe", ".cmd")
+IS_WINDOWS = sys.platform == "win32"
+
+
+def registry_path() -> str:
+    """Windows: PATH as it is saved now (user + system), not as it was when this process started. A program
+    installed after the app (or the window that started it) was opened is on the saved PATH only (09.11:
+    "Claude Code wasn't found" while `claude` worked in a new terminal)."""
+    if sys.platform != "win32":
+        return ""
+    try:
+        import winreg
+    except ImportError:  # pragma: no cover
+        return ""
+    parts: list[str] = []
+    for root, key in ((winreg.HKEY_CURRENT_USER, "Environment"),
+                      (winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment")):
+        try:
+            with winreg.OpenKey(root, key) as k:
+                value, _kind = winreg.QueryValueEx(k, "Path")
+        except OSError:
+            continue
+        parts += [os.path.expandvars(p) for p in str(value).split(os.pathsep) if p.strip()]
+    return os.pathsep.join(parts)
+
+
+def search_path() -> str:
+    """This process's PATH plus any folder the saved Windows PATH has and this one lacks."""
+    current = os.environ.get("PATH", "")
+    have = {p.lower().rstrip("\\/") for p in current.split(os.pathsep) if p}
+    extra = [p for p in registry_path().split(os.pathsep) if p and p.lower().rstrip("\\/") not in have]
+    return os.pathsep.join([current, *extra]) if extra else current
 
 
 def find_program(name: str, extra: tuple[str, ...] = ()) -> str | None:
-    """PATH first, then `extra` (full paths), then the common install folders."""
-    found = shutil.which(name)
+    """PATH first (Windows: also the saved PATH), then `extra` (full paths), then the common install folders."""
+    found = shutil.which(name) or (shutil.which(name, path=search_path()) if IS_WINDOWS else None)
     if found:
         return found
-    suffixes = ("", *WINDOWS_SUFFIXES) if sys.platform == "win32" else ("",)
+    suffixes = ("", *WINDOWS_SUFFIXES) if IS_WINDOWS else ("",)
     for candidate in (*extra, *(f"{d}/{name}" for d in COMMON_DIRS)):
         for suffix in suffixes:
             path = Path(candidate + suffix).expanduser()

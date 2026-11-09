@@ -758,3 +758,37 @@ def test_voice_check_reports_a_broken_recogniser(monkeypatch):
         r = c.post("/api/check/voice", json={"audio": base64.b64encode(b"\0" * 32000).decode()},
                    headers={"Origin": "http://testserver"})
     assert r.status_code == 200 and r.json()["code"] == "stt_error" and "model.bin is missing" in r.json()["message"]
+
+
+def test_windows_finds_a_program_on_the_saved_path(tmp_path, monkeypatch):
+    """Windows 09.11: Claude Code installed after Vukoli started was on the saved PATH only."""
+    from server.engines import locate
+    folder = tmp_path / "Links"
+    folder.mkdir()
+    exe = folder / "claude"
+    exe.write_text("")
+    exe.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.setattr(locate, "COMMON_DIRS", ())
+    assert locate.find_program("claude") is None
+    monkeypatch.setattr(locate, "IS_WINDOWS", True)
+    monkeypatch.setattr(locate, "WINDOWS_SUFFIXES", ())
+    monkeypatch.setattr(locate, "registry_path", lambda: str(folder))
+    assert locate.find_program("claude") == str(exe)
+    assert str(folder) in locate.search_path()
+
+
+def test_cpu_captions_use_a_light_model_and_their_own_lock():
+    """Windows 09.11: caption passes with small.en on the CPU held up the answer's own recognition."""
+    from server import stt
+    cpu = stt.STT("faster_whisper", "small.en")
+    assert cpu.caption_model == stt.CPU_CAPTION_MODEL
+    cpu._lock.acquire()                     # the final pass is running ...
+    try:
+        assert cpu._caption_lock.acquire(blocking=False)   # ... and a caption pass is still allowed
+        cpu._caption_lock.release()
+    finally:
+        cpu._lock.release()
+    assert stt.STT("faster_whisper", "base.en").caption_model == "base.en"
+    assert stt.STT("mlx", "m").caption_model == "m"
+    assert 1 <= stt.cpu_threads() <= 8

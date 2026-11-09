@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 import { EnginePanel, type EnginePanelProps } from "../EnginePanel";
-import type { EngineId, EngineLimits } from "../../lib/types";
-import { EngineFixture, LIMITS, NONE_READY, SETTINGS, makeEngines } from "./fixtures";
+import type { EngineId, EngineLimits, OllamaModelsResponse, OllamaPull } from "../../lib/types";
+import { EngineFixture, LIMITS, MODELS_WITHOUT_BIG, NONE_READY, PULL_DOWNLOADING, SETTINGS, makeEngines } from "./fixtures";
 
 /* D78: Settings → AI engine is one view: the engine in use on top, the other engines under it, set up in place.
  * D81: Setup step 1 uses the same view (Pages/Setup). Fixture: no server; switching and saving change local state. */
@@ -11,18 +11,25 @@ export default meta;
 type Story = StoryObj;
 
 type Limits = Partial<Record<EngineId, EngineLimits>>;
-function Stage({ engines, settings, limits, children }: { engines: ReturnType<typeof makeEngines>; settings?: typeof SETTINGS; limits?: Limits; children: ReactNode }) {
+interface Ollama { models?: OllamaModelsResponse; pull?: OllamaPull; startAnswer?: "ok" | "busy" }
+function Stage({ engines, settings, limits, ollama, children }: { engines: ReturnType<typeof makeEngines>; settings?: typeof SETTINGS; limits?: Limits; ollama?: Ollama; children: ReactNode }) {
   return (
-    <EngineFixture engines={engines} settings={settings} limits={limits}>
+    <EngineFixture engines={engines} settings={settings} limits={limits} {...ollama}>
       <div style={{ maxWidth: "calc(var(--layout-narrow) + var(--space-16))" }}>{children}</div>
     </EngineFixture>
   );
 }
-const panel = (engines: ReturnType<typeof makeEngines>, props: EnginePanelProps, settings?: typeof SETTINGS, limits?: Limits): Story => ({
-  render: () => <Stage engines={engines} settings={settings} limits={limits}><EnginePanel {...props} /></Stage>,
+const panel = (engines: ReturnType<typeof makeEngines>, props: EnginePanelProps, settings?: typeof SETTINGS, limits?: Limits, ollama?: Ollama): Story => ({
+  render: () => <Stage engines={engines} settings={settings} limits={limits} ollama={ollama}><EnginePanel {...props} /></Stage>,
 });
 
 export const SettingsOllama: Story = panel(makeEngines(), {}, { ...SETTINGS, ollama: { ...SETTINGS.ollama, model: "qwen3:8b" } });
+/** The bigger model isn't on the computer: it is listed as "not downloaded"; picking it starts the download. */
+export const SettingsOllamaNotDownloaded: Story = panel(makeEngines(), {}, undefined, undefined, { models: MODELS_WITHOUT_BIG });
+/** A download is running (also what Settings shows when it is opened mid-download). */
+export const SettingsOllamaDownloading: Story = panel(makeEngines(), {}, undefined, undefined, { models: MODELS_WITHOUT_BIG, pull: PULL_DOWNLOADING });
+/** Pick the not-downloaded model while another download runs: the server's "busy" message appears. */
+export const SettingsOllamaPullError: Story = panel(makeEngines(), {}, undefined, undefined, { models: MODELS_WITHOUT_BIG, startAnswer: "busy" });
 /** D117: "Feedback after the call" set to an engine that is not ready (the server falls back to the conversation engine). */
 export const SettingsDebriefOtherEngine: Story = panel(makeEngines({ claude_cli: "ready" }), {}, { ...SETTINGS, debrief_engine: "claude_cli" });
 export const SettingsDebriefNotReady: Story = panel(makeEngines({ codex_cli: "not_installed" }), {}, { ...SETTINGS, debrief_engine: "codex_cli" });
