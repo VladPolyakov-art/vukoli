@@ -9,10 +9,10 @@ or with parameters when the script is run as a file or as a scriptblock:
   & ([scriptblock]::Create((irm <url>))) -Yes -NoModels
 
   -From <zip-or-folder>   use a local archive or unpacked folder instead of downloading the release   (VUKOLI_FROM)
-  -Yes                    accept the defaults, no questions (installs Ollama if missing)               (VUKOLI_YES=1)
-                          Without it the installer asks before installing Ollama and its startup
-                          shortcut. The AI model is chosen and downloaded in the app.
-  -NoOllama               do not install Ollama                                                        (VUKOLI_NO_OLLAMA=1)
+  -Yes                    accept the defaults, no questions                                           (VUKOLI_YES=1)
+                          The installer asks nothing about AI: the engine (Ollama, Claude Code, Codex,
+                          an API key) and its model are set up in the app.
+  -NoOllama               kept for old scripts; does nothing now                                       (VUKOLI_NO_OLLAMA=1)
   -NoModels               skip speech models (Kokoro, Whisper)                                         (VUKOLI_NO_MODELS=1)
   -NoLaunch               do not start the app / open its window at the end                           (VUKOLI_NO_LAUNCH=1)
   -Prefix <dir>           install location, default %LOCALAPPDATA%\Vukoli                              (VUKOLI_PREFIX)
@@ -59,7 +59,7 @@ $null = & {
     $KOKORO_BASE = 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0'
     $UV_INSTALL_URL = 'https://astral.sh/uv/install.ps1'
     $OLLAMA_SETUP_URL = 'https://ollama.com/download/OllamaSetup.exe'
-    $TOTAL = 7
+    $TOTAL = 6
 
     # S = the one mutable state object (functions below read it from the enclosing scope and change its fields).
     $S = @{
@@ -405,13 +405,6 @@ $null = & {
         $needGb = 1.5
         $parts = @('app + Python ~1.5 GB')
         if (-not $S.NoModels) { $needGb += 1.0; $parts += 'speech models ~1 GB' }
-        if (-not $S.NoOllama) {
-            $small = 2.5
-            if ($ramGb -ge 15.5) { $small = 5.2 }
-            $needGb += $small
-            $parts += ('AI model, downloaded later in the app ~{0:N1} GB' -f $small)
-            if (-not (Find-Ollama)) { $needGb += 1.7; $parts += 'Ollama itself ~1.7 GB' }
-        }
         Note ('Needs:   about {0:N1} GB ({1})' -f $needGb, ($parts -join ', '))
         try {
             $root = [System.IO.Path]::GetPathRoot($S.Prefix)
@@ -941,10 +934,9 @@ $null = & {
         Invoke-Step 2 'Getting the app' 'app' { Step-App } { Test-Path -LiteralPath (Join-Path $S.AppServer 'requirements.txt') }
         Invoke-Step 3 'Installing Python and the app dependencies' 'python' { Step-Python } { Test-Path -LiteralPath $S.VenvPy }
         Invoke-Step 4 'Downloading speech models (voice and recognition)' 'models' { Step-Models } $null
-        Invoke-Step 5 'Setting up Ollama (runs the language model on this computer)' '' { Step-Ollama } $null
-        Invoke-Step 6 'Creating shortcuts' '' { Step-Launchers } $null
+        Invoke-Step 5 'Creating shortcuts' '' { Step-Launchers } $null
         Set-StepDone 'complete'
-        Invoke-Step 7 'Starting Vukoli' '' { Step-Launch } $null
+        Invoke-Step 6 'Starting Vukoli' '' { Step-Launch } $null
 
         $sec = $clock.Elapsed.TotalSeconds
         Write-Host ''
@@ -958,11 +950,8 @@ $null = & {
             Write-Host ('  Vukoli opens in its own window (Edge or Chrome app mode): http://127.0.0.1:{0}  (the first-run wizard guides you).' -f $shownPort)
         }
         Write-Host '  Next time: Start menu > Vukoli, or the Desktop shortcut.'
-        if ($S.NoOllama) {
-            Write-Host '  Ollama was not set up; the wizard shows how to connect an engine.'
-        }
-        Write-Host ('  Ollama:   {0}' -f $S.OllamaStatus)
-        Write-Host '  AI model: pick and download it in the app (first-run wizard, or Settings > AI engine)'
+        Write-Host '  AI engine: choose it in the app (first-run wizard, or Settings > AI engine): Ollama with a local model,'
+        Write-Host '             Claude Code, Codex or an API key. The app links to the Ollama download and downloads the model.'
         Write-Host ('  Voice:    {0}' -f $S.SpeechStatus)
         Write-Host ''
         Write-Host 'What the installer created on this computer:'
@@ -970,9 +959,8 @@ $null = & {
         foreach ($l in (Get-ShortcutPaths)) { if (Test-Path -LiteralPath $l) { Write-Host ('  - {0} : a Vukoli shortcut' -f $l) } }
         Write-Host ('  - {0} : the command to start and stop Vukoli' -f (Join-Path $S.Bin 'Vukoli.cmd'))
         Write-Host '  - a "Vukoli" entry in Settings > Apps and the vukoli:// link (your user only)'
-        if ($S.StartupLnk) { Write-Host ('  - {0} : starts Ollama when you sign in (delete it to turn that off)' -f $S.StartupLnk) }
         Write-Host '  Remove all of it: Settings > Apps > Vukoli > Uninstall (your sessions stay).'
-        Write-Host '  Ollama and its models stay: ollama rm <model> removes a model.'
+        Write-Host '  Ollama, if you install it from the app, is a separate program: remove it in Settings > Apps.'
     }
     catch {
         $msg = $_.Exception.Message

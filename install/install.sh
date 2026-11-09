@@ -6,21 +6,20 @@
 #
 # Options (env var in brackets):
 #   --from <zip-or-dir>   use a local archive or unpacked folder instead of downloading the release [VUKOLI_FROM]
-#   --yes                 accept the defaults, ask nothing (Ollama install = yes)                    [VUKOLI_YES=1]
-#                         Without it the installer asks before installing Ollama and its login item
-#                         (no terminal to ask on = the defaults). The AI model is chosen and downloaded in the app.
-#   --no-ollama           do not install Ollama                                                      [VUKOLI_NO_OLLAMA=1]
+#   --yes                 accept the defaults, ask nothing                                           [VUKOLI_YES=1]
+#                         The installer asks nothing about AI: the engine (Ollama, Claude Code, Codex, an API key)
+#                         and its model are set up in the app.
+#   --no-ollama           kept for old scripts; does nothing now                                     [VUKOLI_NO_OLLAMA=1]
 #   --no-models           skip speech models (Kokoro, Whisper)                                       [VUKOLI_NO_MODELS=1]
 #   --no-launch           do not start the app or open its window at the end                         [VUKOLI_NO_LAUNCH=1]
 #   --prefix <dir>        install location (default ~/.vukoli)                                       [VUKOLI_PREFIX]
 #   --uninstall [--purge] remove the app and launchers; --purge also deletes your sessions and data
 #   -h, --help
 # The app opens in its own window (Chrome / Edge / Chromium / Brave app mode); VUKOLI_APP_WINDOW=0 opens a browser tab instead.
-# Test switch: VUKOLI_DRY_RUN=1 prints the Ollama actions (download, install, login agent)
-# instead of doing them. VUKOLI_APP_DIR=<dir> puts Vukoli.app there instead of ~/Applications (tests).
+# Test switch: VUKOLI_APP_DIR=<dir> puts Vukoli.app there instead of ~/Applications (tests).
 #
-# No administrator rights are needed. Everything lives in the install folder, ~/Applications/Vukoli.app
-# and (only if you say yes) the Ollama login item and Ollama itself. Run the same command again to resume or upgrade.
+# No administrator rights are needed. Everything lives in the install folder and ~/Applications/Vukoli.app.
+# Run the same command again to resume or upgrade.
 
 set -euo pipefail
 
@@ -31,7 +30,7 @@ OLLAMA_API="http://127.0.0.1:11434"
 KOKORO_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 PYTHON_VERSION="3.12"
 AGENT_LABEL="com.vukoli.ollama"
-TOTAL_STEPS=7
+TOTAL_STEPS=6
 
 # ---------------------------------------------------------------- options
 FROM="${VUKOLI_FROM:-}"
@@ -341,12 +340,9 @@ FREE_MB="$(free_mb "$PREFIX")"
 NEED_MB=2048
 [ "$NO_MODELS" = 1 ] || NEED_MB=$((NEED_MB + 1536))
 note "Memory: $((RAM_MB / 1024)) GB. Free disk space: $((FREE_MB / 1024)) GB."
-note "Space needed: app + Python about 1.5 GB$( [ "$NO_MODELS" = 1 ] || printf ', speech models about 1 GB' )$( [ "$NO_OLLAMA" = 1 ] || [ "$NO_MODELS" = 1 ] || printf ', and later, in the app, an AI model of 2.5 to 5 GB' )."
+note "Space needed: app + Python about 1.5 GB$( [ "$NO_MODELS" = 1 ] || printf ', speech models about 1 GB' )$( [ "$NO_OLLAMA" = 1 ] || printf '; a local AI model, if you choose one in the app, needs 2.5 to 5 GB more' )."
 if [ "$FREE_MB" -lt "$NEED_MB" ]; then
   fail "Not enough free disk space: $((FREE_MB / 1024)) GB free, about $((NEED_MB / 1024)) GB needed." "Free some space (or use --prefix on a bigger disk) and run the command again."
-fi
-if [ "$NO_OLLAMA" != 1 ] && [ "$NO_MODELS" != 1 ] && [ "$FREE_MB" -lt $((NEED_MB + 8192)) ]; then
-  warn "Less than $(((NEED_MB + 8192) / 1024)) GB free: the AI model you download in the app may not fit."
 fi
 if ! mkdir -p "$PREFIX" 2>/dev/null || [ ! -w "$PREFIX" ]; then
   fail "Cannot write to $PREFIX." "Choose a folder you own with --prefix <folder>."
@@ -356,15 +352,6 @@ if ! curl -fsS --max-time 15 -o /dev/null -I https://pypi.org/simple/ 2>/dev/nul
 fi
 if [ -z "$FROM" ] && ! curl -fsS --max-time 15 -o /dev/null -I https://github.com 2>/dev/null; then
   fail "No network (could not reach github.com)." "Check your internet connection and run the command again."
-fi
-if [ "$NO_OLLAMA" != 1 ] && [ "$IS_MAC" = 1 ]; then
-  if find_ollama_cli >/dev/null 2>&1; then
-    note "Ollama is already installed and will be reused."
-  elif [ -w /Applications ]; then
-    note "If you install Ollama it goes to /Applications."
-  else
-    note "If you install Ollama it goes to ~/Applications (/Applications is not writable for you)."
-  fi
 fi
 note "No administrator password is needed."
 if [ -f "$STATE" ]; then
@@ -548,118 +535,8 @@ else
   SPEECH_STATUS="Kokoro voice + $( [ "$wbackend" = none ] && printf 'no speech recognition' || printf 'Whisper %s' "$wmodel" ) (in $KDIR and the Hugging Face cache)"
 fi
 
-# ---------------------------------------------------------------- 5. Ollama
-step 5 "Local AI engine (Ollama)"
-if [ "$NO_OLLAMA" = 1 ]; then
-  [ "$OLLAMA_STATUS" != "not set up" ] || { OLLAMA_STATUS="skipped (--no-ollama)"; note "Skipped (--no-ollama). Choose an AI engine in the app's first-run setup."; }
-else
-  if OLLAMA_CLI="$(find_ollama_cli)"; then
-    OLLAMA_APP="$(find_ollama_app || true)"
-    note "Ollama found ($OLLAMA_CLI): reusing it."
-    OLLAMA_STATUS="reused"
-  elif [ "$IS_MAC" != 1 ]; then
-    note "Ollama is not installed. On Linux install it from https://ollama.com/download, then choose Ollama in the app."
-    OLLAMA_STATUS="not installed (Linux: install it yourself)"
-  elif [ "${macmajor:-0}" -lt 14 ]; then
-    note "Ollama needs macOS 14 or newer (this is $macver), so it is not offered. Choose another engine in the app."
-    OLLAMA_STATUS="not available on this macOS"
-  else
-    say "    Ollama is the free local AI engine: your answers stay on this computer. It is not installed. Without it, connect Claude Code, Codex or an API key in the app."
-    if ask_yn "Install Ollama now? (download about 215 MB, no admin password)" y; then
-      if [ -w /Applications ]; then target="/Applications"; else target="$HOME/Applications"; fi
-      note "Installing Ollama.app into $target"
-      if [ "$DRY" = 1 ]; then
-        say "    [dry-run] download $OLLAMA_MAC_URL, unpack with ditto, move Ollama.app to $target"
-        OLLAMA_APP="$target/Ollama.app"; OLLAMA_CLI="$OLLAMA_APP/Contents/Resources/ollama"
-      else
-        dl "$OLLAMA_MAC_URL" "$DLDIR/Ollama-darwin.zip" || fail "Could not download Ollama." "Check your internet connection and run the command again, or install Ollama yourself from https://ollama.com/download and run the command again."
-        rm -rf "$DLDIR/ollama-unpack"; mkdir -p "$DLDIR/ollama-unpack" "$target"
-        ditto -x -k "$DLDIR/Ollama-darwin.zip" "$DLDIR/ollama-unpack" || fail "Could not unpack Ollama." "Delete $DLDIR and run the command again."
-        [ -d "$DLDIR/ollama-unpack/Ollama.app" ] || fail "The Ollama download has no Ollama.app." "Install Ollama from https://ollama.com/download and run the command again."
-        rm -rf "$target/Ollama.app"
-        mv "$DLDIR/ollama-unpack/Ollama.app" "$target/Ollama.app"
-        OLLAMA_APP="$target/Ollama.app"; OLLAMA_CLI="$OLLAMA_APP/Contents/Resources/ollama"
-        rm -rf "$DLDIR/ollama-unpack" "$DLDIR/Ollama-darwin.zip"
-        note "Ollama may ask once to add its command-line tool or to move itself: either answer is fine."
-        open -a "$OLLAMA_APP" || true
-        state_set ollama_installed_by_us 1
-      fi
-      OLLAMA_STATUS="installed"
-    else
-      OLLAMA_STATUS="declined"
-      note "Skipped. The app's first-run setup will show every way to connect an AI engine (Ollama, LM Studio, Gemini and others)."
-    fi
-  fi
-
-  # Start Ollama now (the app downloads the model through it), and start it with the computer.
-  if [ -n "$OLLAMA_CLI" ]; then
-    if [ "$DRY" != 1 ] && ! ollama_up; then
-      note "Starting Ollama..."
-      if [ -n "$OLLAMA_APP" ]; then open -g -a "$OLLAMA_APP" || true; fi
-      i=0
-      while [ $i -lt 45 ] && ! ollama_up; do sleep 2; i=$((i + 1)); done   # up to 90 s
-      if ! ollama_up; then
-        note "The Ollama app did not answer; starting the Ollama server directly."
-        nohup "$OLLAMA_CLI" serve >"$PREFIX/logs-ollama.txt" 2>&1 </dev/null &
-        i=0
-        while [ $i -lt 15 ] && ! ollama_up; do sleep 2; i=$((i + 1)); done
-      fi
-      ollama_up || fail "Ollama did not start (waited up to 2 minutes)." "Open Ollama yourself (or run: ollama serve), then run the command again."
-    fi
-
-    # AC3: start with the computer, one line about it.
-    if [ "$IS_MAC" = 1 ]; then
-      if [ -f "$AGENT_PLIST" ]; then
-        AGENT_STATUS="Ollama starts with your computer ($AGENT_PLIST). Turn it off: $BIN autostart off"
-        note "Ollama already starts with your computer (login agent from an earlier install)."
-      elif other="$(foreign_ollama_agent)"; then
-        note "Ollama already starts with your computer ($(basename "$other"))."
-      elif ! ask_yn "Start Ollama when you log in, so Vukoli is ready right away? (a login item; turn it off any time)" y; then
-        note "OK. Open Ollama before you practise; the app tells you if it isn't running."
-      else
-        if [ -n "$OLLAMA_APP" ]; then
-          agent_args="    <string>/usr/bin/open</string>
-    <string>-g</string>
-    <string>-a</string>
-    <string>$OLLAMA_APP</string>"
-        else
-          agent_args="    <string>$OLLAMA_CLI</string>
-    <string>serve</string>"
-        fi
-        if [ "$DRY" = 1 ]; then
-          if [ -n "$OLLAMA_APP" ]; then agent_cmd="open -g -a $OLLAMA_APP"; else agent_cmd="$OLLAMA_CLI serve"; fi
-          say "    [dry-run] write $AGENT_PLIST (RunAtLoad: $agent_cmd) and load it with launchctl"
-        else
-          mkdir -p "$(dirname "$AGENT_PLIST")"
-          cat >"$AGENT_PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>$AGENT_LABEL</string>
-  <key>ProgramArguments</key>
-  <array>
-$agent_args
-  </array>
-  <key>RunAtLoad</key><true/>
-</dict>
-</plist>
-PLIST
-          launchctl bootout "gui/$(id -u)/$AGENT_LABEL" >/dev/null 2>&1 || true
-          launchctl bootstrap "gui/$(id -u)" "$AGENT_PLIST" >/dev/null 2>&1 || true
-          state_set ollama_agent created
-        fi
-        AGENT_STATUS="Ollama starts with your computer ($AGENT_PLIST). Turn it off: $BIN autostart off"
-        note "Ollama will now start with your computer. Turn it off: System Settings > General > Login Items (look under Allow in the Background), or run: $BIN autostart off"
-      fi
-    else
-      note "On Linux Ollama starts with its own service if you installed it with the official script."
-    fi
-  fi
-fi
-
-# ---------------------------------------------------------------- 6. launchers
-step 6 "Create the launchers"
+# ---------------------------------------------------------------- 5. launchers
+step 5 "Create the launchers"
 mkdir -p "$PREFIX/bin" "$PREFIX/logs"
 cp "$APPDIR/install/macos/vukoli" "$BIN" || fail "The launcher is missing from the archive." "Download the release again."
 chmod +x "$BIN"
@@ -690,8 +567,8 @@ fi
 state_set complete 1
 rm -rf "$DLDIR"
 
-# ---------------------------------------------------------------- 7. start
-step 7 "Open the app"
+# ---------------------------------------------------------------- 6. start
+step 6 "Open the app"
 if [ "$NO_LAUNCH" = 1 ]; then
   note "Skipped (--no-launch)."
 else
@@ -706,8 +583,8 @@ say "  Window         : Vukoli opens in its own window (Chrome or Edge app mode;
 say "  Start later    : open Vukoli from Launchpad / Applications (in your home folder), or run: $BIN"
 say "  Stop           : $BIN stop"
 say "  Uninstall      : bash $APPDIR/install/install.sh --uninstall   (add --purge to delete your sessions too)"
-say "  Ollama         : $OLLAMA_STATUS"
-say "  AI model       : pick and download it in the app (first-run setup, or Settings > AI engine)"
+say "  AI engine      : choose it in the app (first-run setup, or Settings > AI engine): Ollama with a local model,"
+say "                   Claude Code, Codex or an API key. The app links to the Ollama download and downloads the model."
 say "  Voice          : $SPEECH_STATUS"
 say ""
 say "What the installer created on this computer:"
@@ -715,7 +592,6 @@ say "  - $PREFIX : the app, its own Python and logs"
 say "  - $BIN : the command to start and stop Vukoli"
 if [ "$IS_MAC" = 1 ]; then say "  - $LAUNCH_APP : the Vukoli icon (Launchpad, Spotlight)"
 else say "  - $HOME/.local/share/applications/vukoli.desktop : the menu entry"; fi
-[ "$AGENT_STATUS" = none ] || say "  - Login item: $AGENT_STATUS"
 say "  Remove all of it: bash $APPDIR/install/install.sh --uninstall (your sessions stay unless you add --purge;"
-say "  Ollama and its models stay: ollama rm <model> removes a model)."
+say "  Ollama, if you install it from the app, is a separate program: delete Ollama.app to remove it)."
 say "  Time           : total $(fmt_secs "$TOTAL"); speech model downloads $(fmt_secs "$MODEL_SECS"); the rest $(fmt_secs $((TOTAL - MODEL_SECS)))"
