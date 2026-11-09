@@ -693,21 +693,12 @@ $null = & {
     }
     function Step-Ollama {
         if ($S.NoOllama) { $S.OllamaStatus = 'skipped (-NoOllama)'; Note 'Skipped (-NoOllama). The wizard will let you connect another engine.'; return }
-        $how = Select-Option 'How should Vukoli run the AI?' @(
-            'On this computer with Ollama: free and private (the app then downloads an AI model, 2.5 to 5 GB, when you pick one)',
-            'I''ll connect another engine in the app (Claude Code, Codex or an API key): no AI download')
-        if ($how -eq 2) {
-            $S.NoOllama = $true
-            $S.OllamaStatus = 'not used (you chose another engine; connect it in the app)'
-            Note 'OK. The first-run wizard shows every way to connect an engine.'
-            return
-        }
         $exe = Find-Ollama
         if ($exe) {
             Note ('Ollama found: {0} (reusing it).' -f $exe)
             $S.OllamaStatus = 'reused'
         } else {
-            Note 'Ollama is not installed. It runs the language model on your computer (free, no account).'
+            Note 'Ollama is not installed. It runs AI models on your computer (free, no account). Without it, connect Claude Code, Codex or an API key in the app.'
             if (-not (Confirm-Default 'Install Ollama now from ollama.com (about 1.7 GB, no admin rights)?')) {
                 Note 'Not installing Ollama. You can connect another service in the first-run wizard, or install Ollama later from https://ollama.com/download'
                 $S.OllamaStatus = 'declined'

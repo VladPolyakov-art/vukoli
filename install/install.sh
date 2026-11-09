@@ -557,16 +557,6 @@ fi
 
 # ---------------------------------------------------------------- 5. Ollama
 step 5 "Local AI engine (Ollama)"
-if [ "$NO_OLLAMA" != 1 ]; then
-  ask_choice "How should Vukoli run the AI?" 1 \
-    "On this computer with Ollama: free and private (the app then downloads an AI model, 2.5 to 5 GB, when you pick one)" \
-    "I'll connect another engine in the app (Claude Code, Codex or an API key): no AI download"
-  if [ "$CHOICE" = 2 ]; then
-    NO_OLLAMA=1
-    OLLAMA_STATUS="not used (you chose another engine; connect it in the app)"
-    note "OK. The app's first-run setup shows every way to connect an engine."
-  fi
-fi
 if [ "$NO_OLLAMA" = 1 ]; then
   [ "$OLLAMA_STATUS" != "not set up" ] || { OLLAMA_STATUS="skipped (--no-ollama)"; note "Skipped (--no-ollama). Choose an AI engine in the app's first-run setup."; }
 else
@@ -581,7 +571,7 @@ else
     note "Ollama needs macOS 14 or newer (this is $macver), so it is not offered. Choose another engine in the app."
     OLLAMA_STATUS="not available on this macOS"
   else
-    say "    Ollama is the free local AI engine: your answers stay on this computer. It is not installed."
+    say "    Ollama is the free local AI engine: your answers stay on this computer. It is not installed. Without it, connect Claude Code, Codex or an API key in the app."
     if ask_yn "Install Ollama now? (download about 215 MB, no admin password)" y; then
       if [ -w /Applications ]; then target="/Applications"; else target="$HOME/Applications"; fi
       note "Installing Ollama.app into $target"

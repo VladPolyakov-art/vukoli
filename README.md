@@ -59,8 +59,8 @@ irm https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/install/insta
 It installs its own private Python, then asks before each big or lasting step, with the size of each download:
 
 1. **Speech models** (Kokoro voice, Whisper recognition, about 1 GB). Without them you type your answers.
-2. **How to run the AI:** locally with Ollama (free and private), or another engine you connect in the app
-   (Claude Code, Codex, an API key). If Ollama is missing, it offers to install it.
+2. **Ollama** (the free local AI engine), if it isn't installed yet. Say no to connect Claude Code, Codex or an
+   API key in the app instead.
 3. **Start Ollama when you log in**, so the app is ready right away. Turn it off any time.
 
 The AI model itself is picked and downloaded in the app (first-run setup, or Settings > AI engine), with progress
