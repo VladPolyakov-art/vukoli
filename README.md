@@ -56,12 +56,12 @@ curl -fsSL https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/instal
 irm https://raw.githubusercontent.com/VladPolyakov-art/vukoli/main/install/install.ps1 | iex
 ```
 
-It installs its own private Python, then asks before each big or lasting step, with the size of each download:
+It installs its own private Python and the speech models (Kokoro voice, Whisper recognition, about 1 GB), then
+asks before each lasting step:
 
-1. **Speech models** (Kokoro voice, Whisper recognition, about 1 GB). Without them you type your answers.
-2. **Ollama** (the free local AI engine), if it isn't installed yet. Say no to connect Claude Code, Codex or an
+1. **Ollama** (the free local AI engine), if it isn't installed yet. Say no to connect Claude Code, Codex or an
    API key in the app instead.
-3. **Start Ollama when you log in**, so the app is ready right away. Turn it off any time.
+2. **Start Ollama when you log in**, so the app is ready right away. Turn it off any time.
 
 The AI model itself is picked and downloaded in the app (first-run setup, or Settings > AI engine), with progress
 and the size shown. Models you already have in Ollama are listed there, so nothing is downloaded twice.

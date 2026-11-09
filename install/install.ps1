@@ -10,7 +10,7 @@ or with parameters when the script is run as a file or as a scriptblock:
 
   -From <zip-or-folder>   use a local archive or unpacked folder instead of downloading the release   (VUKOLI_FROM)
   -Yes                    accept the defaults, no questions (installs Ollama if missing)               (VUKOLI_YES=1)
-                          Without it the installer asks before the speech models, Ollama and its startup
+                          Without it the installer asks before installing Ollama and its startup
                           shortcut. The AI model is chosen and downloaded in the app.
   -NoOllama               do not install Ollama                                                        (VUKOLI_NO_OLLAMA=1)
   -NoModels               skip speech models (Kokoro, Whisper)                                         (VUKOLI_NO_MODELS=1)
@@ -591,19 +591,6 @@ $null = & {
         if (-not $data) { Fail 'Could not find the data folder of the app.' ('Look at ' + (Join-Path $S.Logs 'install.log') + ' and run the same command again.') }
         Note ('Your data folder: {0}' -f $data)
         $kdir = Join-Path (Join-Path $data 'models') 'kokoro'
-        $haveVoice = $true
-        foreach ($f in @('kokoro-v1.0.onnx', 'voices-v1.0.bin')) {
-            $dest = Join-Path $kdir $f
-            if (-not ((Test-Path -LiteralPath $dest) -and ((Get-Item -LiteralPath $dest).Length -gt 1MB))) { $haveVoice = $false }
-        }
-        if (-not $haveVoice) {
-            if (-not (Confirm-Default 'Download the speech models (about 1 GB), so you can talk with Mike out loud? Without them you type your answers.')) {
-                $S.NoRecord = $true
-                $S.SpeechStatus = 'not downloaded (typed answers)'
-                Note 'Skipped. You type your answers; to add the voice later, run the install command again and answer yes.'
-                return
-            }
-        }
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         try {
             foreach ($f in @('kokoro-v1.0.onnx', 'voices-v1.0.bin')) {

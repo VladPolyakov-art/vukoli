@@ -7,7 +7,7 @@
 # Options (env var in brackets):
 #   --from <zip-or-dir>   use a local archive or unpacked folder instead of downloading the release [VUKOLI_FROM]
 #   --yes                 accept the defaults, ask nothing (Ollama install = yes)                    [VUKOLI_YES=1]
-#                         Without it the installer asks before the speech models, Ollama and its login item
+#                         Without it the installer asks before installing Ollama and its login item
 #                         (no terminal to ask on = the defaults). The AI model is chosen and downloaded in the app.
 #   --no-ollama           do not install Ollama                                                      [VUKOLI_NO_OLLAMA=1]
 #   --no-models           skip speech models (Kokoro, Whisper)                                       [VUKOLI_NO_MODELS=1]
@@ -501,19 +501,12 @@ pyhelper() { "$VPY" -I "$HELPER" "$1" "$APPDIR/server" "${@:2}"; }
 
 # ---------------------------------------------------------------- 4. speech models
 step 4 "Speech models (Mike's voice: Kokoro, your voice: Whisper)"
-WANT_SPEECH=1
 if [ "$NO_MODELS" != 1 ]; then
   KDIR="$(pyhelper kokoro-dir)" || fail "Could not find the folder for speech models." "Run the command again."
   winfo="$(pyhelper whisper-info)" || fail "Could not check the speech recognition engine." "Run the command again."
-  if [ -f "$KDIR/kokoro-v1.0.onnx" ] && [ -f "$KDIR/voices-v1.0.bin" ] && { [ "${winfo%% *}" = none ] || is_done whisper "$winfo"; }; then
-    :   # everything is here already: nothing to ask, the loop below says "skipped"
-  elif ! ask_yn "Download the speech models (about 1 GB), so you can talk with Mike out loud? Without them you type your answers." y; then
-    WANT_SPEECH=0
-  fi
 fi
-if [ "$NO_MODELS" = 1 ] || [ "$WANT_SPEECH" = 0 ]; then
-  if [ "$NO_MODELS" = 1 ]; then note "Skipped (--no-models). The app works with typed answers until you add them."
-  else note "Skipped. You type your answers; to add the voice later, run the install command again and answer yes."; fi
+if [ "$NO_MODELS" = 1 ]; then
+  note "Skipped (--no-models). The app works with typed answers until you add them."
   SPEECH_STATUS="not downloaded (typed answers)"
 else
   t0=$SECONDS
