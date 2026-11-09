@@ -7,17 +7,17 @@
 # Options (env var in brackets):
 #   --from <zip-or-dir>   use a local archive or unpacked folder instead of downloading the release [VUKOLI_FROM]
 #   --yes                 accept the defaults, ask nothing (Ollama install = yes)                    [VUKOLI_YES=1]
-#                         Without it the installer asks before the speech models, Ollama, its login item and the
-#                         AI model download (no terminal to ask on = the defaults).
-#   --no-ollama           do not install Ollama and do not pull models                               [VUKOLI_NO_OLLAMA=1]
-#   --no-models           skip speech models (Kokoro, Whisper) and Ollama model pulls               [VUKOLI_NO_MODELS=1]
+#                         Without it the installer asks before the speech models, Ollama and its login item
+#                         (no terminal to ask on = the defaults). The AI model is chosen and downloaded in the app.
+#   --no-ollama           do not install Ollama                                                      [VUKOLI_NO_OLLAMA=1]
+#   --no-models           skip speech models (Kokoro, Whisper)                                       [VUKOLI_NO_MODELS=1]
 #   --no-launch           do not start the app or open its window at the end                         [VUKOLI_NO_LAUNCH=1]
 #   --prefix <dir>        install location (default ~/.vukoli)                                       [VUKOLI_PREFIX]
 #   --uninstall [--purge] remove the app and launchers; --purge also deletes your sessions and data
 #   -h, --help
 # The app opens in its own window (Chrome / Edge / Chromium / Brave app mode); VUKOLI_APP_WINDOW=0 opens a browser tab instead.
-# Test switch: VUKOLI_DRY_RUN=1 prints the Ollama actions (download, install, login agent, model pulls)
-# and settings writes instead of doing them. VUKOLI_APP_DIR=<dir> puts Vukoli.app there instead of ~/Applications (tests).
+# Test switch: VUKOLI_DRY_RUN=1 prints the Ollama actions (download, install, login agent)
+# instead of doing them. VUKOLI_APP_DIR=<dir> puts Vukoli.app there instead of ~/Applications (tests).
 #
 # No administrator rights are needed. Everything lives in the install folder, ~/Applications/Vukoli.app
 # and (only if you say yes) the Ollama login item and Ollama itself. Run the same command again to resume or upgrade.
@@ -31,7 +31,7 @@ OLLAMA_API="http://127.0.0.1:11434"
 KOKORO_BASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 PYTHON_VERSION="3.12"
 AGENT_LABEL="com.vukoli.ollama"
-TOTAL_STEPS=8
+TOTAL_STEPS=7
 
 # ---------------------------------------------------------------- options
 FROM="${VUKOLI_FROM:-}"
@@ -316,7 +316,6 @@ OLLAMA_CLI=""
 OLLAMA_APP=""
 OLLAMA_STATUS="not set up"
 SPEECH_STATUS="not set up"
-MODELS_STATUS="not downloaded"
 AGENT_STATUS="none"
 VERSION_INSTALLED=""
 
@@ -342,12 +341,12 @@ FREE_MB="$(free_mb "$PREFIX")"
 NEED_MB=2048
 [ "$NO_MODELS" = 1 ] || NEED_MB=$((NEED_MB + 1536))
 note "Memory: $((RAM_MB / 1024)) GB. Free disk space: $((FREE_MB / 1024)) GB."
-note "Space needed: app + Python about 1.5 GB$( [ "$NO_MODELS" = 1 ] || printf ', speech models about 1 GB' )$( [ "$NO_OLLAMA" = 1 ] || [ "$NO_MODELS" = 1 ] || printf ', Ollama models 2.5 to 8 GB' )."
+note "Space needed: app + Python about 1.5 GB$( [ "$NO_MODELS" = 1 ] || printf ', speech models about 1 GB' )$( [ "$NO_OLLAMA" = 1 ] || [ "$NO_MODELS" = 1 ] || printf ', and later, in the app, an AI model of 2.5 to 5 GB' )."
 if [ "$FREE_MB" -lt "$NEED_MB" ]; then
   fail "Not enough free disk space: $((FREE_MB / 1024)) GB free, about $((NEED_MB / 1024)) GB needed." "Free some space (or use --prefix on a bigger disk) and run the command again."
 fi
 if [ "$NO_OLLAMA" != 1 ] && [ "$NO_MODELS" != 1 ] && [ "$FREE_MB" -lt $((NEED_MB + 8192)) ]; then
-  warn "Less than $(((NEED_MB + 8192) / 1024)) GB free: the Ollama model download may not fit."
+  warn "Less than $(((NEED_MB + 8192) / 1024)) GB free: the AI model you download in the app may not fit."
 fi
 if ! mkdir -p "$PREFIX" 2>/dev/null || [ ! -w "$PREFIX" ]; then
   fail "Cannot write to $PREFIX." "Choose a folder you own with --prefix <folder>."
@@ -483,13 +482,6 @@ sys.path.insert(0, server)
 if cmd == "kokoro-dir":
     from server import config
     print(config.kokoro_model_dir())
-elif cmd == "recommend":
-    from server.engines import ollama as o
-    print(o.VOICE_MODEL)
-    print(o.recommended_model())
-elif cmd == "set-ollama":
-    from server import config
-    config.update_settings({"ollama": {"model": sys.argv[3], "voice_model": sys.argv[4]}})
 elif cmd == "whisper-info":
     from server import stt
     backend = stt.choose_backend("auto")
@@ -567,7 +559,7 @@ fi
 step 5 "Local AI engine (Ollama)"
 if [ "$NO_OLLAMA" != 1 ]; then
   ask_choice "How should Vukoli run the AI?" 1 \
-    "On this computer with Ollama: free and private (may download 2.5 to 8 GB of AI models)" \
+    "On this computer with Ollama: free and private (the app then downloads an AI model, 2.5 to 5 GB, when you pick one)" \
     "I'll connect another engine in the app (Claude Code, Codex or an API key): no AI download"
   if [ "$CHOICE" = 2 ]; then
     NO_OLLAMA=1
@@ -616,9 +608,9 @@ else
     fi
   fi
 
-  # Start Ollama now (only when models must be pulled), and start it with the computer.
+  # Start Ollama now (the app downloads the model through it), and start it with the computer.
   if [ -n "$OLLAMA_CLI" ]; then
-    if [ "$NO_MODELS" != 1 ] && [ "$DRY" != 1 ] && ! ollama_up; then
+    if [ "$DRY" != 1 ] && ! ollama_up; then
       note "Starting Ollama..."
       if [ -n "$OLLAMA_APP" ]; then open -g -a "$OLLAMA_APP" || true; fi
       i=0
@@ -683,107 +675,8 @@ PLIST
   fi
 fi
 
-# ---------------------------------------------------------------- 6. Ollama models
-step 6 "Download AI models"
-if [ "$NO_OLLAMA" = 1 ] || [ "$NO_MODELS" = 1 ]; then
-  case "$OLLAMA_STATUS" in
-    "not used"*) note "Skipped: you chose another engine." ;;
-    *) note "Skipped ($( [ "$NO_OLLAMA" = 1 ] && printf -- '--no-ollama' || printf -- '--no-models' ))." ;;
-  esac
-elif [ -z "$OLLAMA_CLI" ]; then
-  note "Skipped: no Ollama on this computer."
-else
-  recs="$(pyhelper recommend 2>/dev/null || true)"
-  voice_model="$(printf '%s\n' "$recs" | sed -n 1p)"
-  rec_model="$(printf '%s\n' "$recs" | sed -n 2p)"
-  if [ -z "$voice_model" ]; then
-    voice_model="qwen3:4b-instruct"
-    if [ "$RAM_MB" -ge 15872 ]; then rec_model="qwen3:8b"; else rec_model="qwen3:4b-instruct"; fi
-  fi
-  [ -z "${VUKOLI_OLLAMA_MODEL:-}" ] || rec_model="$VUKOLI_OLLAMA_MODEL"
-  msize() { case "$1" in qwen3:8b) printf 'about 5.2 GB' ;; qwen3:4b*) printf 'about 2.5 GB' ;; *) printf 'size shown by Ollama' ;; esac; }
-  have="$("$OLLAMA_CLI" list 2>/dev/null </dev/null | awk 'NR > 1 {print $1}' || true)"
-  has_model() { printf '%s\n' "$have" | grep -qx "$1"; }
-  models="$voice_model"
-  [ "$rec_model" = "$voice_model" ] || models="$voice_model $rec_model"
-  missing=""
-  for m in $models; do has_model "$m" || missing="$missing $m"; done
-  missing="${missing# }"
-  others=""
-  for m in $have; do
-    case " $models " in *" $m "*) continue ;; esac
-    case "$m" in *embed*|*minilm*|*bge*) continue ;; esac   # embedding models can't hold a conversation
-    others="$others $m"
-  done
-  others="${others# }"
-  note "For $((RAM_MB / 1024)) GB of memory Vukoli recommends $rec_model (voice sessions use $voice_model, it answers faster)."
-  pull=""
-  if [ -z "$missing" ]; then
-    note "Already downloaded: $models. Nothing to download."
-    MODELS_STATUS="$models (already in Ollama)"
-  else
-    total=0 known=1
-    for m in $missing; do case "$m" in qwen3:8b) total=$((total + 52)) ;; qwen3:4b*) total=$((total + 25)) ;; *) known=0 ;; esac; done
-    if [ "$known" = 1 ]; then tsize="about $((total / 10)).$((total % 10)) GB"; else tsize="size shown by Ollama"; fi
-    keys=(rec)
-    opts=("Download $missing ($tsize): recommended")
-    if [ "$rec_model" != "$voice_model" ]; then
-      keys+=(small)
-      if has_model "$voice_model"; then
-        opts+=("Use only $voice_model, which you already have (no download): faster, slightly simpler answers")
-      else
-        opts+=("Download only $voice_model ($(msize "$voice_model")): faster, slightly simpler answers")
-      fi
-    fi
-    if [ -n "$others" ]; then
-      keys+=(own)
-      opts+=("Use a model you already have in Ollama, no download ($others). Vukoli is tuned for Qwen 3; other models may stay in role less well")
-    fi
-    keys+=(none)
-    opts+=("Don't download now: I'll connect another engine in the app (Claude Code, Codex or an API key)")
-    ask_choice "Vukoli needs an AI model in Ollama. Which one?" 1 "${opts[@]}"
-    pick="${keys[$((CHOICE - 1))]}"
-    case "$pick" in
-      rec)
-        pull="$missing"
-        MODELS_STATUS="$models (in Ollama; remove one: ollama rm <name>)" ;;
-      small)
-        has_model "$voice_model" || pull="$voice_model"
-        if [ "$DRY" = 1 ]; then say "    [dry-run] settings: ollama.model = $voice_model"
-        else pyhelper set-ollama "$voice_model" "$voice_model" || warn "Could not save the model choice; pick $voice_model in the app's Settings."; fi
-        MODELS_STATUS="$voice_model (in Ollama; remove: ollama rm $voice_model)" ;;
-      own)
-        own_model="${others%% *}"
-        set -- $others
-        if [ $# -gt 1 ]; then
-          ask_choice "Which model?" 1 "$@"
-          eval "own_model=\${$CHOICE}"
-        fi
-        if [ "$DRY" = 1 ]; then say "    [dry-run] settings: ollama.model = $own_model"
-        else pyhelper set-ollama "$own_model" "$own_model" || warn "Could not save the model choice; pick $own_model in the app's Settings."; fi
-        note "Vukoli will use $own_model. Change it any time in Settings > AI engine."
-        MODELS_STATUS="$own_model (yours, nothing downloaded)" ;;
-      none)
-        note "OK. The app's first-run setup shows every way to connect an engine. To use Ollama later: ollama pull $voice_model"
-        MODELS_STATUS="none downloaded (you'll connect an engine in the app)" ;;
-    esac
-  fi
-  t0=$SECONDS
-  for m in $pull; do
-    if [ "$DRY" = 1 ]; then
-      say "    [dry-run] ollama pull $m ($(msize "$m"))"
-      continue
-    fi
-    note "Downloading $m ($(msize "$m"))"
-    "$OLLAMA_CLI" pull "$m" || fail "Could not download the model $m." "Check your internet connection and free disk space, then run the command again; the download resumes."
-    state_set "model_$m" 1
-  done
-  MODEL_SECS=$((MODEL_SECS + SECONDS - t0))
-  [ -z "$pull" ] || note "AI models ready in $(fmt_secs $((SECONDS - t0)))."
-fi
-
-# ---------------------------------------------------------------- 7. launchers
-step 7 "Create the launchers"
+# ---------------------------------------------------------------- 6. launchers
+step 6 "Create the launchers"
 mkdir -p "$PREFIX/bin" "$PREFIX/logs"
 cp "$APPDIR/install/macos/vukoli" "$BIN" || fail "The launcher is missing from the archive." "Download the release again."
 chmod +x "$BIN"
@@ -814,8 +707,8 @@ fi
 state_set complete 1
 rm -rf "$DLDIR"
 
-# ---------------------------------------------------------------- 8. start
-step 8 "Open the app"
+# ---------------------------------------------------------------- 7. start
+step 7 "Open the app"
 if [ "$NO_LAUNCH" = 1 ]; then
   note "Skipped (--no-launch)."
 else
@@ -831,7 +724,7 @@ say "  Start later    : open Vukoli from Launchpad / Applications (in your home 
 say "  Stop           : $BIN stop"
 say "  Uninstall      : bash $APPDIR/install/install.sh --uninstall   (add --purge to delete your sessions too)"
 say "  Ollama         : $OLLAMA_STATUS"
-say "  AI model       : $MODELS_STATUS"
+say "  AI model       : pick and download it in the app (first-run setup, or Settings > AI engine)"
 say "  Voice          : $SPEECH_STATUS"
 say ""
 say "What the installer created on this computer:"
@@ -842,4 +735,4 @@ else say "  - $HOME/.local/share/applications/vukoli.desktop : the menu entry"; 
 [ "$AGENT_STATUS" = none ] || say "  - Login item: $AGENT_STATUS"
 say "  Remove all of it: bash $APPDIR/install/install.sh --uninstall (your sessions stay unless you add --purge;"
 say "  Ollama and its models stay: ollama rm <model> removes a model)."
-say "  Time           : total $(fmt_secs "$TOTAL"); model downloads $(fmt_secs "$MODEL_SECS"); the rest $(fmt_secs $((TOTAL - MODEL_SECS)))"
+say "  Time           : total $(fmt_secs "$TOTAL"); speech model downloads $(fmt_secs "$MODEL_SECS"); the rest $(fmt_secs $((TOTAL - MODEL_SECS)))"

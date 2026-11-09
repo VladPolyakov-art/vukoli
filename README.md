@@ -62,8 +62,9 @@ It installs its own private Python, then asks before each big or lasting step, w
 2. **How to run the AI:** locally with Ollama (free and private), or another engine you connect in the app
    (Claude Code, Codex, an API key). If Ollama is missing, it offers to install it.
 3. **Start Ollama when you log in**, so the app is ready right away. Turn it off any time.
-4. **The AI model:** the one recommended for your memory size, only the smaller `qwen3:4b-instruct`, a model you
-   already have in Ollama (nothing is downloaded twice), or none for now.
+
+The AI model itself is picked and downloaded in the app (first-run setup, or Settings > AI engine), with progress
+and the size shown. Models you already have in Ollama are listed there, so nothing is downloaded twice.
 
 Then it opens the app on its first-run setup. At the end it lists everything it created on your computer and how
 to remove it. If a step fails, run the same command again: finished steps are skipped. Use `--yes` to accept all
