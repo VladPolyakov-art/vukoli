@@ -792,3 +792,23 @@ def test_cpu_captions_use_a_light_model_and_their_own_lock():
     assert stt.STT("faster_whisper", "base.en").caption_model == "base.en"
     assert stt.STT("mlx", "m").caption_model == "m"
     assert 1 <= stt.cpu_threads() <= 8
+
+
+def test_claude_from_the_desktop_app_is_found(tmp_path):
+    """Windows 09.11: Claude Code existed only inside the Claude desktop app (%APPDATA%/Claude/claude-code/...)."""
+    root = tmp_path / "claude-code"
+    for version, build in (("2.1.308", "c17a819afb40"), ("2.1.321", "d020ce1b5d30"), ("2.1.99", "aaaa")):
+        (root / version / build).mkdir(parents=True)
+        exe = root / version / build / "claude.exe"
+        exe.write_text("")
+        exe.chmod(0o755)
+    assert claude_cli.desktop_claude((tmp_path / "missing", root)) == str(root / "2.1.321" / "d020ce1b5d30" / "claude.exe")
+    assert claude_cli.desktop_claude((tmp_path / "missing",)) is None
+
+
+def test_sign_in_command_names_the_copy_we_found(monkeypatch):
+    monkeypatch.setattr(claude_cli, "find_program", lambda name, extra=(): None)
+    cmd = claude_cli.login_command("/x/Claude/claude-code/2.1.321/d0/claude.app/Contents/MacOS/claude")
+    assert cmd.endswith('claude" auth login') and "claude-code" in cmd
+    monkeypatch.setattr(claude_cli, "find_program", lambda name, extra=(): "/usr/local/bin/claude")
+    assert claude_cli.login_command("/usr/local/bin/claude") == "claude auth login"

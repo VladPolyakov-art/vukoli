@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import tempfile
+from pathlib import Path
 from typing import AsyncIterator
 
 from .. import usage
@@ -35,8 +36,40 @@ BASE_FLAGS = ["--tools", "", "--setting-sources", "", "--strict-mcp-config", "--
 
 
 def find_claude() -> str | None:
-    # ~/.claude/local is where the native installer and `claude migrate-installer` put it.
-    return find_program("claude", ("~/.claude/local/claude",))
+    # ~/.claude/local is where the native installer and `claude migrate-installer` put it. Last: the copy the Claude
+    # desktop app keeps for its Code tab (Windows 09.11: no `claude` on PATH, only that copy).
+    return find_program("claude", ("~/.claude/local/claude",)) or desktop_claude()
+
+
+def login_command(binary: str | None) -> str:
+    """The sign-in command to show: `claude` when it is on PATH, else the full path of the copy we found."""
+    if not binary or Path(binary).name in ("claude", "claude.exe", "claude.cmd") and find_program("claude") == binary:
+        return "claude auth login"
+    return (f'& "{binary}" auth login' if sys.platform == "win32" else f'"{binary}" auth login')
+
+
+def _version_key(path: Path) -> tuple:
+    return tuple(int(p) if p.isdigit() else 0 for p in path.name.split("."))
+
+
+def desktop_claude(roots: tuple[Path, ...] | None = None) -> str | None:
+    """The newest Claude Code that the Claude desktop app downloaded: <app data>/Claude/claude-code/<version>/<id>/
+    claude.exe (Windows) or claude.app/Contents/MacOS/claude (macOS)."""
+    if roots is None:
+        home = Path.home()
+        roots = (Path(os.environ.get("APPDATA") or home / "AppData" / "Roaming") / "Claude" / "claude-code",
+                 home / "Library" / "Application Support" / "Claude" / "claude-code")
+    for root in roots:
+        try:
+            versions = sorted((d for d in root.iterdir() if d.is_dir()), key=_version_key, reverse=True)
+        except OSError:
+            continue
+        for version in versions:
+            for build in sorted(version.iterdir(), reverse=True) if version.is_dir() else ():
+                for exe in (build / "claude.exe", build / "claude.app" / "Contents" / "MacOS" / "claude"):
+                    if exe.is_file() and os.access(exe, os.X_OK):
+                        return str(exe)
+    return None
 
 
 def child_env() -> dict[str, str]:
@@ -142,7 +175,8 @@ class ClaudeCLIEngine(LLMEngine):
                                 warnings=[TERMS_NOTE])
         if self._verified is False:
             return EngineStatus(code="unauthorized", message="Claude Code isn't signed in.",
-                                hint="Run `claude` in Terminal and sign in, then press Connect.", hint_command="claude",
+                                hint="Sign in to Claude Code in a terminal (the command below), then press Connect.",
+                                hint_command=login_command(self._binary or find_claude()),
                                 model=self._model, warnings=[TERMS_NOTE])
         return EngineStatus(code="ready", ready=True, message="Claude Code is signed in.", model=self._model,
                             warnings=[TERMS_NOTE])
@@ -207,7 +241,8 @@ class ClaudeCLIEngine(LLMEngine):
                 code = "unauthorized" if ("login" in low or "auth" in low) else "engine_error"
                 if code == "unauthorized":
                     remember_sign_in(False)
-                raise EngineError(code, error[:300], "Run `claude` in a terminal and sign in.")
+                raise EngineError(code, error[:300],
+                                  f"Sign in to Claude Code in a terminal: {login_command(self._bin())}, then press Connect.")
         finally:
             if proc.returncode is None:
                 proc.kill()
@@ -221,7 +256,8 @@ class ClaudeCLIEngine(LLMEngine):
             reply = await asyncio.wait_for(self.complete([{"role": "user", "content": "Reply with OK."}]), 90)
         except EngineError as exc:
             return EngineStatus(code="unauthorized" if exc.code == "unauthorized" else "error",
-                                message=exc.message, hint=exc.hint, warnings=[TERMS_NOTE])
+                                message=exc.message, hint=exc.hint, warnings=[TERMS_NOTE],
+                                hint_command=login_command(self._bin()) if exc.code == "unauthorized" else "")
         except (asyncio.TimeoutError, OSError, NotImplementedError) as exc:
             return EngineStatus(code="error", message=f"Claude CLI did not answer ({type(exc).__name__}: {exc})"[:300])
         if not reply.strip():
